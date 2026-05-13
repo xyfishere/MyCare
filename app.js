@@ -40,6 +40,7 @@ const defaults = {
     personalBlockTheme: "iceland",
     personalBlockTab: "write",
     personalNoteFilter: "all",
+    language: "zh",
   },
   morningEntries: [],
   focusSessions: [],
@@ -182,6 +183,79 @@ const personalBlockThemeCredits = {
   green: "背景：梯田风景 · Unsplash",
   purple: "背景：薰衣草花海 · Unsplash",
   dark: "背景：极光星空 · Unsplash",
+};
+
+const copy = {
+  zh: {
+    brandSubtitle: "private growth room",
+    nav: {
+      morning: "晨间",
+      focus: "专注",
+      night: "睡前",
+      stats: "统计",
+    },
+    paperEntry: {
+      script: "To future me",
+      title: "写一张小纸条",
+    },
+    today: {
+      eyebrow: "今日",
+      morning: "晨间",
+      focus: "专注",
+      night: "睡前",
+      recorded: "已记录",
+      unrecorded: "未记录",
+      rounds: "轮",
+      completed: "已完成",
+      incomplete: "未完成",
+    },
+    home: {
+      eyebrow: "Choose your room",
+      title: "现在想要做些什么呢？",
+      subtitle: "不要着急，一步一步来。",
+      cards: {
+        morning: ["晨间 selfcare", "短句、身体记录、冥想、Calendar"],
+        focus: ["专注打卡", "心流专注与认真休息"],
+        night: ["睡前 selfcare", "跟着温柔步骤慢慢收尾"],
+        stats: ["统计板块", "查看记录、趋势和专注分类"],
+      },
+    },
+  },
+  en: {
+    brandSubtitle: "private growth room",
+    nav: {
+      morning: "Morning",
+      focus: "Focus",
+      night: "Night",
+      stats: "Stats",
+    },
+    paperEntry: {
+      script: "To future me",
+      title: "Write a small note",
+    },
+    today: {
+      eyebrow: "Today",
+      morning: "Morning",
+      focus: "Focus",
+      night: "Night",
+      recorded: "Logged",
+      unrecorded: "Not yet",
+      rounds: "rounds",
+      completed: "Done",
+      incomplete: "Not yet",
+    },
+    home: {
+      eyebrow: "Choose your room",
+      title: "What would you like to do now?",
+      subtitle: "No rush. One step at a time.",
+      cards: {
+        morning: ["Morning selfcare", "Quotes, body check-in, meditation, Calendar"],
+        focus: ["Focus sprint", "Flow sessions with mindful breaks"],
+        night: ["Night selfcare", "Wind down with gentle bedtime steps"],
+        stats: ["Stats", "Review records, trends, and focus categories"],
+      },
+    },
+  },
 };
 
 const nightModes = {
@@ -364,22 +438,18 @@ function init() {
   setRandomBackground();
   loadMorningQuotes();
 
-  $("#todayLabel").textContent = new Intl.DateTimeFormat("zh-CN", {
-    month: "long",
-    day: "numeric",
-    weekday: "long",
-  }).format(new Date());
-
   $("#calendarUrl").value = state.settings.calendarUrl;
   $("#nightMusicUrl").value = getNightMusicUrl();
   $("#wakeTime").value = new Date().toTimeString().slice(0, 5);
 
+  bindLanguageToggle();
   bindNavigation();
   bindMorning();
   bindFocus();
   bindNight();
   bindPersonalBlock();
   bindStats();
+  renderLanguage();
   showView("home");
   refreshDashboard();
 }
@@ -453,6 +523,75 @@ function bindNavigation() {
   $("#calendarUrl").addEventListener("change", (event) => {
     state.settings.calendarUrl = event.target.value || defaults.settings.calendarUrl;
     saveState();
+  });
+}
+
+function bindLanguageToggle() {
+  $("#languageToggle")?.addEventListener("click", () => {
+    state.settings.language = getLanguage() === "zh" ? "en" : "zh";
+    saveState();
+    renderLanguage();
+  });
+}
+
+function getLanguage() {
+  return state.settings.language === "en" ? "en" : "zh";
+}
+
+function renderLanguage() {
+  const lang = getLanguage();
+  const text = copy[lang];
+  document.documentElement.lang = lang === "zh" ? "zh-CN" : "en";
+  document.body.dataset.language = lang;
+
+  $(".brand p").textContent = text.brandSubtitle;
+  Object.entries(text.nav).forEach(([view, label]) => {
+    const button = $(`.nav-tab[data-view="${view}"]`);
+    if (!button) return;
+    button.querySelector("strong").textContent = label;
+    button.setAttribute("aria-label", label);
+    button.setAttribute("title", label);
+  });
+
+  $(".paper-entry span").textContent = text.paperEntry.script;
+  $(".paper-entry strong").textContent = text.paperEntry.title;
+  $(".today-panel .eyebrow").textContent = text.today.eyebrow;
+  renderTodayPanelLabels();
+
+  $("#todayLabel").textContent = new Intl.DateTimeFormat(lang === "zh" ? "zh-CN" : "en-US", {
+    month: "long",
+    day: "numeric",
+    weekday: "long",
+  }).format(new Date());
+
+  $("#view-home .home-copy .eyebrow").textContent = text.home.eyebrow;
+  $("#homeTitle").textContent = text.home.title;
+  $("#view-home .home-copy p:not(.eyebrow)").textContent = text.home.subtitle;
+  Object.entries(text.home.cards).forEach(([view, [title, description]]) => {
+    const card = $(`.module-card[data-view="${view}"]`);
+    if (!card) return;
+    card.querySelector("strong").textContent = title;
+    card.querySelector("small").textContent = description;
+  });
+
+  $$("#languageToggle [data-lang-label]").forEach((item) => {
+    item.classList.toggle("active", item.dataset.langLabel === lang);
+  });
+  $("#languageToggle").setAttribute("aria-label", lang === "zh" ? "Switch to English" : "切换到中文");
+  refreshDashboard();
+}
+
+function renderTodayPanelLabels() {
+  const text = copy[getLanguage()].today;
+  const rows = [
+    ["morningStatus", text.morning],
+    ["focusStatus", text.focus],
+    ["nightStatus", text.night],
+  ];
+  rows.forEach(([id, label]) => {
+    const status = $(`#${id}`);
+    if (!status?.parentElement) return;
+    status.parentElement.firstChild.textContent = `${label} `;
   });
 }
 
@@ -1227,13 +1366,15 @@ function openFlowLink(url) {
 
 function refreshDashboard() {
   const today = todayKey();
+  const text = copy[getLanguage()].today;
   const morning = state.morningEntries.find((item) => item.date === today);
   const focusToday = state.focusSessions.filter((item) => item.date === today);
   const night = state.nightEntries.find((item) => item.date === today);
 
-  $("#morningStatus").textContent = morning ? "已记录" : "未记录";
-  $("#focusStatus").textContent = `${focusToday.length} 轮`;
-  $("#nightStatus").textContent = night ? "已完成" : "未完成";
+  renderTodayPanelLabels();
+  $("#morningStatus").textContent = morning ? text.recorded : text.unrecorded;
+  $("#focusStatus").textContent = `${focusToday.length} ${text.rounds}`;
+  $("#nightStatus").textContent = night ? text.completed : text.incomplete;
   $("#todayFocusMinutes").textContent = focusToday.reduce((sum, item) => sum + item.minutes, 0);
   $("#todayFocusRounds").textContent = focusToday.length;
   renderFocusCategorySummary(focusToday);
