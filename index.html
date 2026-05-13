@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>My Care</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <div class="background-credit" id="backgroundCredit" aria-label="背景图片来源"></div>
+      <aside class="sidebar" aria-label="主导航">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <span></span>
+          </div>
+          <div>
+            <h1>My Care</h1>
+            <p>private growth room</p>
+          </div>
+        </div>
+
+        <nav class="nav-tabs" aria-label="功能板块">
+          <button class="nav-tab" data-view="morning" aria-label="晨间 selfcare" title="晨间 selfcare">
+            <span aria-hidden="true">☼</span>
+            <strong>晨间</strong>
+          </button>
+          <button class="nav-tab" data-view="focus" aria-label="专注打卡" title="专注打卡">
+            <span aria-hidden="true">◷</span>
+            <strong>专注</strong>
+          </button>
+          <button class="nav-tab" data-view="night" aria-label="睡前 selfcare" title="睡前 selfcare">
+            <span aria-hidden="true">☾</span>
+            <strong>睡前</strong>
+          </button>
+          <button class="nav-tab" data-view="stats" aria-label="统计板块" title="统计">
+            <span aria-hidden="true">▦</span>
+            <strong>统计</strong>
+          </button>
+        </nav>
+
+        <button class="paper-entry" data-view="block" type="button" aria-label="进入小纸条">
+          <span>To future me</span>
+          <strong>写一张小纸条</strong>
+        </button>
+
+        <div class="today-panel">
+          <p class="eyebrow">今日</p>
+          <div class="date-line" id="todayLabel"></div>
+          <div class="mini-grid">
+            <span>晨间 <b id="morningStatus">未记录</b></span>
+            <span>专注 <b id="focusStatus">0 轮</b></span>
+            <span>睡前 <b id="nightStatus">未完成</b></span>
+          </div>
+        </div>
+
+        <p class="copyright">© 2026 My Care. All rights reserved.</p>
+      </aside>
+
+      <main class="main">
+        <section class="view active" id="view-home" aria-labelledby="homeTitle">
+          <div class="home-view">
+            <div class="home-copy">
+              <p class="eyebrow">Choose your room</p>
+              <h2 id="homeTitle">现在想要做些什么呢？</h2>
+              <p>不要着急，一步一步来。</p>
+            </div>
+            <div class="home-grid">
+              <button class="module-card" data-view="morning">
+                <span aria-hidden="true">☼</span>
+                <strong>晨间 selfcare</strong>
+                <small>短句、身体记录、冥想、Calendar</small>
+              </button>
+              <button class="module-card" data-view="focus">
+                <span aria-hidden="true">◷</span>
+                <strong>专注打卡</strong>
+                <small>30 分钟专注，5 分钟休息</small>
+              </button>
+              <button class="module-card" data-view="night">
+                <span aria-hidden="true">☾</span>
+                <strong>睡前 selfcare</strong>
+                <small>跟着自定义步骤慢慢收尾</small>
+              </button>
+              <button class="module-card" data-view="stats">
+                <span aria-hidden="true">▦</span>
+                <strong>统计板块</strong>
+                <small>查看记录、趋势和专注分类</small>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="view-morning" aria-labelledby="morningTitle">
+          <button class="immersive-home" data-view="home" type="button" aria-label="返回主页">返回主页</button>
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Morning selfcare</p>
+              <h2 id="morningTitle">Congratulations on starting your new day!</h2>
+              <p class="morning-subtitle">我的灵魂再次呼吸，我的双眼再次看见。</p>
+            </div>
+            <button class="icon-button audio-toggle" data-audio="morning" aria-label="播放晨间音乐" title="播放音乐"><span aria-hidden="true"></span></button>
+          </div>
+          <div class="morning-player is-hidden" id="morningMusicPlayerWrap" aria-hidden="true">
+            <iframe id="morningMusicPlayer" title="晨间音乐播放器" allow="autoplay; fullscreen" loading="lazy"></iframe>
+          </div>
+
+          <div class="ritual-layout morning-single">
+            <div class="ritual-stage">
+              <p class="stage-label" id="morningStepLabel">第 1 步</p>
+              <h3 id="morningPrompt">爱自己是一生浪漫的开始。</h3>
+              <p id="morningHint" hidden></p>
+              <form class="inline-record is-hidden" id="morningForm">
+                <label class="morning-field" data-morning-field="skin">
+                  皮肤状态
+                  <select id="skinState">
+                    <option value="稳定">稳定</option>
+                    <option value="干燥">干燥</option>
+                    <option value="泛红">泛红</option>
+                    <option value="爆痘">爆痘</option>
+                    <option value="敏感">敏感</option>
+                  </select>
+                </label>
+                <label class="morning-field" data-morning-field="wake">
+                  起床时间
+                  <input id="wakeTime" type="time" />
+                </label>
+                <label class="morning-field" data-morning-field="hunger">
+                  饥饿值
+                  <input id="hunger" type="range" min="0" max="10" value="5" />
+                  <output id="hungerOut">5 / 10</output>
+                </label>
+                <label class="morning-field" data-morning-field="note">
+                  今日一句话
+                  <textarea id="morningNote" rows="3" placeholder="例如：今天先完成最小的一步。"></textarea>
+                </label>
+                <label class="morning-field" data-morning-field="meditation">
+                  选择一个晨间冥想
+                  <div class="meditation-options" role="group" aria-label="晨间冥想选择">
+                    <button class="meditation-option" data-meditation="focus" type="button">专注冥想</button>
+                    <button class="meditation-option" data-meditation="emotion" type="button">情绪冥想</button>
+                    <button class="meditation-option" data-meditation="mindfulness" type="button">正念冥想</button>
+                  </div>
+                </label>
+                <label class="morning-field" data-morning-field="calendar">
+                  Calendar 链接
+                  <input id="calendarUrl" type="url" />
+                </label>
+              </form>
+              <div class="action-row">
+                <button class="primary" id="startMorning">开始晨间流程</button>
+                <button class="secondary" id="nextMorning">下一步</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="view-focus" aria-labelledby="focusTitle">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Focus sprint</p>
+              <h2 id="focusTitle">心流模式</h2>
+            </div>
+            <button class="icon-button" id="resetFocus" aria-label="重置计时器" title="重置计时器">↺</button>
+          </div>
+
+          <div class="focus-layout">
+            <div class="timer-panel">
+              <div class="timer-ring" id="timerRing" aria-label="专注计时进度">
+                <div class="water-fill" aria-hidden="true">
+                  <span></span>
+                  <span></span>
+                </div>
+                <div class="time-glass" aria-hidden="true">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+                <div class="timer-readout">
+                  <span id="timerMode">专注</span>
+                  <strong id="timerDisplay">30:00</strong>
+                </div>
+              </div>
+              <div class="action-row center">
+                <button class="primary" id="toggleFocus">开始</button>
+                <button class="secondary" id="skipFocus">跳过</button>
+              </div>
+              <div class="focus-duration-wrap" aria-label="专注时长">
+                <span class="focus-control-label">专注时长</span>
+                <div class="focus-duration">
+                  <button class="duration-option" data-duration="15" type="button">15 分</button>
+                  <button class="duration-option" data-duration="25" type="button">25 分</button>
+                  <button class="duration-option active" data-duration="30" type="button">30 分</button>
+                  <button class="duration-option" data-duration="45" type="button">45 分</button>
+                  <label class="custom-duration">
+                    <span>自定义</span>
+                    <input id="customFocusMinutes" type="number" min="5" max="120" value="30" />
+                    <small>分钟</small>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-title">
+                <h3>本轮任务</h3>
+                <span id="cycleLabel">第 1 轮</span>
+              </div>
+              <span class="focus-control-label">专注分类</span>
+              <div class="focus-categories" role="group" aria-label="专注分类">
+                <button class="focus-category active" data-focus-category="学习" type="button">学习</button>
+                <button class="focus-category" data-focus-category="工作" type="button">工作</button>
+                <button class="focus-category" data-focus-category="阅读" type="button">阅读</button>
+                <button class="focus-category" data-focus-category="创作" type="button">创作</button>
+                <button class="focus-category" data-focus-category="生活" type="button">生活</button>
+              </div>
+              <textarea id="focusTask" rows="4" placeholder="写下一个小到可以开始的任务。"></textarea>
+              <div class="focus-metrics">
+                <div>
+                  <b id="todayFocusMinutes">0</b>
+                  <span>今日分钟</span>
+                </div>
+                <div>
+                  <b id="todayFocusRounds">0</b>
+                  <span>完成轮数</span>
+                </div>
+              </div>
+              <div class="focus-category-summary" id="focusCategorySummary"></div>
+              <button class="secondary full" id="logFocus">手动记一轮完成</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="view-night" aria-labelledby="nightTitle">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Night selfcare</p>
+              <h2 id="nightTitle">“不要温和地走进那个良夜”</h2>
+            </div>
+            <button class="icon-button audio-toggle" data-audio="night" aria-label="播放睡前音乐" title="播放音乐"><span aria-hidden="true"></span></button>
+          </div>
+
+          <div class="night-layout">
+            <div class="ritual-stage night-stage">
+              <p class="stage-label" id="nightStepLabel">30 分钟流程</p>
+              <h3 id="nightPrompt">准备好水、护肤品和明天要穿的衣服。</h3>
+              <p id="nightHint">选择一个模式，然后跟着当前步骤慢慢做。</p>
+              <div class="night-progress">
+                <div id="nightProgressBar"></div>
+              </div>
+              <div class="action-row">
+                <button class="primary" id="startNight">开始睡前流程</button>
+                <button class="secondary" id="completeNight">下一步</button>
+                <button class="secondary immersive-home night-home-action" data-view="home" type="button" aria-label="返回主页">返回主页</button>
+              </div>
+            </div>
+
+            <div class="panel" id="nightSettings">
+              <div class="panel-title">
+                <h3>睡前模式</h3>
+                <span id="nightModeDuration">12 分钟</span>
+              </div>
+              <div class="mode-switch" role="group" aria-label="睡前模式">
+                <button class="mode-option active" data-night-mode="simple" type="button">
+                  <strong>精简模式</strong>
+                </button>
+                <button class="mode-option" data-night-mode="decompress" type="button">
+                  <strong>解压模式</strong>
+                </button>
+                <button class="mode-option" data-night-mode="relaxed" type="button">
+                  <strong>放松模式</strong>
+                </button>
+              </div>
+              <div class="night-music">
+                <div class="panel-title compact">
+                  <h3>睡前音乐</h3>
+                  <span>选择即播放</span>
+                </div>
+                <div class="music-switch" role="group" aria-label="睡前音乐主题">
+                  <button class="music-option active" data-music-theme="classical" type="button">古典</button>
+                  <button class="music-option" data-music-theme="guitar" type="button">吉他木音</button>
+                  <button class="music-option" data-music-theme="rain" type="button">雨声</button>
+                </div>
+                <label class="sr-only">
+                  当前主题链接
+                  <input id="nightMusicUrl" type="url" />
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="night-player is-hidden" id="nightMusicPlayerWrap">
+            <iframe id="nightMusicPlayer" title="睡前音乐播放器" allow="autoplay; fullscreen" loading="lazy"></iframe>
+          </div>
+        </section>
+
+        <section class="view" id="view-block" aria-labelledby="blockTitle">
+          <div class="block-shell block-theme-iceland" id="personalBlockShell">
+            <div class="block-atmosphere" aria-hidden="true"></div>
+            <div class="block-head">
+              <div>
+                <p class="eyebrow">Personal Block</p>
+                <h2 id="blockTitle">给未来自己的小纸条</h2>
+                <p>把一句话轻轻放在这里，等未来的某一天再遇见。</p>
+              </div>
+              <div class="block-theme-switch" role="group" aria-label="小纸条主题">
+                <button class="block-theme-option active" data-block-theme="iceland" type="button">冰蓝</button>
+                <button class="block-theme-option" data-block-theme="green" type="button">原野</button>
+                <button class="block-theme-option" data-block-theme="purple" type="button">薰衣草</button>
+                <button class="block-theme-option" data-block-theme="dark" type="button">极光</button>
+              </div>
+            </div>
+
+            <div class="block-panels">
+              <section class="block-panel active" id="blockWritePanel" aria-label="写小纸条">
+                <div class="note-composer">
+                  <div class="composer-top">
+                    <div>
+                      <p class="eyebrow">A small note</p>
+                      <h3>写给未来的我</h3>
+                    </div>
+                    <div class="recipient-switch" role="group" aria-label="收信人">
+                      <button class="recipient-option active" data-recipient="self" type="button">自己</button>
+                      <button class="recipient-option" data-recipient="friend" type="button" aria-disabled="true">朋友</button>
+                    </div>
+                  </div>
+
+                  <textarea id="personalNoteText" rows="4" maxlength="220" placeholder="只写一句也可以。"></textarea>
+
+                  <div class="note-control-group">
+                    <span>现在的心情</span>
+                    <div class="note-chip-row" id="noteMoodChoices" role="group" aria-label="心情选择">
+                      <button class="note-chip active" data-note-mood="平静" type="button">平静</button>
+                      <button class="note-chip" data-note-mood="开心" type="button">开心</button>
+                      <button class="note-chip" data-note-mood="疲惫" type="button">疲惫</button>
+                      <button class="note-chip" data-note-mood="焦虑" type="button">焦虑</button>
+                      <button class="note-chip" data-note-mood="期待" type="button">期待</button>
+                    </div>
+                  </div>
+
+                  <div class="note-control-group">
+                    <span>几天以后再读</span>
+                    <div class="note-chip-row" id="noteDelayChoices" role="group" aria-label="开启日期">
+                      <button class="note-chip" data-note-days="3" type="button">3 天后</button>
+                      <button class="note-chip active" data-note-days="7" type="button">7 天后</button>
+                      <button class="note-chip" data-note-days="30" type="button">30 天后</button>
+                      <button class="note-chip" data-note-random="true" type="button">随机 1-30 天</button>
+                      <label class="custom-note-delay">
+                        <span>自定义</span>
+                        <input id="customNoteDays" type="number" min="1" max="365" value="14" />
+                        <small>天</small>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div class="composer-actions">
+                    <p id="personalNoteHint">这张纸条会在 7 天后回来。</p>
+                    <button class="block-save-button" id="savePersonalNote" type="button">保存为小纸条</button>
+                  </div>
+                </div>
+              </section>
+
+              <section class="block-panel active" id="blockReadPanel" aria-label="看小纸条">
+                <div class="board-head">
+                  <div>
+                    <p class="eyebrow">Memory board</p>
+                    <h3>我的洞洞板</h3>
+                  </div>
+                  <p>之前写下的小纸条，会安静地贴在这里。</p>
+                </div>
+                <div class="notes-toolbar">
+                  <button class="block-save-button quiet" id="randomPersonalNote" type="button">随机看一张</button>
+                  <label class="note-date-search">
+                    <span>按时间搜索</span>
+                    <input id="noteSearchDate" type="date" />
+                  </label>
+                  <div class="note-filter-row" role="group" aria-label="心情筛选">
+                    <button class="note-filter active" data-note-filter="all" type="button">全部</button>
+                    <button class="note-filter" data-note-filter="平静" type="button">平静</button>
+                    <button class="note-filter" data-note-filter="开心" type="button">开心</button>
+                    <button class="note-filter" data-note-filter="疲惫" type="button">疲惫</button>
+                    <button class="note-filter" data-note-filter="焦虑" type="button">焦虑</button>
+                    <button class="note-filter" data-note-filter="期待" type="button">期待</button>
+                  </div>
+                </div>
+                <div class="mood-stats" id="noteMoodStats" aria-label="心情统计"></div>
+                <div class="notes-board" id="personalNotesBoard" aria-live="polite"></div>
+              </section>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="view-stats" aria-labelledby="statsTitle">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Patterns</p>
+              <h2 id="statsTitle">从记录里看见自己的节奏</h2>
+            </div>
+            <button class="icon-button" id="exportData" aria-label="导出数据" title="导出数据">⇩</button>
+          </div>
+
+          <div class="stats-grid">
+            <div class="panel">
+              <div class="panel-title">
+                <h3>近 7 天饥饿值</h3>
+                <span>晨间记录</span>
+              </div>
+              <canvas id="hungerChart" width="640" height="260"></canvas>
+            </div>
+            <div class="panel">
+              <div class="panel-title">
+                <h3>近 7 天专注分钟</h3>
+                <span>番茄钟</span>
+              </div>
+              <canvas id="focusChart" width="640" height="260"></canvas>
+            </div>
+            <div class="panel">
+              <div class="panel-title">
+                <h3>近 7 天分类专注</h3>
+                <span>分类统计</span>
+              </div>
+              <canvas id="categoryChart" width="640" height="260"></canvas>
+            </div>
+            <div class="panel summary-panel">
+              <div class="panel-title">
+                <h3>总体状况</h3>
+                <span id="summaryRange">本周</span>
+              </div>
+              <div class="summary-list" id="summaryList"></div>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
