@@ -162,10 +162,12 @@ let audio = {};
 let focusTimer = {
   mode: "focus",
   running: false,
+  paused: false,
   remaining: 30 * 60,
   total: 30 * 60,
   focusMinutes: 30,
   interval: null,
+  endAt: null,
   cycle: 1,
 };
 let focusCategory = "学习";
@@ -794,9 +796,19 @@ function init() {
   bindNight();
   bindPersonalBlock();
   bindStats();
+  bindTimerAccuracy();
   renderLanguage();
   showView("home");
   refreshDashboard();
+}
+
+function bindTimerAccuracy() {
+  document.addEventListener("visibilitychange", () => {
+    if (focusTimer.running) tickFocusTimer();
+  });
+  window.addEventListener("focus", () => {
+    if (focusTimer.running) tickFocusTimer();
+  });
 }
 
 function setRandomBackground() {
@@ -1310,24 +1322,45 @@ function toggleFocusTimer() {
 }
 
 function startFocusTimer() {
+  clearInterval(focusTimer.interval);
   focusTimer.running = true;
+  focusTimer.paused = false;
+  focusTimer.endAt = Date.now() + focusTimer.remaining * 1000;
   $("#toggleFocus").textContent = t().common.pause;
-  focusTimer.interval = setInterval(() => {
-    focusTimer.remaining -= 1;
-    if (focusTimer.remaining <= 0) finishFocusSegment();
-    renderTimer();
-  }, 1000);
+  focusTimer.interval = setInterval(tickFocusTimer, 500);
+  tickFocusTimer();
 }
 
 function pauseFocusTimer() {
+  syncFocusTimerRemaining();
   focusTimer.running = false;
+  focusTimer.paused = true;
+  focusTimer.endAt = null;
   clearInterval(focusTimer.interval);
   $("#toggleFocus").textContent = t().common.resume;
+  renderTimer();
+}
+
+function tickFocusTimer() {
+  syncFocusTimerRemaining();
+  if (focusTimer.remaining <= 0) {
+    finishFocusSegment();
+    return;
+  }
+  renderTimer();
+}
+
+function syncFocusTimerRemaining() {
+  if (!focusTimer.running || !focusTimer.endAt) return;
+  focusTimer.remaining = Math.max(0, Math.ceil((focusTimer.endAt - Date.now()) / 1000));
 }
 
 function finishFocusSegment() {
+  syncFocusTimerRemaining();
   clearInterval(focusTimer.interval);
   focusTimer.interval = null;
+  focusTimer.endAt = null;
+  focusTimer.paused = false;
   let autoStartBreak = false;
   if (focusTimer.mode === "focus") {
     const completedMinutes = focusTimer.focusMinutes;
@@ -1355,10 +1388,12 @@ function resetFocusTimer() {
   focusTimer = {
     mode: "focus",
     running: false,
+    paused: false,
     remaining: selectedFocusMinutes * 60,
     total: selectedFocusMinutes * 60,
     focusMinutes: selectedFocusMinutes,
     interval: null,
+    endAt: null,
     cycle: 1,
   };
   $("#toggleFocus").textContent = t().common.start;
@@ -1372,7 +1407,7 @@ function renderTimer() {
   $("#timerDisplay").textContent = `${minutes}:${seconds}`;
   $("#timerMode").textContent = focusTimer.mode === "focus" ? t().focus.focusMode : t().focus.breakMode;
   $("#cycleLabel").textContent = interpolate(t().focus.round, { count: focusTimer.cycle });
-  $("#toggleFocus").textContent = focusTimer.running ? t().common.pause : (focusTimer.interval ? t().common.resume : t().common.start);
+  $("#toggleFocus").textContent = focusTimer.running ? t().common.pause : (focusTimer.paused ? t().common.resume : t().common.start);
   $("#timerRing").style.setProperty("--water-level", `${Math.max(progress * 100, 4)}%`);
   $("#timerRing").style.setProperty("--sand-progress", `${Math.max(progress * 100, 3)}%`);
   $("#timerRing").style.setProperty("--sand-remaining", `${Math.max((1 - progress) * 100, 3)}%`);
@@ -1403,7 +1438,7 @@ function setFocusDuration(minutes) {
   selectedFocusMinutes = normalized;
   $("#customFocusMinutes").value = normalized;
   renderFocusDurationOptions();
-  if (!focusTimer.running && focusTimer.mode === "focus") {
+  if (!focusTimer.running && !focusTimer.paused && focusTimer.mode === "focus") {
     focusTimer.focusMinutes = selectedFocusMinutes;
     focusTimer.remaining = selectedFocusMinutes * 60;
     focusTimer.total = selectedFocusMinutes * 60;
