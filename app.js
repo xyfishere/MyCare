@@ -216,6 +216,18 @@ const copy = {
       script: "To future me",
       title: "写一张小纸条",
     },
+    habitEntry: {
+      script: "Habit Garden",
+      title: "养一颗习惯种子",
+    },
+    habits: {
+      eyebrow: "Habit Garden",
+      title: "习惯花园",
+      subtitle: "不是突然变好，而是慢慢长出稳定的系统。",
+      comingSoon: "Coming soon",
+      prompt: "今天第一个 25 分钟做什么？",
+      description: "这里会先放今日启动、低能量版本和 8 周路径。入口已经准备好，下一步就可以开始搭模块。",
+    },
     today: {
       eyebrow: "今日",
       morning: "晨间",
@@ -401,6 +413,18 @@ const copy = {
     paperEntry: {
       script: "To future me",
       title: "Write a small note",
+    },
+    habitEntry: {
+      script: "Habit Garden",
+      title: "Grow a habit seed",
+    },
+    habits: {
+      eyebrow: "Habit Garden",
+      title: "Habit Garden",
+      subtitle: "Build a stable system slowly, not a perfect streak overnight.",
+      comingSoon: "Coming soon",
+      prompt: "What is your first 25-minute block today?",
+      description: "This space will hold today's starter, low-energy version, and the 8-week path. The entry is ready, and the module can grow from here.",
     },
     today: {
       eyebrow: "Today",
@@ -928,6 +952,8 @@ function renderLanguage() {
 
   $(".paper-entry span").textContent = text.paperEntry.script;
   $(".paper-entry strong").textContent = text.paperEntry.title;
+  $(".habit-entry span").textContent = text.habitEntry.script;
+  $(".habit-entry strong").textContent = text.habitEntry.title;
   $(".today-panel .eyebrow").textContent = text.today.eyebrow;
   renderTodayPanelLabels();
 
@@ -956,6 +982,7 @@ function renderLanguage() {
   renderFocusLanguage();
   renderNightLanguage();
   renderPersonalBlockLanguage();
+  renderHabitLanguage();
   renderStatsLanguage();
   refreshDashboard();
 }
@@ -1066,6 +1093,16 @@ function renderPersonalBlockLanguage() {
   });
   updatePersonalNoteHint();
   renderPersonalNotes();
+}
+
+function renderHabitLanguage() {
+  const text = t().habits;
+  $("#view-habits .section-head .eyebrow").textContent = text.eyebrow;
+  $("#habitTitle").textContent = text.title;
+  $("#view-habits .section-head .muted").textContent = text.subtitle;
+  $("#view-habits .habit-placeholder .eyebrow").textContent = text.comingSoon;
+  $("#view-habits .habit-placeholder h3").textContent = text.prompt;
+  $("#view-habits .habit-placeholder p:not(.eyebrow)").textContent = text.description;
 }
 
 function renderStatsLanguage() {
