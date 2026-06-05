@@ -47,6 +47,58 @@ const defaults = {
   nightEntries: [],
   healthRecords: [],
   personalNotes: [],
+  workGoals: [
+    {
+      id: "goal-start-system",
+      title: "每周 5 天稳定启动工作",
+      deadline: "2026-08-02",
+      category: "行动力",
+      status: "open",
+      note: "",
+      createdAt: "2026-06-08T00:00:00.000Z",
+      completedAt: "",
+    },
+    {
+      id: "goal-job-applications",
+      title: "完成 40-60 份精投申请",
+      deadline: "2026-08-02",
+      category: "求职",
+      status: "open",
+      note: "",
+      createdAt: "2026-06-08T00:00:00.000Z",
+      completedAt: "",
+    },
+    {
+      id: "goal-speaking-practice",
+      title: "完成 30+ 次面试表达练习",
+      deadline: "2026-08-02",
+      category: "口语",
+      status: "open",
+      note: "",
+      createdAt: "2026-06-08T00:00:00.000Z",
+      completedAt: "",
+    },
+    {
+      id: "goal-tech-output",
+      title: "完成 8 篇技术笔记 + 2 个小实验",
+      deadline: "2026-08-02",
+      category: "技术",
+      status: "open",
+      note: "",
+      createdAt: "2026-06-08T00:00:00.000Z",
+      completedAt: "",
+    },
+    {
+      id: "goal-health-rhythm",
+      title: "睡眠稳定在 11:00-11:30 上床；运动每周 3-4 次",
+      deadline: "2026-08-02",
+      category: "健康",
+      status: "open",
+      note: "",
+      createdAt: "2026-06-08T00:00:00.000Z",
+      completedAt: "",
+    },
+  ],
 };
 
 const backgroundImages = [
@@ -220,6 +272,10 @@ const copy = {
       script: "Habit Garden",
       title: "养一颗习惯种子",
     },
+    workEntry: {
+      script: "Work Goals",
+      title: "查看目标和 deadline",
+    },
     habits: {
       eyebrow: "Habit Garden",
       title: "习惯花园",
@@ -227,6 +283,30 @@ const copy = {
       comingSoon: "Coming soon",
       prompt: "今天第一个 25 分钟做什么？",
       description: "这里会先放今日启动、低能量版本和 8 周路径。入口已经准备好，下一步就可以开始搭模块。",
+    },
+    work: {
+      eyebrow: "Work Goals",
+      title: "工作目标和 Deadline",
+      subtitle: "把现在最重要的事情放在这里，完成后打卡并留一句 note。",
+      formTitle: "新增目标",
+      formMeta: "轻量记录",
+      goalLabel: "目标",
+      goalPlaceholder: "例如：完成 5 份精投申请",
+      categoryLabel: "分类",
+      categoryPlaceholder: "求职 / 技术 / 健康",
+      deadlineLabel: "Deadline",
+      add: "加入目标列表",
+      currentTitle: "当前目标",
+      openSummary: "{open} open · {done} done",
+      dueToday: "今天到期",
+      overdue: "已逾期 {days} 天",
+      daysLeft: "还剩 {days} 天",
+      completed: "已完成",
+      noteLabel: "完成 note",
+      notePlaceholder: "完成后写一句 note，例如：今天完成得比想象中顺。",
+      complete: "完成并打卡",
+      reopen: "重新打开",
+      empty: "暂时没有目标。先加一个最急的小目标就好。",
     },
     today: {
       eyebrow: "今日",
@@ -418,6 +498,10 @@ const copy = {
       script: "Habit Garden",
       title: "Grow a habit seed",
     },
+    workEntry: {
+      script: "Work Goals",
+      title: "Goals and deadlines",
+    },
     habits: {
       eyebrow: "Habit Garden",
       title: "Habit Garden",
@@ -425,6 +509,30 @@ const copy = {
       comingSoon: "Coming soon",
       prompt: "What is your first 25-minute block today?",
       description: "This space will hold today's starter, low-energy version, and the 8-week path. The entry is ready, and the module can grow from here.",
+    },
+    work: {
+      eyebrow: "Work Goals",
+      title: "Work Goals and Deadlines",
+      subtitle: "Keep the most important work in one calm place. Check it off and leave a note when it is done.",
+      formTitle: "New goal",
+      formMeta: "Lightweight",
+      goalLabel: "Goal",
+      goalPlaceholder: "For example: send 5 tailored applications",
+      categoryLabel: "Category",
+      categoryPlaceholder: "Job search / Tech / Health",
+      deadlineLabel: "Deadline",
+      add: "Add to goals",
+      currentTitle: "Current goals",
+      openSummary: "{open} open · {done} done",
+      dueToday: "Due today",
+      overdue: "{days} days overdue",
+      daysLeft: "{days} days left",
+      completed: "Completed",
+      noteLabel: "Completion note",
+      notePlaceholder: "Add a note after finishing, e.g. this went better than expected.",
+      complete: "Complete and check in",
+      reopen: "Reopen",
+      empty: "No goals yet. Add one small urgent goal first.",
     },
     today: {
       eyebrow: "Today",
@@ -779,6 +887,9 @@ function loadState() {
     if (!loaded.settings.nightMusicPlaylists[loaded.settings.nightMusicTheme]) {
       loaded.settings.nightMusicTheme = defaults.settings.nightMusicTheme;
     }
+    if (!Array.isArray(parsed.workGoals)) {
+      loaded.workGoals = cloneDefaults().workGoals;
+    }
     return loaded;
   } catch {
     return cloneDefaults();
@@ -819,6 +930,7 @@ function init() {
   bindFocus();
   bindNight();
   bindPersonalBlock();
+  bindWorkGoals();
   bindStats();
   bindTimerAccuracy();
   renderLanguage();
@@ -954,6 +1066,8 @@ function renderLanguage() {
   $(".paper-entry strong").textContent = text.paperEntry.title;
   $(".habit-entry span").textContent = text.habitEntry.script;
   $(".habit-entry strong").textContent = text.habitEntry.title;
+  $(".work-entry span").textContent = text.workEntry.script;
+  $(".work-entry strong").textContent = text.workEntry.title;
   $(".today-panel .eyebrow").textContent = text.today.eyebrow;
   renderTodayPanelLabels();
 
@@ -983,6 +1097,7 @@ function renderLanguage() {
   renderNightLanguage();
   renderPersonalBlockLanguage();
   renderHabitLanguage();
+  renderWorkLanguage();
   renderStatsLanguage();
   refreshDashboard();
 }
@@ -1105,6 +1220,24 @@ function renderHabitLanguage() {
   $("#view-habits .habit-placeholder p:not(.eyebrow)").textContent = text.description;
 }
 
+function renderWorkLanguage() {
+  if (!$("#view-work")) return;
+  const text = t().work;
+  $("#view-work .section-head .eyebrow").textContent = text.eyebrow;
+  $("#workTitle").textContent = text.title;
+  $("#view-work .section-head .muted").textContent = text.subtitle;
+  $("#workGoalForm .panel-title h3").textContent = text.formTitle;
+  $("#workGoalForm .panel-title span").textContent = text.formMeta;
+  $("[data-work-label='title']").childNodes[0].textContent = `${text.goalLabel} `;
+  $("[data-work-label='category']").childNodes[0].textContent = `${text.categoryLabel} `;
+  $("[data-work-label='deadline']").childNodes[0].textContent = `${text.deadlineLabel} `;
+  $("#workGoalTitle").placeholder = text.goalPlaceholder;
+  $("#workGoalCategory").placeholder = text.categoryPlaceholder;
+  $("#workGoalForm button[type='submit']").textContent = text.add;
+  $("#view-work .work-list-panel .panel-title h3").textContent = text.currentTitle;
+  renderWorkGoals();
+}
+
 function renderStatsLanguage() {
   const text = t().stats;
   $("#view-stats .section-head .eyebrow").textContent = text.eyebrow;
@@ -1149,6 +1282,7 @@ function showView(viewName) {
   setImmersiveMode(viewName);
   if (viewName !== "morning") stopMorningBackgroundTrack();
   if (viewName === "block") renderPersonalBlock();
+  if (viewName === "work") renderWorkGoals();
   if (viewName !== "block") $("#backgroundCredit").textContent = currentBackgroundCredit;
   if (viewName === "stats") drawCharts();
 }
@@ -1900,6 +2034,124 @@ function formatShortDate(dateText) {
   if (!dateText) return "";
   const date = new Date(`${dateText}T00:00:00`);
   return new Intl.DateTimeFormat(getLanguage() === "zh" ? "zh-CN" : "en-US", { month: "short", day: "numeric" }).format(date);
+}
+
+function bindWorkGoals() {
+  if (!$("#workGoalForm")) return;
+  $("#workGoalDeadline").value = "2026-08-02";
+  $("#workGoalForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const title = $("#workGoalTitle").value.trim();
+    const deadline = $("#workGoalDeadline").value;
+    if (!title || !deadline) return;
+    state.workGoals = state.workGoals || [];
+    state.workGoals.unshift({
+      id: `goal-${Date.now()}-${Math.round(Math.random() * 1000)}`,
+      title,
+      deadline,
+      category: $("#workGoalCategory").value.trim(),
+      status: "open",
+      note: "",
+      createdAt: new Date().toISOString(),
+      completedAt: "",
+    });
+    $("#workGoalTitle").value = "";
+    $("#workGoalCategory").value = "";
+    saveState();
+    renderWorkGoals();
+  });
+
+  $("#workGoalList").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-work-action]");
+    if (!button) return;
+    const card = button.closest("[data-goal-id]");
+    const goal = getWorkGoal(card?.dataset.goalId);
+    if (!goal) return;
+    if (button.dataset.workAction === "complete") {
+      goal.status = "done";
+      goal.completedAt = new Date().toISOString();
+      goal.note = card.querySelector(".work-goal-note").value.trim();
+    }
+    if (button.dataset.workAction === "reopen") {
+      goal.status = "open";
+      goal.completedAt = "";
+    }
+    saveState();
+    renderWorkGoals();
+  });
+
+  $("#workGoalList").addEventListener("change", (event) => {
+    if (!event.target.classList.contains("work-goal-note")) return;
+    const card = event.target.closest("[data-goal-id]");
+    const goal = getWorkGoal(card?.dataset.goalId);
+    if (!goal) return;
+    goal.note = event.target.value.trim();
+    saveState();
+  });
+}
+
+function getWorkGoal(goalId) {
+  return (state.workGoals || []).find((goal) => goal.id === goalId);
+}
+
+function renderWorkGoals() {
+  if (!$("#workGoalList")) return;
+  state.workGoals = state.workGoals || [];
+  const goals = [...state.workGoals].sort((a, b) => {
+    if (a.status !== b.status) return a.status === "open" ? -1 : 1;
+    return String(a.deadline || "").localeCompare(String(b.deadline || ""));
+  });
+  const open = goals.filter((goal) => goal.status !== "done").length;
+  const done = goals.length - open;
+  $("#workGoalSummary").textContent = interpolate(t().work.openSummary, { open, done });
+  $("#workGoalList").innerHTML = goals.length
+    ? goals.map(renderWorkGoalCard).join("")
+    : `<div class="empty-note">${t().work.empty}</div>`;
+}
+
+function renderWorkGoalCard(goal) {
+  const isDone = goal.status === "done";
+  const deadlineText = getWorkDeadlineText(goal);
+  return `
+    <article class="work-goal-card ${isDone ? "done" : ""}" data-goal-id="${escapeHtml(goal.id)}">
+      <div class="work-goal-main">
+        <div>
+          <p class="eyebrow">${escapeHtml(goal.category || t().work.currentTitle)}</p>
+          <h3>${escapeHtml(goal.title)}</h3>
+        </div>
+        <span class="work-deadline ${getWorkDeadlineClass(goal)}">${deadlineText}</span>
+      </div>
+      <label class="work-note-wrap">
+        <span>${escapeHtml(t().work.noteLabel)}</span>
+        <textarea class="work-goal-note" rows="3" placeholder="${escapeHtml(t().work.notePlaceholder)}">${escapeHtml(goal.note || "")}</textarea>
+      </label>
+      <div class="work-goal-actions">
+        ${isDone
+          ? `<span class="work-completed">${escapeHtml(t().work.completed)} · ${escapeHtml(formatShortDate(goal.completedAt?.slice(0, 10)))}</span><button class="secondary" data-work-action="reopen" type="button">${escapeHtml(t().work.reopen)}</button>`
+          : `<button class="primary" data-work-action="complete" type="button">${escapeHtml(t().work.complete)}</button>`}
+      </div>
+    </article>
+  `;
+}
+
+function getWorkDeadlineText(goal) {
+  if (goal.status === "done") return t().work.completed;
+  const today = new Date(`${todayKey()}T00:00:00`);
+  const deadline = new Date(`${goal.deadline}T00:00:00`);
+  const days = Math.round((deadline - today) / 86400000);
+  if (days < 0) return interpolate(t().work.overdue, { days: Math.abs(days) });
+  if (days === 0) return t().work.dueToday;
+  return interpolate(t().work.daysLeft, { days });
+}
+
+function getWorkDeadlineClass(goal) {
+  if (goal.status === "done") return "done";
+  const today = new Date(`${todayKey()}T00:00:00`);
+  const deadline = new Date(`${goal.deadline}T00:00:00`);
+  const days = Math.round((deadline - today) / 86400000);
+  if (days < 0) return "overdue";
+  if (days <= 7) return "soon";
+  return "";
 }
 
 function escapeHtml(value) {

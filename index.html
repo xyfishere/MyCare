@@ -49,6 +49,11 @@
           <strong>养一颗习惯种子</strong>
         </button>
 
+        <button class="paper-entry work-entry" data-view="work" type="button" aria-label="进入工作目标">
+          <span>Work Goals</span>
+          <strong>查看目标和 deadline</strong>
+        </button>
+
         <div class="today-panel">
           <p class="eyebrow">今日</p>
           <div class="date-line" id="todayLabel"></div>
@@ -414,6 +419,48 @@
             <p class="eyebrow">Coming soon</p>
             <h3>今天第一个 25 分钟做什么？</h3>
             <p>这里会先放今日启动、低能量版本和 8 周路径。入口已经准备好，下一步就可以开始搭模块。</p>
+          </div>
+        </section>
+
+        <section class="view" id="view-work" aria-labelledby="workTitle">
+          <div class="section-head">
+            <div>
+              <p class="eyebrow">Work Goals</p>
+              <h2 id="workTitle">工作目标和 Deadline</h2>
+              <p class="muted">把现在最重要的事情放在这里，完成后打卡并留一句 note。</p>
+            </div>
+          </div>
+
+          <div class="work-layout">
+            <form class="panel work-form" id="workGoalForm">
+              <div class="panel-title">
+                <h3>新增目标</h3>
+                <span>轻量记录</span>
+              </div>
+              <label data-work-label="title">
+                目标
+                <input id="workGoalTitle" type="text" maxlength="90" placeholder="例如：完成 5 份精投申请" required />
+              </label>
+              <div class="work-form-row">
+                <label data-work-label="category">
+                  分类
+                  <input id="workGoalCategory" type="text" maxlength="20" placeholder="求职 / 技术 / 健康" />
+                </label>
+                <label data-work-label="deadline">
+                  Deadline
+                  <input id="workGoalDeadline" type="date" required />
+                </label>
+              </div>
+              <button class="primary full" type="submit">加入目标列表</button>
+            </form>
+
+            <div class="panel work-list-panel">
+              <div class="panel-title">
+                <h3>当前目标</h3>
+                <span id="workGoalSummary">0 open</span>
+              </div>
+              <div class="work-goal-list" id="workGoalList" aria-live="polite"></div>
+            </div>
           </div>
         </section>
 
