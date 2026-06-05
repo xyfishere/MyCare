@@ -259,6 +259,7 @@ const copy = {
       unreadable: "天后可读",
     },
     nav: {
+      work: "目标",
       morning: "晨间",
       focus: "专注",
       night: "睡前",
@@ -271,10 +272,6 @@ const copy = {
     habitEntry: {
       script: "Habit Garden",
       title: "养一颗习惯种子",
-    },
-    workEntry: {
-      script: "Work Goals",
-      title: "查看目标和 deadline",
     },
     habits: {
       eyebrow: "Habit Garden",
@@ -485,6 +482,7 @@ const copy = {
       unreadable: "days left",
     },
     nav: {
+      work: "Goals",
       morning: "Morning",
       focus: "Focus",
       night: "Night",
@@ -497,10 +495,6 @@ const copy = {
     habitEntry: {
       script: "Habit Garden",
       title: "Grow a habit seed",
-    },
-    workEntry: {
-      script: "Work Goals",
-      title: "Goals and deadlines",
     },
     habits: {
       eyebrow: "Habit Garden",
@@ -1066,8 +1060,6 @@ function renderLanguage() {
   $(".paper-entry strong").textContent = text.paperEntry.title;
   $(".habit-entry span").textContent = text.habitEntry.script;
   $(".habit-entry strong").textContent = text.habitEntry.title;
-  $(".work-entry span").textContent = text.workEntry.script;
-  $(".work-entry strong").textContent = text.workEntry.title;
   $(".today-panel .eyebrow").textContent = text.today.eyebrow;
   renderTodayPanelLabels();
 
