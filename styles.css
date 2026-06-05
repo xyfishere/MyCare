@@ -317,7 +317,9 @@ p {
   min-height: calc(100vh - 68px);
   display: none;
   align-content: center;
-  padding-block: clamp(18px, 4vh, 44px);
+  justify-items: center;
+  gap: 18px;
+  padding-block: clamp(20px, 3.6vh, 38px);
 }
 
 #view-work.active {
@@ -329,7 +331,7 @@ p {
   content: "";
   position: absolute;
   pointer-events: none;
-  opacity: 0.42;
+  opacity: 0.22;
 }
 
 #view-work::before {
@@ -355,18 +357,22 @@ p {
 }
 
 .work-head {
-  width: min(860px, 100%);
+  width: min(760px, 100%);
   margin-inline: auto;
-  align-items: start;
-  margin-bottom: 18px;
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  text-align: center;
+  margin-bottom: 0;
 }
 
 #view-work .section-head h2 {
-  font-size: clamp(2.25rem, 5vw, 4.1rem);
+  font-size: clamp(2.15rem, 4.6vw, 3.45rem);
 }
 
 #view-work .section-head .muted {
-  max-width: 48ch;
+  max-width: 46ch;
+  margin-inline: auto;
   line-height: 1.75;
 }
 
@@ -376,7 +382,7 @@ p {
 
 .work-view-switch {
   display: inline-grid;
-  grid-template-columns: repeat(2, minmax(90px, 1fr));
+  grid-template-columns: repeat(2, minmax(86px, 1fr));
   gap: 5px;
   padding: 5px;
   border: 1px solid rgba(73, 111, 82, 0.12);
@@ -388,7 +394,7 @@ p {
 }
 
 .work-view-option {
-  min-height: 38px;
+  min-height: 36px;
   border: 0;
   border-radius: 999px;
   background: transparent;
@@ -422,7 +428,7 @@ p {
 }
 
 .work-view {
-  width: min(860px, 100%);
+  width: min(760px, 100%);
   margin-inline: auto;
   position: relative;
   z-index: 1;
@@ -431,7 +437,7 @@ p {
 .work-form,
 .work-list-panel {
   width: 100%;
-  padding: clamp(24px, 3vw, 34px);
+  padding: clamp(22px, 2.6vw, 30px);
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(244, 250, 241, 0.6)),
     rgba(255, 255, 255, 0.72);
@@ -441,7 +447,7 @@ p {
 }
 
 .work-form {
-  width: min(720px, 100%);
+  width: min(680px, 100%);
   margin-inline: auto;
 }
 
@@ -490,13 +496,13 @@ p {
 
 .work-goal-list {
   display: grid;
-  gap: 16px;
+  gap: 13px;
 }
 
 .work-goal-card {
   border: 1px solid rgba(73, 111, 82, 0.13);
   border-radius: 8px;
-  padding: clamp(18px, 2.3vw, 24px);
+  padding: 18px 20px 18px 22px;
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.84), rgba(244, 250, 241, 0.58)),
     rgba(255, 255, 255, 0.66);
@@ -525,7 +531,7 @@ p {
 .work-goal-main {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  gap: 18px;
   align-items: start;
 }
 
@@ -533,7 +539,7 @@ p {
   margin-top: 7px;
   color: #183228;
   font-family: var(--font-ui);
-  font-size: clamp(1.08rem, 1.8vw, 1.28rem);
+  font-size: clamp(1.03rem, 1.5vw, 1.18rem);
   font-weight: 700;
   line-height: 1.42;
   letter-spacing: 0;
@@ -541,14 +547,14 @@ p {
 
 .work-deadline {
   flex: 0 0 auto;
-  min-width: 168px;
+  min-width: 154px;
   border: 1px solid rgba(73, 111, 82, 0.14);
   border-radius: 8px;
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(244, 250, 241, 0.58)),
     rgba(255, 255, 255, 0.68);
   color: rgba(38, 71, 53, 0.72);
-  padding: 11px 13px;
+  padding: 9px 11px;
   text-align: right;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.62),
@@ -562,13 +568,13 @@ p {
 
 .work-deadline b {
   color: #183228;
-  font: 800 0.86rem/1.2 var(--font-ui);
+  font: 800 0.8rem/1.2 var(--font-ui);
 }
 
 .work-deadline small {
-  margin-top: 5px;
+  margin-top: 4px;
   color: rgba(98, 117, 106, 0.78);
-  font: 650 0.74rem/1.25 var(--font-ui);
+  font: 650 0.7rem/1.25 var(--font-ui);
 }
 
 .work-deadline.soon {
@@ -590,12 +596,12 @@ p {
 }
 
 .work-note-wrap {
-  margin-top: 14px;
+  margin-top: 12px;
   font-size: 0.8rem;
 }
 
 .work-note-wrap textarea {
-  min-height: 84px;
+  min-height: 74px;
   resize: vertical;
   font-weight: 500;
 }
@@ -605,7 +611,7 @@ p {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  margin-top: 14px;
+  margin-top: 12px;
 }
 
 .work-completed {
@@ -616,7 +622,7 @@ p {
 }
 
 .work-empty-state {
-  min-height: 300px;
+  min-height: 260px;
   display: grid;
   place-items: center;
   align-content: center;
@@ -3366,6 +3372,11 @@ canvas {
 
   .work-head {
     gap: 16px;
+  }
+
+  #view-work {
+    min-height: auto;
+    align-content: start;
   }
 
   .board-head {
