@@ -312,8 +312,66 @@ p {
   line-height: 1.8;
 }
 
+#view-work {
+  position: relative;
+  min-height: calc(100vh - 68px);
+  display: none;
+  align-content: center;
+  padding-block: clamp(18px, 4vh, 44px);
+}
+
+#view-work.active {
+  display: grid;
+}
+
+#view-work::before,
+#view-work::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  opacity: 0.42;
+}
+
+#view-work::before {
+  width: min(360px, 38vw);
+  height: min(360px, 38vw);
+  right: -120px;
+  top: 8%;
+  border: 1px solid rgba(127, 179, 140, 0.18);
+  border-radius: 50%;
+  border-left-color: transparent;
+  border-bottom-color: transparent;
+}
+
+#view-work::after {
+  left: min(4vw, 42px);
+  bottom: 9%;
+  width: 170px;
+  height: 118px;
+  border-left: 1px solid rgba(73, 111, 82, 0.14);
+  border-bottom: 1px solid rgba(73, 111, 82, 0.1);
+  border-radius: 0 0 0 70px;
+  transform: rotate(-8deg);
+}
+
 .work-head {
+  width: min(860px, 100%);
+  margin-inline: auto;
   align-items: start;
+  margin-bottom: 18px;
+}
+
+#view-work .section-head h2 {
+  font-size: clamp(2.25rem, 5vw, 4.1rem);
+}
+
+#view-work .section-head .muted {
+  max-width: 48ch;
+  line-height: 1.75;
+}
+
+#view-work .panel-title h3 {
+  font-size: 1.12rem;
 }
 
 .work-view-switch {
@@ -363,14 +421,28 @@ p {
   display: block;
 }
 
+.work-view {
+  width: min(860px, 100%);
+  margin-inline: auto;
+  position: relative;
+  z-index: 1;
+}
+
 .work-form,
 .work-list-panel {
-  width: min(900px, 100%);
-  padding: 24px;
+  width: 100%;
+  padding: clamp(24px, 3vw, 34px);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(244, 250, 241, 0.6)),
+    rgba(255, 255, 255, 0.72);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 22px 56px rgba(24, 50, 40, 0.085);
 }
 
 .work-form {
   width: min(720px, 100%);
+  margin-inline: auto;
 }
 
 .work-form label,
@@ -418,17 +490,32 @@ p {
 
 .work-goal-list {
   display: grid;
-  gap: 14px;
+  gap: 16px;
 }
 
 .work-goal-card {
   border: 1px solid rgba(73, 111, 82, 0.13);
   border-radius: 8px;
-  padding: 18px;
+  padding: clamp(18px, 2.3vw, 24px);
   background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.78), rgba(244, 250, 241, 0.54)),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.84), rgba(244, 250, 241, 0.58)),
     rgba(255, 255, 255, 0.66);
-  box-shadow: 0 12px 28px rgba(24, 50, 40, 0.055);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    0 12px 28px rgba(24, 50, 40, 0.055);
+  position: relative;
+  overflow: hidden;
+}
+
+.work-goal-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 18px;
+  bottom: 18px;
+  width: 3px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(127, 179, 140, 0.72), rgba(217, 199, 122, 0.46));
 }
 
 .work-goal-card.done {
@@ -443,24 +530,29 @@ p {
 }
 
 .work-goal-main h3 {
-  margin-top: 6px;
+  margin-top: 7px;
   color: #183228;
-  font-size: 1.08rem;
-  line-height: 1.45;
+  font-family: var(--font-ui);
+  font-size: clamp(1.08rem, 1.8vw, 1.28rem);
+  font-weight: 700;
+  line-height: 1.42;
+  letter-spacing: 0;
 }
 
 .work-deadline {
   flex: 0 0 auto;
-  min-width: 156px;
+  min-width: 168px;
   border: 1px solid rgba(73, 111, 82, 0.14);
   border-radius: 8px;
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(244, 250, 241, 0.58)),
     rgba(255, 255, 255, 0.68);
   color: rgba(38, 71, 53, 0.72);
-  padding: 10px 12px;
+  padding: 11px 13px;
   text-align: right;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.56);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    0 8px 18px rgba(24, 50, 40, 0.045);
 }
 
 .work-deadline b,
@@ -470,13 +562,13 @@ p {
 
 .work-deadline b {
   color: #183228;
-  font: 800 0.82rem/1.2 var(--font-ui);
+  font: 800 0.86rem/1.2 var(--font-ui);
 }
 
 .work-deadline small {
   margin-top: 5px;
   color: rgba(98, 117, 106, 0.78);
-  font: 650 0.72rem/1.25 var(--font-ui);
+  font: 650 0.74rem/1.25 var(--font-ui);
 }
 
 .work-deadline.soon {
@@ -524,7 +616,7 @@ p {
 }
 
 .work-empty-state {
-  min-height: 260px;
+  min-height: 300px;
   display: grid;
   place-items: center;
   align-content: center;
@@ -536,6 +628,12 @@ p {
     rgba(255, 255, 255, 0.52);
   color: rgba(38, 71, 53, 0.68);
   text-align: center;
+}
+
+.work-empty-state p {
+  max-width: 34ch;
+  font-size: 1rem;
+  line-height: 1.8;
 }
 
 .today-panel,
