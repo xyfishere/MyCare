@@ -422,15 +422,29 @@
         </section>
 
         <section class="view" id="view-work" aria-labelledby="workTitle">
-          <div class="section-head">
+          <div class="section-head work-head">
             <div>
               <p class="eyebrow">Work Goals</p>
               <h2 id="workTitle">工作目标和 Deadline</h2>
               <p class="muted">把现在最重要的事情放在这里，完成后打卡并留一句 note。</p>
             </div>
+            <div class="work-view-switch" role="group" aria-label="目标页面切换">
+              <button class="work-view-option active" data-work-view="list" type="button">List</button>
+              <button class="work-view-option" data-work-view="add" type="button">Add New</button>
+            </div>
           </div>
 
-          <div class="work-layout">
+          <div class="work-view active" id="workListView">
+            <div class="panel work-list-panel">
+              <div class="panel-title">
+                <h3>当前目标</h3>
+                <span id="workGoalSummary">0 open · 0 done</span>
+              </div>
+              <div class="work-goal-list" id="workGoalList" aria-live="polite"></div>
+            </div>
+          </div>
+
+          <div class="work-view" id="workAddView">
             <form class="panel work-form" id="workGoalForm">
               <div class="panel-title">
                 <h3>新增目标</h3>
@@ -452,14 +466,6 @@
               </div>
               <button class="primary full" type="submit">加入目标列表</button>
             </form>
-
-            <div class="panel work-list-panel">
-              <div class="panel-title">
-                <h3>当前目标</h3>
-                <span id="workGoalSummary">0 open</span>
-              </div>
-              <div class="work-goal-list" id="workGoalList" aria-live="polite"></div>
-            </div>
           </div>
         </section>
 
