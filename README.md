@@ -9,6 +9,7 @@ Open `index.html` directly in a browser.
 ## Files
 
 - `index.html` - app markup
+- `about.html` / `about.css` / `about.js` - bilingual contact, updates, and privacy page
 - `styles.css` - visual design and responsive styles
 - `app.js` - app logic and local storage
 - `morning-quotes.json` - editable morning quote list

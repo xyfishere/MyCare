@@ -2151,6 +2151,33 @@ p {
   text-align: center;
 }
 
+.site-footer {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  color: rgba(98, 117, 106, 0.58);
+  font-family: var(--font-ui);
+  font-size: 0.7rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.site-footer a {
+  color: rgba(73, 111, 82, 0.76);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.site-footer a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.site-footer small {
+  font-size: 0.64rem;
+}
+
 .eyebrow {
   font-family: var(--font-ui);
   font-size: 0.76rem;
