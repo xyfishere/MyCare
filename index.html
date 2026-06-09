@@ -9,6 +9,11 @@
   <body>
     <div class="app-shell">
       <div class="background-credit" id="backgroundCredit" aria-label="背景图片来源"></div>
+      <button class="language-toggle global-language-toggle" id="languageToggle" type="button" aria-label="Switch language">
+        <span data-lang-label="zh">中文</span>
+        <span aria-hidden="true">/</span>
+        <span data-lang-label="en">EN</span>
+      </button>
       <aside class="sidebar" aria-label="主导航">
         <div class="brand">
           <div class="brand-mark" aria-hidden="true">
@@ -78,11 +83,6 @@
       <main class="main">
         <section class="view active" id="view-home" aria-labelledby="homeTitle">
           <div class="home-view">
-            <button class="language-toggle" id="languageToggle" type="button" aria-label="Switch language">
-              <span data-lang-label="zh">中文</span>
-              <span aria-hidden="true">/</span>
-              <span data-lang-label="en">EN</span>
-            </button>
             <div class="home-copy">
               <p class="eyebrow">Choose your room</p>
               <h2 id="homeTitle">现在想要做些什么呢？</h2>
@@ -410,10 +410,28 @@
                 </div>
                 <div class="notes-toolbar">
                   <button class="block-save-button quiet" id="randomPersonalNote" type="button">随机看一张</button>
-                  <label class="note-date-search">
+                  <div class="note-date-search">
                     <span>按时间搜索</span>
-                    <input id="noteSearchDate" type="date" />
-                  </label>
+                    <input id="noteSearchDate" type="hidden" />
+                    <button class="note-date-trigger" id="noteDateTrigger" type="button" aria-haspopup="dialog" aria-expanded="false">
+                      <i aria-hidden="true"></i>
+                      <b id="noteDateTriggerText">选择日期</b>
+                      <em aria-hidden="true"></em>
+                    </button>
+                    <div class="note-calendar" id="noteCalendar" role="dialog" aria-label="按日期筛选小纸条" hidden>
+                      <header class="note-calendar-head">
+                        <button id="noteCalendarPrev" type="button" aria-label="上个月">‹</button>
+                        <strong id="noteCalendarTitle"></strong>
+                        <button id="noteCalendarNext" type="button" aria-label="下个月">›</button>
+                      </header>
+                      <div class="note-calendar-weekdays" id="noteCalendarWeekdays" aria-hidden="true"></div>
+                      <div class="note-calendar-days" id="noteCalendarDays"></div>
+                      <footer class="note-calendar-foot">
+                        <button id="noteCalendarToday" type="button">今天</button>
+                        <button id="noteCalendarClear" type="button">清除筛选</button>
+                      </footer>
+                    </div>
+                  </div>
                   <div class="note-filter-row" role="group" aria-label="心情筛选">
                     <button class="note-filter active" data-note-filter="all" type="button">全部</button>
                     <button class="note-filter" data-note-filter="平静" type="button">平静</button>

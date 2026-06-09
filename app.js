@@ -207,6 +207,7 @@ let nightInterval = null;
 let selectedNoteMood = "平静";
 let selectedNoteDelay = { type: "days", days: 7 };
 let selectedNoteRecipient = "self";
+let noteCalendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let currentBackgroundCredit = "";
 let selectedHabitStart = { task: "", category: "工作" };
 
@@ -1666,6 +1667,7 @@ function renderPersonalBlockLanguage() {
   $(".board-head > p").textContent = text.boardSubtitle;
   $("#randomPersonalNote").textContent = text.randomRead;
   $(".note-date-search span").textContent = text.searchByDate;
+  renderNoteDateSearch();
   $$(".note-filter").forEach((button) => {
     button.textContent = button.dataset.noteFilter === "all" ? text.all : displayMood(button.dataset.noteFilter);
   });
@@ -2449,7 +2451,7 @@ function bindPersonalBlock() {
 
   $("#savePersonalNote").addEventListener("click", savePersonalNote);
   $("#randomPersonalNote").addEventListener("click", showRandomPersonalNote);
-  $("#noteSearchDate").addEventListener("change", renderPersonalNotes);
+  bindNoteDateSearch();
 
   $$(".note-filter").forEach((button) => {
     button.addEventListener("click", () => {
@@ -2468,6 +2470,115 @@ function renderPersonalBlock() {
   renderNoteDelaySelection();
   updatePersonalNoteHint();
   renderPersonalNotes();
+  renderNoteDateSearch();
+}
+
+function bindNoteDateSearch() {
+  $("#noteDateTrigger")?.addEventListener("click", () => {
+    const calendar = $("#noteCalendar");
+    if (!calendar) return;
+    const selected = $("#noteSearchDate")?.value;
+    if (calendar.hidden && selected) {
+      const date = new Date(`${selected}T00:00:00`);
+      noteCalendarMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+    }
+    calendar.hidden = !calendar.hidden;
+    $("#noteDateTrigger").setAttribute("aria-expanded", String(!calendar.hidden));
+    renderNoteDateSearch();
+  });
+  $("#noteCalendarPrev")?.addEventListener("click", () => {
+    noteCalendarMonth = new Date(noteCalendarMonth.getFullYear(), noteCalendarMonth.getMonth() - 1, 1);
+    renderNoteDateSearch();
+  });
+  $("#noteCalendarNext")?.addEventListener("click", () => {
+    noteCalendarMonth = new Date(noteCalendarMonth.getFullYear(), noteCalendarMonth.getMonth() + 1, 1);
+    renderNoteDateSearch();
+  });
+  $("#noteCalendarToday")?.addEventListener("click", () => selectNoteSearchDate(todayKey()));
+  $("#noteCalendarClear")?.addEventListener("click", () => selectNoteSearchDate(""));
+  $("#noteCalendarDays")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-note-calendar-date]");
+    if (button) selectNoteSearchDate(button.dataset.noteCalendarDate);
+  });
+  document.addEventListener("click", (event) => {
+    const search = $(".note-date-search");
+    if (!search?.contains(event.target)) closeNoteCalendar();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeNoteCalendar();
+  });
+}
+
+function closeNoteCalendar() {
+  const calendar = $("#noteCalendar");
+  if (!calendar || calendar.hidden) return;
+  calendar.hidden = true;
+  $("#noteDateTrigger")?.setAttribute("aria-expanded", "false");
+}
+
+function selectNoteSearchDate(value) {
+  $("#noteSearchDate").value = value;
+  if (value) {
+    const date = new Date(`${value}T00:00:00`);
+    noteCalendarMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+  }
+  closeNoteCalendar();
+  renderNoteDateSearch();
+  renderPersonalNotes();
+}
+
+function renderNoteDateSearch() {
+  const trigger = $("#noteDateTriggerText");
+  const title = $("#noteCalendarTitle");
+  const weekdays = $("#noteCalendarWeekdays");
+  const daysTarget = $("#noteCalendarDays");
+  if (!trigger || !title || !weekdays || !daysTarget) return;
+  const zh = getLanguage() === "zh";
+  const locale = zh ? "zh-CN" : "en-US";
+  const selected = $("#noteSearchDate")?.value || "";
+  trigger.textContent = selected
+    ? new Intl.DateTimeFormat(locale, { year: "numeric", month: "short", day: "numeric" }).format(new Date(`${selected}T00:00:00`))
+    : (zh ? "选择日期" : "Choose a date");
+  $("#noteDateTrigger")?.classList.toggle("has-date", Boolean(selected));
+  title.textContent = new Intl.DateTimeFormat(locale, { year: "numeric", month: "long" }).format(noteCalendarMonth);
+  $("#noteCalendarPrev")?.setAttribute("aria-label", zh ? "上个月" : "Previous month");
+  $("#noteCalendarNext")?.setAttribute("aria-label", zh ? "下个月" : "Next month");
+  $("#noteCalendarToday").textContent = zh ? "今天" : "Today";
+  $("#noteCalendarClear").textContent = zh ? "清除筛选" : "Clear";
+  weekdays.innerHTML = (zh ? ["一", "二", "三", "四", "五", "六", "日"] : ["M", "T", "W", "T", "F", "S", "S"])
+    .map((day) => `<span>${day}</span>`).join("");
+
+  const year = noteCalendarMonth.getFullYear();
+  const month = noteCalendarMonth.getMonth();
+  const firstOffset = (new Date(year, month, 1).getDay() + 6) % 7;
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const previousLastDay = new Date(year, month, 0).getDate();
+  const cells = [];
+  for (let index = 0; index < 42; index += 1) {
+    const dayNumber = index - firstOffset + 1;
+    let cellDate;
+    let muted = false;
+    if (dayNumber < 1) {
+      cellDate = new Date(year, month - 1, previousLastDay + dayNumber);
+      muted = true;
+    } else if (dayNumber > lastDay) {
+      cellDate = new Date(year, month + 1, dayNumber - lastDay);
+      muted = true;
+    } else {
+      cellDate = new Date(year, month, dayNumber);
+    }
+    const key = toLocalDateKey(cellDate);
+    const hasNote = (state.personalNotes || []).some((note) => note.date === key || note.openAt?.slice(0, 10) === key);
+    cells.push(`<button type="button" data-note-calendar-date="${key}" class="${muted ? "is-muted" : ""} ${key === selected ? "is-selected" : ""} ${key === todayKey() ? "is-today" : ""} ${hasNote ? "has-note" : ""}" aria-label="${key}">${cellDate.getDate()}</button>`);
+  }
+  daysTarget.innerHTML = cells.join("");
+}
+
+function toLocalDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function renderPersonalBlockTheme() {
@@ -2650,12 +2761,7 @@ function bindHabitGarden() {
   });
 
   $(".habit-seed-status-button")?.addEventListener("click", () => {
-    $(".habit-seed-status-button")?.classList.add("is-selected");
-    $("#habitSeedList")?.classList.add("is-highlighted");
-    setTimeout(() => {
-      $(".habit-seed-status-button")?.classList.remove("is-selected");
-      $("#habitSeedList")?.classList.remove("is-highlighted");
-    }, 900);
+    openHabitSeedStats();
   });
 
 }
@@ -2678,11 +2784,18 @@ function bindLowEnergyMode() {
     });
   });
   $(".low-energy-seed-button")?.addEventListener("click", () => {
-    showView("habits");
-    setTimeout(() => {
-      $("#habitSeedList")?.classList.add("is-highlighted");
-      setTimeout(() => $("#habitSeedList")?.classList.remove("is-highlighted"), 900);
-    }, 0);
+    openHabitSeedStats();
+  });
+}
+
+function openHabitSeedStats() {
+  showView("stats");
+  requestAnimationFrame(() => {
+    const section = $(".stats-seed-section");
+    if (!section) return;
+    section.classList.add("is-highlighted");
+    section.scrollIntoView({ behavior: "smooth", block: "start" });
+    setTimeout(() => section.classList.remove("is-highlighted"), 1200);
   });
 }
 
