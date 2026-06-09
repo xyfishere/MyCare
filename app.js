@@ -1425,6 +1425,7 @@ function normalizeMorningQuotes(quotes) {
         return {
           label: `短句 ${index + 1}`,
           prompt: quote.trim(),
+          promptEn: "",
           hint: "",
         };
       }
@@ -1435,7 +1436,7 @@ function normalizeMorningQuotes(quotes) {
         hint: quote.hint || "",
       };
     })
-    .filter((quote) => quote.prompt);
+    .filter((quote) => quote.prompt && quote.promptEn);
 }
 
 function resetMorningSteps() {
@@ -1956,7 +1957,7 @@ function getLocalizedMorningStep(step) {
     return {
       ...step,
       label: morningIndex === 0 ? "Read one line" : "Read another line",
-      prompt: step.promptEn || step.prompt,
+      prompt: step.promptEn,
       hint: "",
     };
   }
