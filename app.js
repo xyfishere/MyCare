@@ -830,46 +830,55 @@ const defaultMorningQuotes = [
   {
     label: "先读一句",
     prompt: "爱自己是一生浪漫的开始。",
+    promptEn: "Loving yourself is the beginning of a lifelong romance.",
     hint: "",
   },
   {
     label: "再读一句",
     prompt: "人不可以逃避苦难，亦不可以放弃希望。",
+    promptEn: "We cannot escape hardship, nor can we give up hope.",
     hint: "",
   },
   {
     label: "启动提醒",
     prompt: "唯有“美”能让生命拥意义。",
+    promptEn: "Only beauty can give life meaning.",
     hint: "",
   },
   {
     label: "短句 4",
     prompt: "我们体内住着一个存在，他无所不知，他知道自己想要什么，它比我们更懂得如何生活得更好。",
+    promptEn: "There is something within us that knows what it wants and understands how we might live more fully.",
     hint: "",
   },
   {
     label: "短句 5",
     prompt: "如果一个人一直足够坚定，就能实现他的愿望。",
+    promptEn: "If a person remains steadfast enough, they can bring their wish to life.",
     hint: "",
   },
   {
     label: "短句 6",
     prompt: "我始终沉浸在自己之中，我的注意力永远朝向内心。",
+    promptEn: "I remain immersed in myself, with my attention always turned inward.",
     hint: "",
   },
   {
     label: "短句 7",
     prompt: "寻找自己，在自己内心扎根，试探着走出自己的道路，无论这条路将通向何方。",
+    promptEn: "Find yourself, take root within, and gently make your own path wherever it may lead.",
     hint: "",
   },
   {
     label: "短句 8",
     prompt: "读书，痛苦，爱着从痛苦中滋生出来的那份喜悦，这是一个永无止境的过程。",
+    promptEn: "To read, to endure, and to love the joy that grows from hardship is an endless process.",
     hint: "",
   },
   {
     label: "短句 9",
     prompt: "我遇见的每一个人，街头的每一丝气味，都让我有了无限去爱的理由。",
+    promptEn: "Every person I meet and every scent in the street gives me endless reasons to love.",
     hint: "",
   },
 ];
@@ -1421,7 +1430,8 @@ function normalizeMorningQuotes(quotes) {
       }
       return {
         label: quote.label || `短句 ${index + 1}`,
-        prompt: String(quote.prompt || "").trim(),
+        prompt: String(quote.zh || quote.prompt || "").trim(),
+        promptEn: String(quote.en || quote.promptEn || "").trim(),
         hint: quote.hint || "",
       };
     })
@@ -1430,6 +1440,8 @@ function normalizeMorningQuotes(quotes) {
 
 function resetMorningSteps() {
   morningSteps = [...pickMorningQuotes(), ...morningCheckInSteps];
+  morningIndex = Math.min(morningIndex, morningSteps.length - 1);
+  if ($("#morningPrompt")) renderMorningPrompt();
 }
 
 function pickMorningQuotes() {
@@ -1944,6 +1956,7 @@ function getLocalizedMorningStep(step) {
     return {
       ...step,
       label: morningIndex === 0 ? "Read one line" : "Read another line",
+      prompt: step.promptEn || step.prompt,
       hint: "",
     };
   }
