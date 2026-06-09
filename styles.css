@@ -2722,8 +2722,14 @@ p {
   margin-top: 12px;
   font-size: clamp(1.65rem, 2.55vw, 2.55rem);
   line-height: 1.28;
-  font-weight: 400;
-  opacity: 0.94;
+  font-weight: 500;
+  opacity: 1;
+  text-shadow:
+    0 1px 1px rgba(255, 255, 255, 0.72),
+    0 0 10px rgba(255, 255, 255, 0.86),
+    0 0 24px rgba(220, 241, 226, 0.68),
+    0 0 46px rgba(127, 179, 140, 0.46),
+    0 3px 18px rgba(6, 18, 12, 0.58);
 }
 
 .night-mode #view-night .section-head .audio-toggle {
@@ -4219,6 +4225,7 @@ body.block-mode[data-block-theme="dark"] .app-shell::before {
 
 .mode-option,
 .music-option {
+  min-width: 0;
   min-height: 50px;
   border: 1px solid transparent;
   border-radius: 7px;
@@ -4234,6 +4241,12 @@ body.block-mode[data-block-theme="dark"] .app-shell::before {
     border-color 180ms ease,
     transform 180ms ease,
     box-shadow 180ms ease;
+}
+
+.mode-option strong {
+  max-width: 100%;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .music-option {
