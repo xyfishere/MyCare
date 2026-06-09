@@ -53,6 +53,15 @@
           <strong>养一颗习惯种子</strong>
         </button>
 
+        <button class="account-entry" id="accountEntry" type="button" aria-label="Open account">
+          <span class="account-entry-icon" aria-hidden="true"></span>
+          <span class="account-entry-copy">
+            <strong id="accountEntryTitle">Sign in</strong>
+            <small id="accountEntryStatus">Local only</small>
+          </span>
+          <span class="account-entry-dot" id="accountEntryDot" aria-hidden="true"></span>
+        </button>
+
         <div class="today-panel">
           <p class="eyebrow">今日</p>
           <div class="date-line" id="todayLabel"></div>
@@ -83,7 +92,7 @@
               <button class="module-card" data-view="morning">
                 <span aria-hidden="true">☼</span>
                 <strong>晨间 selfcare</strong>
-                <small>短句、身体记录、冥想、Calendar</small>
+                <small>短句、身体记录、冥想、Goals / Calendar</small>
               </button>
               <button class="module-card" data-view="focus">
                 <span aria-hidden="true">◷</span>
@@ -155,10 +164,17 @@
                     <button class="meditation-option" data-meditation="mindfulness" type="button">正念冥想</button>
                   </div>
                 </label>
-                <label class="morning-field" data-morning-field="calendar">
-                  Calendar 链接
-                  <input id="calendarUrl" type="url" />
-                </label>
+                <div class="morning-field" data-morning-field="finalAction">
+                  <span id="morningFinalActionLabel">冥想后的下一步</span>
+                  <div class="morning-final-options" role="group" aria-label="冥想后的下一步">
+                    <button class="morning-final-option active" data-morning-final-action="goals" type="button">Goals</button>
+                    <button class="morning-final-option" data-morning-final-action="calendar" type="button">Calendar</button>
+                  </div>
+                  <label class="morning-calendar-setting is-hidden">
+                    <span id="morningCalendarLabel">Calendar 链接</span>
+                    <input id="calendarUrl" type="url" />
+                  </label>
+                </div>
               </form>
               <div class="action-row">
                 <button class="primary" id="startMorning">开始晨间流程</button>
@@ -232,6 +248,15 @@
                 <button class="focus-category" data-focus-category="生活" type="button">生活</button>
               </div>
               <textarea id="focusTask" rows="4" placeholder="写下一个小到可以开始的任务。"></textarea>
+              <label class="focus-seed-control" for="focusHabitSeed">
+                <span id="focusSeedLabel">Habit seed <small>可选</small></span>
+                <select id="focusHabitSeed">
+                  <option value="none">不关联</option>
+                  <option value="health">Health</option>
+                  <option value="tech">Tech</option>
+                  <option value="soft-skills">Soft Skills</option>
+                </select>
+              </label>
               <div class="focus-metrics">
                 <div>
                   <b id="todayFocusMinutes">0</b>
@@ -254,7 +279,6 @@
               <p class="eyebrow">Night selfcare</p>
               <h2 id="nightTitle">“不要温和地走进那个良夜”</h2>
             </div>
-            <button class="icon-button audio-toggle" data-audio="night" aria-label="播放睡前音乐" title="播放音乐"><span aria-hidden="true"></span></button>
           </div>
 
           <div class="night-layout">
@@ -414,10 +438,119 @@
               <p class="muted">不是突然变好，而是慢慢长出稳定的系统。</p>
             </div>
           </div>
-          <div class="panel habit-placeholder">
-            <p class="eyebrow">Coming soon</p>
-            <h3>今天第一个 25 分钟做什么？</h3>
-            <p>这里会先放今日启动、低能量版本和 8 周路径。入口已经准备好，下一步就可以开始搭模块。</p>
+
+          <div class="habit-garden">
+            <section class="panel habit-start-card">
+              <div class="panel-title">
+                <h3>今日第一个 25 分钟</h3>
+                <span id="habitTodayStatus">还没有启动</span>
+              </div>
+              <p>今天不用打开所有事情。先选择一个最容易开始的 25 分钟。</p>
+              <div class="habit-custom-start">
+                <input id="habitCustomTask" type="text" maxlength="80" placeholder="或者写下你自己的第一个 25 分钟..." />
+                <button class="primary" id="startHabitFocus" type="button">开始 25 分钟</button>
+              </div>
+            </section>
+
+            <section class="panel habit-energy-card">
+              <div class="panel-title">
+                <h3>低能量版本</h3>
+                <span>保留系统</span>
+              </div>
+              <p>状态差的时候，只做最低版本也算回到系统。</p>
+              <div class="habit-energy-options">
+                <button data-energy-action="工作 25 分钟" type="button">工作 25 分钟</button>
+                <button data-energy-action="口语 5 分钟" type="button">口语 5 分钟</button>
+                <button data-energy-action="散步或拉伸 10 分钟" type="button">散步 / 拉伸 10 分钟</button>
+                <button data-energy-action="今晚尽量按时睡" type="button">今晚尽量按时睡</button>
+              </div>
+            </section>
+
+            <section class="panel habit-seeds-card">
+              <div class="panel-title">
+                <h3>习惯种子状态</h3>
+                <span>本周照顾次数</span>
+              </div>
+              <div class="habit-seed-list" id="habitSeedList"></div>
+              <button class="habit-seed-status-button" type="button">Open habit seed status</button>
+            </section>
+
+          </div>
+        </section>
+
+        <section class="view" id="view-low-energy" aria-labelledby="lowEnergyTitle">
+          <header class="low-energy-topbar">
+            <div>
+              <p class="eyebrow">Habit Garden</p>
+              <button class="low-energy-back" type="button">← Back to Habit Garden</button>
+            </div>
+          </header>
+
+          <div class="low-energy-shell">
+            <div class="low-energy-decor" aria-hidden="true">
+              <img class="low-energy-sketch-tree" src="assets/decor/low-energy-handdrawn-tree.svg" alt="" />
+              <img class="low-energy-sketch-branch" src="assets/decor/low-energy-leaf-branch.svg" alt="" />
+              <span class="low-energy-particle particle-one"></span>
+              <span class="low-energy-particle particle-two"></span>
+              <span class="low-energy-particle particle-three"></span>
+              <span class="low-energy-particle particle-four"></span>
+              <span class="low-energy-particle particle-five"></span>
+              <span class="low-energy-particle particle-six"></span>
+            </div>
+            <div class="low-energy-hero">
+              <div>
+                <div class="low-energy-title-lockup">
+                  <img src="assets/decor/low-energy-leaf-branch.svg" alt="" aria-hidden="true" />
+                  <h2 id="lowEnergyTitle">Low-energy mode</h2>
+                  <span class="low-energy-title-particle title-particle-one" aria-hidden="true"></span>
+                  <span class="low-energy-title-particle title-particle-two" aria-hidden="true"></span>
+                  <span class="low-energy-title-particle title-particle-three" aria-hidden="true"></span>
+                  <span class="low-energy-title-particle title-particle-four" aria-hidden="true"></span>
+                  <span class="low-energy-title-particle title-particle-five" aria-hidden="true"></span>
+                  <span class="low-energy-title-particle title-particle-six" aria-hidden="true"></span>
+                  <span class="low-energy-title-particle title-particle-seven" aria-hidden="true"></span>
+                  <span class="low-energy-title-particle title-particle-eight" aria-hidden="true"></span>
+                </div>
+                <p>On low-energy days, the goal is not to perform well. The goal is to return.</p>
+              </div>
+              <span class="low-energy-keep">Keep the system</span>
+              <div class="low-energy-rules">
+                <span>Complete 1 = keep the chain</span>
+                <span>Complete 2 = enough for today</span>
+              </div>
+            </div>
+
+            <section class="low-energy-task-panel">
+              <div class="low-energy-core">
+                <p class="low-energy-label">Core / 核心任务</p>
+                <button class="low-energy-core-button" id="lowEnergyCore" type="button">
+                  <span aria-hidden="true">◷</span>
+                  Work for 25 minutes
+                </button>
+                <small>One focused 25 minutes is a win.</small>
+              </div>
+
+              <div class="low-energy-optional">
+                <p class="low-energy-label">Optional / 可选恢复</p>
+                <div class="low-energy-option-grid">
+                  <button data-low-energy-task="Take a shower" type="button"><span>01</span>Take a shower</button>
+                  <button data-low-energy-task="Walk or stretch for 10 minutes" type="button"><span>02</span>Walk / stretch 10 minutes</button>
+                  <button data-low-energy-task="Eat something" type="button"><span>03</span>Eat something</button>
+                </div>
+                <small>Choose what helps you feel a little better.</small>
+              </div>
+            </section>
+
+            <section class="low-energy-tree-panel">
+              <div>
+                <p class="eyebrow">Habit tree</p>
+                <h3>Your habits are seeds.</h3>
+                <p>Nurture them and watch them grow.</p>
+              </div>
+              <button class="low-energy-seed-button" type="button">Open Habit seed status →</button>
+            </section>
+
+            <p class="low-energy-footer">No catching up. Just restart tomorrow.</p>
           </div>
         </section>
 
@@ -437,7 +570,10 @@
           <div class="work-view active" id="workListView">
             <div class="panel work-list-panel">
               <div class="panel-title">
-                <h3>当前目标</h3>
+                <div class="work-goal-filters" role="tablist" aria-label="Goal status">
+                  <button class="work-goal-filter active" data-goal-filter="current" role="tab" aria-selected="true" type="button">Current Goals</button>
+                  <button class="work-goal-filter" data-goal-filter="finished" role="tab" aria-selected="false" type="button">Finished Goals</button>
+                </div>
                 <span id="workGoalSummary">0 open · 0 done</span>
               </div>
               <div class="work-goal-list" id="workGoalList" aria-live="polite"></div>
@@ -470,49 +606,206 @@
         </section>
 
         <section class="view" id="view-stats" aria-labelledby="statsTitle">
-          <div class="section-head">
+          <div class="section-head stats-head">
             <div>
               <p class="eyebrow">Patterns</p>
-              <h2 id="statsTitle">从记录里看见自己的节奏</h2>
+              <h2 id="statsTitle">看见自己的节奏</h2>
+              <p class="stats-subtitle" id="statsSubtitle">只看趋势，不评价每一天。</p>
             </div>
-            <button class="icon-button" id="exportData" aria-label="导出数据" title="导出数据">⇩</button>
+            <div class="stats-head-actions">
+              <div class="stats-range-switch" role="group" aria-label="统计时间范围">
+                <button class="stats-range active" data-stats-range="7" type="button">7 天</button>
+                <button class="stats-range" data-stats-range="30" type="button">30 天</button>
+                <button class="stats-range" data-stats-range="all" type="button">全部</button>
+              </div>
+              <button class="icon-button" id="exportData" aria-label="导出数据" title="导出数据">⇩</button>
+            </div>
           </div>
 
-          <div class="stats-grid">
-            <div class="panel">
-              <div class="panel-title">
-                <h3>近 7 天饥饿值</h3>
-                <span>晨间记录</span>
+          <div class="stats-sections">
+            <section class="stats-section stats-health-section">
+              <header class="stats-section-head">
+                <span class="stats-section-icon" aria-hidden="true">♡</span>
+                <div>
+                  <p class="eyebrow">Health</p>
+                  <h3 id="healthStatsTitle">身体状态</h3>
+                  <p id="healthStatsSubtitle">观察饥饿感与皮肤状态的变化。</p>
+                </div>
+                <div class="stats-inline-summary" id="healthStatsSummary"></div>
+              </header>
+              <div class="stats-chart-grid">
+                <article class="stats-chart-card">
+                  <div class="stats-chart-title">
+                    <span class="mini-line-icon" aria-hidden="true"></span>
+                    <div><h4 id="hungerStatsTitle">Hunger level</h4><p id="hungerStatsMeta">晨间记录 · 0–10</p></div>
+                  </div>
+                  <canvas id="hungerChart" width="720" height="270"></canvas>
+                </article>
+                <article class="stats-chart-card">
+                  <div class="stats-chart-title">
+                    <span class="mini-spark-icon" aria-hidden="true">✦</span>
+                    <div><h4 id="skinStatsTitle">皮肤状态</h4><p id="skinStatsMeta">按日期查看变化</p></div>
+                  </div>
+                  <div class="skin-timeline" id="skinTimeline"></div>
+                </article>
               </div>
-              <canvas id="hungerChart" width="640" height="260"></canvas>
-            </div>
-            <div class="panel">
-              <div class="panel-title">
-                <h3>近 7 天专注分钟</h3>
-                <span>番茄钟</span>
+            </section>
+
+            <section class="stats-section stats-focus-section">
+              <header class="stats-section-head">
+                <span class="stats-section-icon timer-icon" aria-hidden="true"></span>
+                <div>
+                  <p class="eyebrow">Focus</p>
+                  <h3 id="focusStatsTitle">专注投入</h3>
+                  <p id="focusStatsSubtitle">查看时间投入，而不是追逐完美表现。</p>
+                </div>
+                <div class="stats-inline-summary" id="focusStatsSummary"></div>
+              </header>
+              <div class="stats-chart-grid">
+                <article class="stats-chart-card">
+                  <div class="stats-chart-title">
+                    <span class="mini-column-icon" aria-hidden="true"></span>
+                    <div><h4 id="focusMinutesStatsTitle">每日专注分钟</h4><p id="focusMinutesStatsMeta">每天投入的时间</p></div>
+                  </div>
+                  <canvas id="focusChart" width="720" height="270"></canvas>
+                </article>
+                <article class="stats-chart-card">
+                  <div class="stats-chart-title">
+                    <span class="mini-bars-icon" aria-hidden="true"></span>
+                    <div><h4 id="categoryStatsTitle">专注类别</h4><p id="categoryStatsMeta">按累计分钟比较</p></div>
+                  </div>
+                  <canvas id="categoryChart" width="720" height="270"></canvas>
+                </article>
               </div>
-              <canvas id="focusChart" width="640" height="260"></canvas>
-            </div>
-            <div class="panel">
-              <div class="panel-title">
-                <h3>近 7 天分类专注</h3>
-                <span>分类统计</span>
+            </section>
+
+            <section class="stats-section stats-goals-section">
+              <header class="stats-section-head">
+                <span class="stats-section-icon goals-icon" aria-hidden="true"></span>
+                <div>
+                  <p class="eyebrow">Goals</p>
+                  <h3 id="goalsStatsTitle">目标进展</h3>
+                  <p id="goalsStatsSubtitle">看清正在推进的事情，也看见已经完成的部分。</p>
+                </div>
+                <div class="stats-inline-summary" id="goalsStatsSummary"></div>
+              </header>
+              <div class="stats-chart-grid goals-stats-grid">
+                <article class="stats-chart-card">
+                  <div class="stats-chart-title">
+                    <span class="mini-goal-icon" aria-hidden="true"></span>
+                    <div><h4 id="goalStatusTitle">目标状态</h4><p id="goalStatusMeta">当前进展概览</p></div>
+                  </div>
+                  <div class="goal-status-chart" id="goalStatusChart"></div>
+                </article>
+                <article class="stats-chart-card">
+                  <div class="stats-chart-title">
+                    <span class="mini-bars-icon" aria-hidden="true"></span>
+                    <div><h4 id="goalCategoryTitle">目标类别</h4><p id="goalCategoryMeta">目标数量与已完成数量</p></div>
+                  </div>
+                  <div class="goal-category-chart" id="goalCategoryChart"></div>
+                </article>
+                <article class="stats-chart-card goals-deadline-card">
+                  <div class="stats-chart-title">
+                    <span class="mini-timeline-icon" aria-hidden="true"></span>
+                    <div><h4 id="goalDeadlineTitle">Deadline 时间线</h4><p id="goalDeadlineMeta">接下来值得留意的目标</p></div>
+                  </div>
+                  <div class="goal-deadline-timeline" id="goalDeadlineTimeline"></div>
+                </article>
               </div>
-              <canvas id="categoryChart" width="640" height="260"></canvas>
-            </div>
-            <div class="panel summary-panel">
-              <div class="panel-title">
-                <h3>总体状况</h3>
-                <span id="summaryRange">本周</span>
+            </section>
+
+            <section class="stats-section stats-seed-section">
+              <header class="stats-section-head">
+                <span class="stats-section-icon sprout-icon" aria-hidden="true"></span>
+                <div>
+                  <p class="eyebrow">Habit Seed</p>
+                  <h3 id="seedStatsTitle">习惯种子</h3>
+                  <p id="seedStatsSubtitle">看看最近把注意力温柔地放在了哪里。</p>
+                </div>
+                <div class="stats-inline-summary" id="seedStatsSummary"></div>
+              </header>
+              <div class="stats-chart-grid">
+                <article class="stats-chart-card">
+                  <div class="stats-chart-title">
+                    <span class="mini-seed-icon" aria-hidden="true">⌁</span>
+                    <div><h4 id="seedCompareTitle">Seed 对比</h4><p id="seedCompareMeta">专注次数与累计分钟</p></div>
+                  </div>
+                  <div class="seed-comparison" id="seedComparison"></div>
+                </article>
+                <article class="stats-chart-card">
+                  <div class="stats-chart-title">
+                    <span class="mini-timeline-icon" aria-hidden="true"></span>
+                    <div><h4 id="seedTimelineTitle">最近照顾时间线</h4><p id="seedTimelineMeta">记录出现的位置，而不是连续天数</p></div>
+                  </div>
+                  <div class="seed-timeline" id="seedTimeline"></div>
+                </article>
               </div>
-              <div class="summary-list" id="summaryList"></div>
-            </div>
+            </section>
           </div>
         </section>
 
       </main>
     </div>
 
+    <dialog class="account-dialog" id="accountDialog" aria-labelledby="accountDialogTitle">
+      <form method="dialog" class="account-dialog-card">
+        <button class="account-dialog-close" value="cancel" type="submit" aria-label="Close">×</button>
+        <p class="eyebrow" id="accountDialogEyebrow">Private cloud sync</p>
+        <h2 id="accountDialogTitle">Your My Care account</h2>
+        <p class="account-dialog-copy" id="accountDialogCopy">Sign in with a secure email link to sync your data across devices.</p>
+
+        <div class="account-signed-out" id="accountSignedOut">
+          <label for="accountEmail" id="accountEmailLabel">Email address</label>
+          <input id="accountEmail" name="email" type="email" autocomplete="email" placeholder="you@example.com" />
+          <button class="primary account-action" id="sendMagicLink" type="button">Send magic link</button>
+        </div>
+
+        <div class="account-signed-in is-hidden" id="accountSignedIn">
+          <div class="account-profile">
+            <span class="account-avatar" aria-hidden="true"></span>
+            <div>
+              <strong id="accountEmailDisplay"></strong>
+              <small id="accountSyncMeta">Local changes are saved first.</small>
+            </div>
+          </div>
+          <div class="account-sync-actions">
+            <button class="primary" id="syncNow" type="button">Sync now</button>
+            <button class="secondary" id="signOut" type="button">Sign out</button>
+          </div>
+          <section class="account-history">
+            <div class="account-history-head">
+              <strong id="accountHistoryTitle">Cloud history</strong>
+              <button class="account-text-button" id="refreshHistory" type="button">Refresh</button>
+            </div>
+            <div class="account-history-list" id="accountHistoryList"></div>
+          </section>
+        </div>
+
+        <div class="account-conflict is-hidden" id="accountConflict">
+          <p id="accountConflictCopy">This device and the cloud both have data. Choose which version to keep.</p>
+          <div class="account-sync-actions">
+            <button class="primary" id="useDeviceData" type="button">Use this device</button>
+            <button class="secondary" id="useCloudData" type="button">Use cloud data</button>
+          </div>
+        </div>
+
+        <section class="account-backups">
+          <strong id="accountBackupTitle">Backup file</strong>
+          <p id="accountBackupCopy">Download a portable copy or restore one from your device.</p>
+          <div class="account-sync-actions">
+            <button class="secondary" id="downloadBackup" type="button">Download backup</button>
+            <button class="secondary" id="chooseBackup" type="button">Import backup</button>
+          </div>
+          <input class="sr-only" id="backupFileInput" type="file" accept="application/json,.json" />
+        </section>
+
+        <p class="account-message" id="accountMessage" role="status"></p>
+        <p class="account-privacy" id="accountPrivacy">Cloud sync is optional. Your data stays on this device until you sign in.</p>
+      </form>
+    </dialog>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

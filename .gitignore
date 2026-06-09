@@ -4,5 +4,8 @@ Thumbs.db
 node_modules/
 dist/
 build/
+backend/data/
+backend/__pycache__/
+*.pyc
 .env
 .env.*

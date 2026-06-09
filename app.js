@@ -1,4 +1,15 @@
 const STORE_KEY = "myCareApp.v1";
+const RECORD_DATA_RESET_VERSION = "test-baseline-2026-06";
+const RECORD_DATA_KEYS = [
+  "morningEntries",
+  "focusSessions",
+  "nightEntries",
+  "healthRecords",
+  "personalNotes",
+  "habitEntries",
+  "habitReviews",
+  "workGoals",
+];
 const todayKey = () => new Date().toISOString().slice(0, 10);
 
 const defaultNightMusicPlaylists = {
@@ -34,6 +45,7 @@ const legacyNightMusicPlaylists = {
 const defaults = {
   settings: {
     calendarUrl: "https://calendar.google.com/calendar/u/0/r/day",
+    morningFinalAction: "goals",
     nightMode: "simple",
     nightMusicTheme: "classical",
     nightMusicPlaylists: defaultNightMusicPlaylists,
@@ -41,13 +53,19 @@ const defaults = {
     personalBlockTab: "write",
     personalNoteFilter: "all",
     workGoalView: "list",
+    workGoalFilter: "current",
     language: "zh",
+    recordDataResetVersion: RECORD_DATA_RESET_VERSION,
+    lastLocalChangeAt: "",
+    lastCloudSyncAt: "",
   },
   morningEntries: [],
   focusSessions: [],
   nightEntries: [],
   healthRecords: [],
   personalNotes: [],
+  habitEntries: [],
+  habitReviews: [],
   workGoals: [],
 };
 
@@ -161,6 +179,13 @@ const backgroundImages = [
 
 let state = loadState();
 let audio = {};
+let supabaseClient = null;
+let currentUser = null;
+let cloudRevision = 0;
+let cloudSnapshot = null;
+let cloudSyncTimer = null;
+let cloudSyncInProgress = false;
+let applyingCloudState = false;
 let focusTimer = {
   mode: "focus",
   running: false,
@@ -173,7 +198,9 @@ let focusTimer = {
   cycle: 1,
 };
 let focusCategory = "学习";
+let selectedFocusSeed = "none";
 let selectedFocusMinutes = 30;
+let selectedStatsRange = "7";
 let morningIndex = 0;
 let nightIndex = 0;
 let nightInterval = null;
@@ -181,6 +208,15 @@ let selectedNoteMood = "平静";
 let selectedNoteDelay = { type: "days", days: 7 };
 let selectedNoteRecipient = "self";
 let currentBackgroundCredit = "";
+let selectedHabitStart = { task: "", category: "工作" };
+
+const habitSeeds = [
+  { key: "start", label: "启动", labelEn: "Start", icon: "01" },
+  { key: "job", label: "求职", labelEn: "Job", icon: "02" },
+  { key: "speaking", label: "口语", labelEn: "Speaking", icon: "03" },
+  { key: "tech", label: "技术", labelEn: "Tech", icon: "04" },
+  { key: "health", label: "健康", labelEn: "Health", icon: "05" },
+];
 
 const personalBlockThemeCredits = {
   iceland: "背景：冰湖雪山 · Unsplash",
@@ -227,9 +263,19 @@ const copy = {
       eyebrow: "Habit Garden",
       title: "习惯花园",
       subtitle: "不是突然变好，而是慢慢长出稳定的系统。",
-      comingSoon: "Coming soon",
-      prompt: "今天第一个 25 分钟做什么？",
-      description: "这里会先放今日启动、低能量版本和 8 周路径。入口已经准备好，下一步就可以开始搭模块。",
+      firstBlock: "今日第一个 25 分钟",
+      notStarted: "还没有启动",
+      started: "今天已经启动",
+      firstBlockCopy: "小小的开始会慢慢塑造稳定的改变。你可以的。",
+      customPlaceholder: "这 25 分钟里，最重要的一件事是...",
+      startFocus: "开始 25 分钟",
+      lowEnergy: "低能量模式",
+      keepSystem: "保留系统",
+      lowEnergyCopy: "状态差的时候，只做最低版本也算回到系统。",
+      seedsTitle: "Habit tree",
+      seedsMeta: "你的习惯是种子。慢慢照顾它们。",
+      cared: "已照顾",
+      rest: "休眠",
     },
     work: {
       eyebrow: "Work Goals",
@@ -246,6 +292,7 @@ const copy = {
       deadlineLabel: "Deadline",
       add: "加入目标列表",
       currentTitle: "当前目标",
+      finishedTitle: "已完成目标",
       openSummary: "{open} open · {done} done",
       dueToday: "今天到期",
       overdue: "已逾期 {days} 天",
@@ -253,10 +300,14 @@ const copy = {
       completed: "已完成",
       dueOn: "截止 {date}",
       noteLabel: "完成 note",
+      addNote: "添加 note",
+      editNote: "编辑 note",
       notePlaceholder: "完成后写一句 note，例如：今天完成得比想象中顺。",
       complete: "完成并打卡",
       reopen: "重新打开",
       empty: "暂时没有目标。先加一个最急的小目标就好。",
+      currentEmpty: "暂时没有进行中的目标。",
+      finishedEmpty: "还没有完成的目标。",
       emptyCta: "添加一个目标",
     },
     today: {
@@ -275,8 +326,9 @@ const copy = {
       title: "现在想要做些什么呢？",
       subtitle: "不要着急，一步一步来。",
       cards: {
-        morning: ["晨间 selfcare", "短句、身体记录、冥想、Calendar"],
+        work: ["工作目标", "清单、deadline 和完成 note"],
         focus: ["专注打卡", "心流专注与认真休息"],
+        morning: ["晨间 selfcare", "短句、身体记录、冥想、Goals / Calendar"],
         night: ["睡前 selfcare", "跟着温柔步骤慢慢收尾"],
         stats: ["统计板块", "查看记录、趋势和专注分类"],
       },
@@ -289,6 +341,10 @@ const copy = {
       restart: "从头开始",
       chooseMeditation: "选择冥想",
       openCalendar: "打开 Calendar",
+      openGoals: "打开 Goals",
+      goalsOption: "Goals",
+      calendarOption: "Calendar",
+      finalActionLabel: "冥想后的下一步",
       completeTitle: "晨间流程完成。今天不用完美，只要能回来就好。",
       completeHint: "你已经把今天打开了。",
       step: "第",
@@ -318,6 +374,14 @@ const copy = {
       custom: "自定义",
       taskTitle: "本轮任务",
       categoryLabel: "专注分类",
+      seedLabel: "Habit seed",
+      seedOptional: "可选",
+      seeds: {
+        none: "不关联",
+        health: "Health",
+        tech: "Tech",
+        "soft-skills": "Soft Skills",
+      },
       categories: {
         学习: "学习",
         工作: "工作",
@@ -347,6 +411,7 @@ const copy = {
       fallback: "今天到这里就很好。",
       duration: "{minutes} 分钟",
       stepLabel: "{mode} · 第 {step} 步 / {total}",
+      start: "开始睡前流程",
       complete: "完成睡前",
       completeTitle: "睡前流程完成。现在可以把自己交给睡眠了。",
       completeHint: "如果一会儿还是很清醒，就先离开床，去暗处做安静无聊的事，困了再回来。",
@@ -454,9 +519,20 @@ const copy = {
       eyebrow: "Habit Garden",
       title: "Habit Garden",
       subtitle: "Build a stable system slowly, not a perfect streak overnight.",
-      comingSoon: "Coming soon",
-      prompt: "What is your first 25-minute block today?",
-      description: "This space will hold today's starter, low-energy version, and the 8-week path. The entry is ready, and the module can grow from here.",
+      firstBlock: "First 25-minute block",
+      notStarted: "Not started yet",
+      started: "Started today",
+      firstBlockCopy: "Small starts shape lasting change. You've got this.",
+      customPlaceholder: "What's the most important thing to focus on in this 25 minutes?",
+      startFocus: "Start 25 minutes",
+      lowEnergy: "Low-energy mode",
+      keepSystem: "Keep the system",
+      lowEnergyCopy: "On low-energy days, the smallest version still counts as returning.",
+      lowEnergyButton: "Enter Low-energy mode",
+      seedsTitle: "Habit tree",
+      seedsMeta: "Your habits are seeds. Nurture them and watch them grow.",
+      cared: "Cared for",
+      rest: "Rest",
     },
     work: {
       eyebrow: "Work Goals",
@@ -473,6 +549,7 @@ const copy = {
       deadlineLabel: "Deadline",
       add: "Add to goals",
       currentTitle: "Current goals",
+      finishedTitle: "Finished goals",
       openSummary: "{open} open · {done} done",
       dueToday: "Due today",
       overdue: "{days} days overdue",
@@ -480,10 +557,14 @@ const copy = {
       completed: "Completed",
       dueOn: "Due {date}",
       noteLabel: "Completion note",
+      addNote: "Add note",
+      editNote: "Edit note",
       notePlaceholder: "Add a note after finishing, e.g. this went better than expected.",
       complete: "Complete and check in",
       reopen: "Reopen",
       empty: "No goals yet. Add one small urgent goal first.",
+      currentEmpty: "No current goals.",
+      finishedEmpty: "No finished goals yet.",
       emptyCta: "Add New Goal",
     },
     today: {
@@ -502,8 +583,9 @@ const copy = {
       title: "What would you like to do now?",
       subtitle: "No rush. One step at a time.",
       cards: {
-        morning: ["Morning selfcare", "Quotes, body check-in, meditation, Calendar"],
+        work: ["Work Goals", "Lists, deadlines, and completion notes"],
         focus: ["Focus sprint", "Flow sessions with mindful breaks"],
+        morning: ["Morning selfcare", "Quotes, body check-in, meditation, Goals / Calendar"],
         night: ["Night selfcare", "Wind down with gentle bedtime steps"],
         stats: ["Stats", "Review records, trends, and focus categories"],
       },
@@ -516,6 +598,10 @@ const copy = {
       restart: "Start over",
       chooseMeditation: "Choose meditation",
       openCalendar: "Open Calendar",
+      openGoals: "Open Goals",
+      goalsOption: "Goals",
+      calendarOption: "Calendar",
+      finalActionLabel: "After meditation",
       completeTitle: "Morning flow complete. Today does not need to be perfect. Coming back is enough.",
       completeHint: "You have gently opened the day.",
       step: "Step",
@@ -545,6 +631,14 @@ const copy = {
       custom: "Custom",
       taskTitle: "Current task",
       categoryLabel: "Focus category",
+      seedLabel: "Habit seed",
+      seedOptional: "Optional",
+      seeds: {
+        none: "Not linked",
+        health: "Health",
+        tech: "Tech",
+        "soft-skills": "Soft Skills",
+      },
       categories: {
         学习: "Study",
         工作: "Work",
@@ -574,6 +668,7 @@ const copy = {
       fallback: "This is enough for tonight.",
       duration: "{minutes} min",
       stepLabel: "{mode} · Step {step} / {total}",
+      start: "Start bedtime flow",
       complete: "Finish bedtime",
       completeTitle: "Bedtime flow complete. You can hand yourself over to sleep now.",
       completeHint: "If you still feel very awake later, leave the bed for a quiet, dim, boring activity, then return when sleepy.",
@@ -753,7 +848,7 @@ const defaultMorningQuotes = [
   },
   {
     label: "短句 5",
-    prompt: "如果一个人一直足够鉴定，就能实现他的愿望。",
+    prompt: "如果一个人一直足够坚定，就能实现他的愿望。",
     hint: "",
   },
   {
@@ -812,10 +907,10 @@ const morningCheckInSteps = [
   },
   {
     label: "今日目标",
-    prompt: "冥想回来后，打开 Calendar。",
-    hint: "把今天最重要的目标放进一个看得见的时间块里。",
-    field: "calendar",
-    action: "openCalendar",
+    prompt: "冥想回来后，选择接下来要打开的地方。",
+    hint: "去 Goals 整理今天的重点，或者打开 Calendar 安排时间。",
+    field: "finalAction",
+    action: "finishMorning",
   },
 ];
 
@@ -843,6 +938,13 @@ function loadState() {
       loaded.workGoals = cloneDefaults().workGoals;
     }
     loaded.workGoals = removeSeededWorkGoals(loaded.workGoals);
+    if (parsed.settings?.recordDataResetVersion !== RECORD_DATA_RESET_VERSION) {
+      RECORD_DATA_KEYS.forEach((key) => {
+        loaded[key] = [];
+      });
+      loaded.settings.recordDataResetVersion = RECORD_DATA_RESET_VERSION;
+      localStorage.setItem(STORE_KEY, JSON.stringify(loaded));
+    }
     return loaded;
   } catch {
     return cloneDefaults();
@@ -875,9 +977,13 @@ function cloneDefaults() {
   return JSON.parse(JSON.stringify(defaults));
 }
 
-function saveState() {
+function saveState({ skipCloud = false, preserveTimestamp = false } = {}) {
+  if (!preserveTimestamp) {
+    state.settings.lastLocalChangeAt = new Date().toISOString();
+  }
   localStorage.setItem(STORE_KEY, JSON.stringify(state));
   refreshDashboard();
+  if (!skipCloud && !applyingCloudState) queueCloudSync();
 }
 
 function init() {
@@ -894,12 +1000,380 @@ function init() {
   bindFocus();
   bindNight();
   bindPersonalBlock();
+  bindHabitGarden();
+  bindLowEnergyMode();
   bindWorkGoals();
   bindStats();
   bindTimerAccuracy();
+  bindAccount();
   renderLanguage();
   showView("home");
   refreshDashboard();
+  initSupabase();
+}
+
+function bindAccount() {
+  $("#accountEntry")?.addEventListener("click", () => {
+    renderAccountUI();
+    $("#accountDialog")?.showModal();
+  });
+  $("#sendMagicLink")?.addEventListener("click", sendMagicLink);
+  $("#syncNow")?.addEventListener("click", () => syncToCloud({ announce: true }));
+  $("#signOut")?.addEventListener("click", signOut);
+  $("#useDeviceData")?.addEventListener("click", () => syncToCloud({ announce: true, force: true }));
+  $("#useCloudData")?.addEventListener("click", applyPendingCloudState);
+  $("#downloadBackup")?.addEventListener("click", () => downloadStateBackup(state));
+  $("#chooseBackup")?.addEventListener("click", () => $("#backupFileInput")?.click());
+  $("#backupFileInput")?.addEventListener("change", importStateBackup);
+  $("#refreshHistory")?.addEventListener("click", loadCloudHistory);
+  $("#accountHistoryList")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-history-id]");
+    if (button) restoreCloudHistory(button.dataset.historyId);
+  });
+}
+
+function getSupabaseConfig() {
+  const config = window.MYCARE_SUPABASE_CONFIG || {};
+  return {
+    url: String(config.url || "").trim(),
+    publishableKey: String(config.publishableKey || config.anonKey || "").trim(),
+  };
+}
+
+function isSupabaseConfigured() {
+  const config = getSupabaseConfig();
+  return Boolean(config.url && config.publishableKey && window.supabase?.createClient);
+}
+
+async function initSupabase() {
+  if (!isSupabaseConfigured()) {
+    renderAccountUI();
+    return;
+  }
+  const config = getSupabaseConfig();
+  supabaseClient = window.supabase.createClient(config.url, config.publishableKey);
+  const { data, error } = await supabaseClient.auth.getSession();
+  if (error) {
+    setAccountMessage(error.message, true);
+  }
+  currentUser = data?.session?.user || null;
+  renderAccountUI();
+  if (currentUser) {
+    await reconcileCloudState();
+    await loadCloudHistory();
+  }
+
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    currentUser = session?.user || null;
+    renderAccountUI();
+    if (currentUser && event !== "INITIAL_SESSION") {
+      window.setTimeout(async () => {
+        await reconcileCloudState();
+        await loadCloudHistory();
+      }, 0);
+    }
+  });
+}
+
+async function sendMagicLink() {
+  if (!supabaseClient) {
+    setAccountMessage(getLanguage() === "zh"
+      ? "云同步尚未配置。请先在 supabase-config.js 中填写公开配置。"
+      : "Cloud sync is not configured yet. Add the public settings in supabase-config.js.", true);
+    return;
+  }
+  const email = $("#accountEmail")?.value.trim();
+  if (!email) {
+    setAccountMessage(getLanguage() === "zh" ? "请先填写邮箱。" : "Enter your email first.", true);
+    return;
+  }
+  setAccountMessage(getLanguage() === "zh" ? "正在发送安全登录链接..." : "Sending a secure sign-in link...");
+  const redirectTo = window.location.origin === "null"
+    ? window.location.href.split(/[?#]/)[0]
+    : `${window.location.origin}${window.location.pathname}`;
+  const { error } = await supabaseClient.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: redirectTo },
+  });
+  setAccountMessage(error
+    ? error.message
+    : (getLanguage() === "zh" ? "登录链接已发送，请查看邮箱。" : "Magic link sent. Check your email."), Boolean(error));
+}
+
+async function signOut() {
+  if (!supabaseClient) return;
+  const { error } = await supabaseClient.auth.signOut();
+  if (error) {
+    setAccountMessage(error.message, true);
+    return;
+  }
+  currentUser = null;
+  cloudRevision = 0;
+  cloudSnapshot = null;
+  setAccountMessage(getLanguage() === "zh" ? "已退出。数据仍保存在此设备。" : "Signed out. Your data remains on this device.");
+  renderAccountUI();
+}
+
+function queueCloudSync() {
+  if (!supabaseClient || !currentUser || cloudSyncInProgress || cloudSnapshot) return;
+  window.clearTimeout(cloudSyncTimer);
+  cloudSyncTimer = window.setTimeout(() => syncToCloud(), 1400);
+  renderAccountUI("syncing");
+}
+
+async function reconcileCloudState() {
+  if (!supabaseClient || !currentUser) return;
+  setAccountMessage(getLanguage() === "zh" ? "正在检查云端数据..." : "Checking cloud data...");
+  const { data, error } = await supabaseClient
+    .from("app_states")
+    .select("payload, revision, updated_at")
+    .eq("user_id", currentUser.id)
+    .maybeSingle();
+  if (error) {
+    setAccountMessage(error.message, true);
+    renderAccountUI("error");
+    return;
+  }
+  if (!data) {
+    await syncToCloud({ announce: true, force: true });
+    return;
+  }
+
+  cloudRevision = Number(data.revision || 0);
+  const remoteUpdatedAt = data.updated_at || "";
+  const lastSync = Date.parse(state.settings.lastCloudSyncAt || "") || 0;
+  const localChanged = Date.parse(state.settings.lastLocalChangeAt || "") || 0;
+  const remoteChanged = Date.parse(remoteUpdatedAt || "") || 0;
+  const localIsNewer = localChanged > lastSync + 1000;
+  const remoteIsNewer = remoteChanged > lastSync + 1000;
+
+  if (!lastSync || (localIsNewer && remoteIsNewer)) {
+    cloudSnapshot = data;
+    setAccountMessage(getLanguage() === "zh"
+      ? "本机和云端都有数据，请选择要保留的版本。"
+      : "This device and the cloud both have data. Choose which version to keep.");
+    renderAccountUI("conflict");
+    return;
+  }
+  if (remoteIsNewer) {
+    applyCloudState(data);
+    return;
+  }
+  if (localIsNewer) {
+    await syncToCloud({ force: true });
+    return;
+  }
+  setAccountMessage(getLanguage() === "zh" ? "已与云端同步。" : "Synced with the cloud.");
+  renderAccountUI("synced");
+}
+
+async function syncToCloud({ announce = false, force = false } = {}) {
+  if (!supabaseClient || !currentUser || cloudSyncInProgress) return;
+  if (cloudSnapshot && !force) {
+    renderAccountUI("conflict");
+    return;
+  }
+  cloudSyncInProgress = true;
+  window.clearTimeout(cloudSyncTimer);
+  if (announce) setAccountMessage(getLanguage() === "zh" ? "正在同步..." : "Syncing...");
+  renderAccountUI("syncing");
+  const payload = JSON.parse(JSON.stringify(state));
+  const { data, error } = await supabaseClient
+    .from("app_states")
+    .upsert({ user_id: currentUser.id, payload }, { onConflict: "user_id" })
+    .select("revision, updated_at")
+    .single();
+  cloudSyncInProgress = false;
+  if (error) {
+    setAccountMessage(error.message, true);
+    renderAccountUI("error");
+    return;
+  }
+  cloudRevision = Number(data.revision || cloudRevision);
+  cloudSnapshot = null;
+  state.settings.lastCloudSyncAt = data.updated_at;
+  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  setAccountMessage(getLanguage() === "zh" ? "已安全同步到云端。" : "Safely synced to the cloud.");
+  renderAccountUI("synced");
+  loadCloudHistory();
+}
+
+function applyPendingCloudState() {
+  if (!cloudSnapshot) return;
+  applyCloudState(cloudSnapshot);
+}
+
+function applyCloudState(snapshot) {
+  applyingCloudState = true;
+  const payload = snapshot?.payload || {};
+  state = {
+    ...cloneDefaults(),
+    ...payload,
+    settings: { ...cloneDefaults().settings, ...(payload.settings || {}) },
+  };
+  state.settings.nightMusicPlaylists = migrateNightMusicPlaylists(payload.settings?.nightMusicPlaylists);
+  state.settings.lastCloudSyncAt = snapshot.updated_at || new Date().toISOString();
+  state.settings.lastLocalChangeAt = state.settings.lastCloudSyncAt;
+  cloudRevision = Number(snapshot.revision || cloudRevision);
+  cloudSnapshot = null;
+  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  applyingCloudState = false;
+  renderLanguage();
+  refreshDashboard();
+  setAccountMessage(getLanguage() === "zh" ? "已使用云端数据。" : "Cloud data loaded.");
+  renderAccountUI("synced");
+}
+
+function setAccountMessage(message = "", isError = false) {
+  const target = $("#accountMessage");
+  if (!target) return;
+  target.textContent = message;
+  target.classList.toggle("is-error", isError);
+}
+
+function renderAccountUI(status = "") {
+  const zh = getLanguage() === "zh";
+  const configured = isSupabaseConfigured();
+  const signedIn = Boolean(currentUser);
+  const conflict = Boolean(cloudSnapshot);
+  $("#accountEntryTitle").textContent = signedIn ? (currentUser.email || (zh ? "我的账户" : "My account")) : (zh ? "登录与同步" : "Sign in & sync");
+  $("#accountEntryStatus").textContent = signedIn
+    ? (status === "syncing" ? (zh ? "同步中..." : "Syncing...") : (zh ? "云同步已开启" : "Cloud sync on"))
+    : (configured ? (zh ? "可选云同步" : "Optional cloud sync") : (zh ? "仅保存在本机" : "Local only"));
+  $("#accountEntryDot").classList.toggle("is-online", signedIn && status !== "error");
+
+  $("#accountDialogEyebrow").textContent = zh ? "私密云同步" : "Private cloud sync";
+  $("#accountDialogTitle").textContent = signedIn ? (zh ? "你的 My Care 账户" : "Your My Care account") : (zh ? "登录 My Care" : "Sign in to My Care");
+  $("#accountDialogCopy").textContent = zh
+    ? "使用邮箱安全链接登录，在不同设备之间同步你的记录。"
+    : "Sign in with a secure email link to sync your data across devices.";
+  $("#accountEmailLabel").textContent = zh ? "邮箱地址" : "Email address";
+  $("#sendMagicLink").textContent = zh ? "发送登录链接" : "Send magic link";
+  $("#syncNow").textContent = zh ? "立即同步" : "Sync now";
+  $("#signOut").textContent = zh ? "退出登录" : "Sign out";
+  $("#accountSyncMeta").textContent = zh ? "更改会先保存在本机。" : "Local changes are saved first.";
+  $("#accountConflictCopy").textContent = zh
+    ? "本机和云端都有数据，请选择要保留的版本。"
+    : "This device and the cloud both have data. Choose which version to keep.";
+  $("#useDeviceData").textContent = zh ? "使用本机数据" : "Use this device";
+  $("#useCloudData").textContent = zh ? "使用云端数据" : "Use cloud data";
+  $("#accountPrivacy").textContent = zh
+    ? "云同步完全可选。登录前，你的数据只保存在此设备。"
+    : "Cloud sync is optional. Your data stays on this device until you sign in.";
+  $("#accountBackupTitle").textContent = zh ? "备份文件" : "Backup file";
+  $("#accountBackupCopy").textContent = zh
+    ? "下载一份可携带的完整数据，或从设备恢复备份。"
+    : "Download a portable copy or restore one from your device.";
+  $("#downloadBackup").textContent = zh ? "下载备份" : "Download backup";
+  $("#chooseBackup").textContent = zh ? "导入备份" : "Import backup";
+  $("#accountHistoryTitle").textContent = zh ? "云端历史版本" : "Cloud history";
+  $("#refreshHistory").textContent = zh ? "刷新" : "Refresh";
+  $("#accountEmailDisplay").textContent = currentUser?.email || "";
+  $("#accountSignedOut").classList.toggle("is-hidden", signedIn);
+  $("#accountSignedIn").classList.toggle("is-hidden", !signedIn || conflict);
+  $("#accountConflict").classList.toggle("is-hidden", !signedIn || !conflict);
+}
+
+function downloadStateBackup(payload = state, suffix = "") {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const extra = suffix ? `-${suffix}` : "";
+  link.href = url;
+  link.download = `my-care-backup-${todayKey()}${extra}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+  setAccountMessage(getLanguage() === "zh" ? "备份文件已下载。" : "Backup downloaded.");
+}
+
+async function importStateBackup(event) {
+  const input = event.currentTarget;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file) return;
+  try {
+    const imported = JSON.parse(await file.text());
+    if (!isValidStateBackup(imported)) throw new Error("invalid backup");
+    downloadStateBackup(state, "before-import");
+    applyingCloudState = true;
+    state = {
+      ...cloneDefaults(),
+      ...imported,
+      settings: { ...cloneDefaults().settings, ...(imported.settings || {}) },
+    };
+    state.settings.nightMusicPlaylists = migrateNightMusicPlaylists(imported.settings?.nightMusicPlaylists);
+    applyingCloudState = false;
+    saveState();
+    renderLanguage();
+    refreshDashboard();
+    setAccountMessage(getLanguage() === "zh"
+      ? "备份已恢复。恢复前的数据也已自动下载。"
+      : "Backup restored. The previous data was downloaded automatically.");
+  } catch {
+    applyingCloudState = false;
+    setAccountMessage(getLanguage() === "zh" ? "无法读取这个备份文件。" : "This backup file could not be read.", true);
+  }
+}
+
+function isValidStateBackup(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const expectedArrays = ["morningEntries", "focusSessions", "nightEntries", "personalNotes", "habitEntries", "workGoals"];
+  return expectedArrays.some((key) => Array.isArray(value[key])) && (!value.settings || typeof value.settings === "object");
+}
+
+async function loadCloudHistory() {
+  const list = $("#accountHistoryList");
+  if (!list) return;
+  if (!supabaseClient || !currentUser) {
+    list.innerHTML = "";
+    return;
+  }
+  list.innerHTML = `<p class="account-history-empty">${getLanguage() === "zh" ? "正在读取..." : "Loading..."}</p>`;
+  const { data, error } = await supabaseClient
+    .from("app_state_history")
+    .select("id, revision, saved_at")
+    .eq("user_id", currentUser.id)
+    .order("saved_at", { ascending: false })
+    .limit(20);
+  if (error) {
+    list.innerHTML = `<p class="account-history-empty">${getLanguage() === "zh" ? "请先重新运行最新的 schema.sql。" : "Run the latest schema.sql first."}</p>`;
+    return;
+  }
+  if (!data?.length) {
+    list.innerHTML = `<p class="account-history-empty">${getLanguage() === "zh" ? "同步更新后，旧版本会出现在这里。" : "Older versions will appear after sync updates."}</p>`;
+    return;
+  }
+  const locale = getLanguage() === "zh" ? "zh-CN" : "en-US";
+  list.innerHTML = data.map((item) => `
+    <div class="account-history-item">
+      <div>
+        <strong>${new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(item.saved_at))}</strong>
+        <small>${getLanguage() === "zh" ? "版本" : "Revision"} ${Number(item.revision || 0)}</small>
+      </div>
+      <button type="button" data-history-id="${item.id}">${getLanguage() === "zh" ? "恢复" : "Restore"}</button>
+    </div>
+  `).join("");
+}
+
+async function restoreCloudHistory(historyId) {
+  if (!supabaseClient || !currentUser || !historyId) return;
+  const zh = getLanguage() === "zh";
+  if (!window.confirm(zh ? "恢复这个版本吗？当前版本会先自动保存到历史记录。" : "Restore this version? The current version will be archived first.")) return;
+  const { data, error } = await supabaseClient
+    .from("app_state_history")
+    .select("payload, revision, saved_at")
+    .eq("user_id", currentUser.id)
+    .eq("id", historyId)
+    .single();
+  if (error || !data) {
+    setAccountMessage(error?.message || (zh ? "无法读取历史版本。" : "Could not load that version."), true);
+    return;
+  }
+  downloadStateBackup(state, "before-restore");
+  applyCloudState({ payload: data.payload, revision: data.revision, updated_at: data.saved_at });
+  state.settings.lastLocalChangeAt = new Date().toISOString();
+  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  await syncToCloud({ announce: true, force: true });
 }
 
 function bindTimerAccuracy() {
@@ -1042,6 +1516,7 @@ function renderLanguage() {
   $("#view-home .home-copy .eyebrow").textContent = text.home.eyebrow;
   $("#homeTitle").textContent = text.home.title;
   $("#view-home .home-copy p:not(.eyebrow)").textContent = text.home.subtitle;
+  ensureHomeModuleCards();
   Object.entries(text.home.cards).forEach(([view, [title, description]]) => {
     const card = $(`.module-card[data-view="${view}"]`);
     if (!card) return;
@@ -1059,9 +1534,27 @@ function renderLanguage() {
   renderNightLanguage();
   renderPersonalBlockLanguage();
   renderHabitLanguage();
+  renderLowEnergyLanguage();
   renderWorkLanguage();
   renderStatsLanguage();
+  renderAccountUI();
   refreshDashboard();
+}
+
+function ensureHomeModuleCards() {
+  const grid = $(".home-grid");
+  if (!grid || $(".module-card[data-view='work']")) return;
+  const card = document.createElement("button");
+  card.className = "module-card";
+  card.dataset.view = "work";
+  card.type = "button";
+  card.innerHTML = `
+    <span aria-hidden="true">◆</span>
+    <strong></strong>
+    <small></small>
+  `;
+  card.addEventListener("click", () => showView("work"));
+  grid.prepend(card);
 }
 
 function renderMorningLanguage() {
@@ -1071,7 +1564,7 @@ function renderMorningLanguage() {
   $("#view-morning .section-head .eyebrow").textContent = text.eyebrow;
   $("#morningTitle").textContent = text.title;
   $(".morning-subtitle").textContent = text.subtitle;
-  $("#startMorning").textContent = morningIndex === 0 ? text.start : text.restart;
+  $("#startMorning").textContent = text.start;
   $$("[data-morning-field]").forEach((field) => {
     const key = field.dataset.morningField;
     const label = text[key];
@@ -1082,6 +1575,10 @@ function renderMorningLanguage() {
     const button = $(`.meditation-option[data-meditation="${key}"]`);
     if (button) button.textContent = label;
   });
+  $("#morningFinalActionLabel").textContent = text.finalActionLabel;
+  $("#morningCalendarLabel").textContent = text.calendar;
+  $("[data-morning-final-action='goals']").textContent = text.goalsOption;
+  $("[data-morning-final-action='calendar']").textContent = text.calendarOption;
   const skinOptions = getLanguage() === "en"
     ? ["Stable", "Dry", "Redness", "Breakout", "Sensitive"]
     : ["稳定", "干燥", "泛红", "爆痘", "敏感"];
@@ -1089,6 +1586,7 @@ function renderMorningLanguage() {
     option.textContent = skinOptions[index] || option.textContent;
   });
   renderMorningPrompt();
+  renderMorningFinalAction();
   setAudioButtonState("morning", Boolean(audio.morning?.playing));
 }
 
@@ -1106,8 +1604,10 @@ function renderFocusLanguage() {
     button.textContent = `${button.dataset.duration} ${text.minuteUnit}`;
   });
   $("#view-focus .panel-title h3").textContent = text.taskTitle;
-  $$("#view-focus .panel > .focus-control-label").forEach((item) => {
-    item.textContent = text.categoryLabel;
+  $("#view-focus .panel > .focus-control-label").textContent = text.categoryLabel;
+  $("#focusSeedLabel").innerHTML = `${text.seedLabel} <small>${text.seedOptional}</small>`;
+  $$("#focusHabitSeed option").forEach((option) => {
+    option.textContent = text.seeds[option.value] || option.textContent;
   });
   $("#focusTask").placeholder = text.taskPlaceholder;
   const metricLabels = $$("#view-focus .focus-metrics span");
@@ -1130,6 +1630,7 @@ function renderNightLanguage() {
   });
   $(".night-home-action").textContent = t().common.home;
   $(".night-home-action").setAttribute("aria-label", t().common.home);
+  $("#startNight").textContent = text.start;
   renderNightStep();
   setAudioButtonState("night", Boolean(audio.night?.playing) || !$("#nightMusicPlayerWrap")?.classList.contains("is-hidden"));
 }
@@ -1177,9 +1678,55 @@ function renderHabitLanguage() {
   $("#view-habits .section-head .eyebrow").textContent = text.eyebrow;
   $("#habitTitle").textContent = text.title;
   $("#view-habits .section-head .muted").textContent = text.subtitle;
-  $("#view-habits .habit-placeholder .eyebrow").textContent = text.comingSoon;
-  $("#view-habits .habit-placeholder h3").textContent = text.prompt;
-  $("#view-habits .habit-placeholder p:not(.eyebrow)").textContent = text.description;
+  $(".habit-start-card .panel-title h3").textContent = text.firstBlock;
+  $(".habit-start-card > p").textContent = text.firstBlockCopy;
+  $("#habitCustomTask").placeholder = text.customPlaceholder;
+  $("#startHabitFocus").textContent = text.startFocus;
+  $(".habit-energy-card .panel-title h3").textContent = text.lowEnergy;
+  $(".habit-energy-card .panel-title span").textContent = text.keepSystem;
+  $(".habit-energy-card > p").textContent = text.lowEnergyCopy;
+  const lowEnergyButton = $(".habit-energy-options button");
+  if (lowEnergyButton) {
+    lowEnergyButton.textContent = text.lowEnergyButton || "进入低能量模式";
+    lowEnergyButton.dataset.energyAction = getLanguage() === "zh" ? "低能量模式" : "Low-energy mode";
+  }
+  $(".habit-seeds-card .panel-title h3").textContent = text.seedsTitle;
+  $(".habit-seeds-card .panel-title span").textContent = text.seedsMeta;
+  const seedStatusButton = $(".habit-seed-status-button");
+  if (seedStatusButton) {
+    seedStatusButton.textContent = getLanguage() === "zh" ? "打开习惯种子状态" : "Open habit seed status";
+  }
+  renderHabitGarden();
+}
+
+function renderLowEnergyLanguage() {
+  if (!$("#view-low-energy")) return;
+  const zh = getLanguage() === "zh";
+  $(".low-energy-back").textContent = zh ? "← 返回 Habit Garden" : "← Back to Habit Garden";
+  $("#lowEnergyTitle").textContent = zh ? "低能量模式" : "Low-energy mode";
+  $(".low-energy-hero > div > p").textContent = zh
+    ? "低能量日的目标不是表现良好，而是温柔地回来。"
+    : "On low-energy days, the goal is not to perform well. The goal is to return.";
+  $(".low-energy-keep").textContent = zh ? "保留系统" : "Keep the system";
+  const rules = $$(".low-energy-rules span");
+  if (rules[0]) rules[0].textContent = zh ? "完成 1 个 = 没断线" : "Complete 1 = keep the chain";
+  if (rules[1]) rules[1].textContent = zh ? "完成 2 个 = 今天足够了" : "Complete 2 = enough for today";
+  $(".low-energy-core .low-energy-label").textContent = zh ? "核心任务" : "Core task";
+  $("#lowEnergyCore").lastChild.textContent = zh ? " 工作 25 分钟" : " Work for 25 minutes";
+  $(".low-energy-core small").textContent = zh ? "专注 25 分钟已经是一种胜利。" : "One focused 25 minutes is a win.";
+  $(".low-energy-optional .low-energy-label").textContent = zh ? "可选恢复" : "Optional recovery";
+  const options = $$(".low-energy-option-grid button");
+  const labels = zh
+    ? ["洗澡", "散步 / 拉伸 10 分钟", "吃点东西"]
+    : ["Take a shower", "Walk / stretch 10 minutes", "Eat something"];
+  options.forEach((button, index) => {
+    button.lastChild.textContent = labels[index] || "";
+  });
+  $(".low-energy-optional small").textContent = zh ? "选择一件能让自己舒服一点的事情。" : "Choose what helps you feel a little better.";
+  $(".low-energy-tree-panel h3").textContent = zh ? "你的习惯是种子。" : "Your habits are seeds.";
+  $(".low-energy-tree-panel p:not(.eyebrow)").textContent = zh ? "慢慢照顾它们，看着它们生长。" : "Nurture them and watch them grow.";
+  $(".low-energy-seed-button").textContent = zh ? "打开习惯种子状态 →" : "Open Habit seed status →";
+  $(".low-energy-footer").textContent = zh ? "不需要补回来。明天重新开始就好。" : "No catching up. Just restart tomorrow.";
 }
 
 function renderWorkLanguage() {
@@ -1198,29 +1745,55 @@ function renderWorkLanguage() {
   $("#workGoalTitle").placeholder = text.goalPlaceholder;
   $("#workGoalCategory").placeholder = text.categoryPlaceholder;
   $("#workGoalForm button[type='submit']").textContent = text.add;
-  $("#view-work .work-list-panel .panel-title h3").textContent = text.currentTitle;
+  $("[data-goal-filter='current']").textContent = text.currentTitle;
+  $("[data-goal-filter='finished']").textContent = text.finishedTitle;
   renderWorkGoalView();
   renderWorkGoals();
 }
 
 function renderStatsLanguage() {
   const text = t().stats;
+  const zh = getLanguage() === "zh";
   $("#view-stats .section-head .eyebrow").textContent = text.eyebrow;
-  $("#statsTitle").textContent = text.title;
+  $("#statsTitle").textContent = zh ? "看见自己的节奏" : "See Your Rhythm";
+  $("#statsSubtitle").textContent = zh ? "只看趋势，不评价每一天。" : "Notice the patterns without judging each day.";
   $("#exportData").setAttribute("aria-label", text.export);
   $("#exportData").setAttribute("title", text.export);
-  const panels = $$("#view-stats .stats-grid .panel");
-  const content = [
-    [text.hungerTitle, text.hungerSub],
-    [text.focusTitle, text.focusSub],
-    [text.categoryTitle, text.categorySub],
-    [text.summaryTitle, text.summaryRange],
-  ];
-  panels.forEach((panel, index) => {
-    const title = panel.querySelector(".panel-title h3");
-    const subtitle = panel.querySelector(".panel-title span");
-    if (title) title.textContent = content[index]?.[0] || title.textContent;
-    if (subtitle) subtitle.textContent = content[index]?.[1] || subtitle.textContent;
+  const labels = {
+    healthStatsTitle: zh ? "身体状态" : "Health",
+    healthStatsSubtitle: zh ? "观察饥饿感与皮肤状态的变化。" : "Notice changes in hunger and skin status.",
+    hungerStatsTitle: "Hunger level",
+    hungerStatsMeta: zh ? "晨间记录 · 0–10" : "Morning check-in · 0–10",
+    skinStatsTitle: zh ? "皮肤状态" : "Skin status",
+    skinStatsMeta: zh ? "按日期查看变化" : "Changes over time",
+    focusStatsTitle: zh ? "专注投入" : "Focus",
+    focusStatsSubtitle: zh ? "查看时间投入，而不是追逐完美表现。" : "See where time went without chasing perfection.",
+    focusMinutesStatsTitle: zh ? "每日专注分钟" : "Daily focus minutes",
+    focusMinutesStatsMeta: zh ? "每天投入的时间" : "Time invested each day",
+    categoryStatsTitle: zh ? "专注类别" : "Focus categories",
+    categoryStatsMeta: zh ? "按累计分钟比较" : "Compared by total minutes",
+    goalsStatsTitle: zh ? "目标进展" : "Goals",
+    goalsStatsSubtitle: zh ? "看清正在推进的事情，也看见已经完成的部分。" : "See what is moving and what has already been completed.",
+    goalStatusTitle: zh ? "目标状态" : "Goal status",
+    goalStatusMeta: zh ? "当前进展概览" : "A calm progress overview",
+    goalCategoryTitle: zh ? "目标类别" : "Goal categories",
+    goalCategoryMeta: zh ? "目标数量与已完成数量" : "Total and completed goals",
+    goalDeadlineTitle: zh ? "Deadline 时间线" : "Deadline timeline",
+    goalDeadlineMeta: zh ? "接下来值得留意的目标" : "What deserves attention next",
+    seedStatsTitle: zh ? "习惯种子" : "Habit Seeds",
+    seedStatsSubtitle: zh ? "看看最近把注意力温柔地放在了哪里。" : "See where your attention has been gently placed.",
+    seedCompareTitle: zh ? "Seed 对比" : "Seed comparison",
+    seedCompareMeta: zh ? "专注次数与累计分钟" : "Sessions and total minutes",
+    seedTimelineTitle: zh ? "最近照顾时间线" : "Recent care timeline",
+    seedTimelineMeta: zh ? "记录出现的位置，而不是连续天数" : "Presence over streaks",
+  };
+  Object.entries(labels).forEach(([id, label]) => {
+    const target = $(`#${id}`);
+    if (target) target.textContent = label;
+  });
+  $$(".stats-range").forEach((button) => {
+    const range = button.dataset.statsRange;
+    button.textContent = range === "all" ? (zh ? "全部" : "All") : `${range} ${zh ? "天" : "days"}`;
   });
   if ($("#view-stats").classList.contains("active")) drawCharts();
 }
@@ -1247,6 +1820,7 @@ function showView(viewName) {
   setImmersiveMode(viewName);
   if (viewName !== "morning") stopMorningBackgroundTrack();
   if (viewName === "block") renderPersonalBlock();
+  if (viewName === "habits") renderHabitGarden();
   if (viewName === "work") renderWorkGoals();
   if (viewName !== "block") $("#backgroundCredit").textContent = currentBackgroundCredit;
   if (viewName === "stats") drawCharts();
@@ -1266,25 +1840,28 @@ function bindMorning() {
 
   $("#startMorning").addEventListener("click", () => {
     playMorningBackgroundTrack();
-    resetMorningSteps();
-    morningIndex = 0;
-    $("#startMorning").textContent = t().morning.restart;
-    $("#nextMorning").textContent = t().common.next;
+    morningIndex = Math.min(morningIndex + 1, morningSteps.length - 1);
     renderMorningPrompt();
   });
 
   $("#nextMorning").addEventListener("click", () => {
     const currentStep = morningSteps[morningIndex];
     if (currentStep?.action === "saveAndMeditate") {
-      saveMorningEntry({ openMeditation: false, stayOnMeditation: true });
+      saveMorningEntry({ openMeditation: false });
       return;
     }
-    if (currentStep?.action === "openCalendar") {
+    if (currentStep?.action === "finishMorning") {
       updateMorningLinks();
       saveState();
-      openFlowLink(state.settings.calendarUrl);
       renderMorningComplete();
       $("#nextMorning").textContent = t().common.done;
+      if (state.settings.morningFinalAction === "calendar") {
+        openFlowLink(state.settings.calendarUrl);
+      } else {
+        state.settings.workGoalFilter = "current";
+        saveState();
+        showView("work");
+      }
       return;
     }
     morningIndex = Math.min(morningIndex + 1, morningSteps.length - 1);
@@ -1302,6 +1879,15 @@ function bindMorning() {
       saveMorningEntry({ openMeditation: false });
       openFlowLink(meditation.url);
       morningIndex = Math.min(morningIndex + 1, morningSteps.length - 1);
+      renderMorningPrompt();
+    });
+  });
+
+  $$(".morning-final-option").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.settings.morningFinalAction = button.dataset.morningFinalAction;
+      saveState();
+      renderMorningFinalAction();
       renderMorningPrompt();
     });
   });
@@ -1341,6 +1927,8 @@ function renderMorningPrompt() {
   $("#morningHint").textContent = step.hint || "";
   $("#morningHint").hidden = !step.hint;
   $("#nextMorning").textContent = getMorningButtonText(step);
+  $("#startMorning").hidden = morningIndex !== 0;
+  $("#nextMorning").hidden = morningIndex === 0;
   $("#morningForm").classList.toggle("is-hidden", !step.field);
   $$(".morning-field").forEach((field) => {
     field.classList.toggle("active", field.dataset.morningField === step.field);
@@ -1383,22 +1971,38 @@ function getLocalizedMorningStep(step) {
       prompt: "Good. Now choose a morning meditation.",
       hint: "Choose one link below. Your check-in will be saved with it.",
     },
-    calendar: {
+    finalAction: {
       label: "Today's goal",
-      prompt: "After meditation, open Calendar.",
-      hint: "Put the most important goal into a visible time block.",
+      prompt: "After meditation, choose where to continue.",
+      hint: "Review your Goals or open Calendar to plan the time.",
     },
   };
   return { ...step, ...(translations[step.field] || {}) };
 }
 
 function getMorningButtonText(step) {
-  if (step.action === "saveAndMeditate") return t().morning.chooseMeditation;
-  if (step.action === "openCalendar") return t().morning.openCalendar;
+  if (step.action === "saveAndMeditate") return t().common.next;
+  if (step.action === "finishMorning") {
+    return state.settings.morningFinalAction === "calendar"
+      ? t().morning.openCalendar
+      : t().morning.openGoals;
+  }
   return t().common.next;
 }
 
+function renderMorningFinalAction() {
+  const action = state.settings.morningFinalAction === "calendar" ? "calendar" : "goals";
+  $$(".morning-final-option").forEach((button) => {
+    const isActive = button.dataset.morningFinalAction === action;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  });
+  $(".morning-calendar-setting").classList.toggle("is-hidden", action !== "calendar");
+}
+
 function renderMorningComplete() {
+  $("#startMorning").hidden = true;
+  $("#nextMorning").hidden = true;
   $("#morningForm").classList.add("is-hidden");
   $$(".morning-field").forEach((field) => field.classList.remove("active"));
   $("#morningStepLabel").textContent = t().common.completed;
@@ -1448,7 +2052,12 @@ function bindFocus() {
   $("#customFocusMinutes").addEventListener("change", (event) => {
     setFocusDuration(Number(event.target.value));
   });
+  $("#focusHabitSeed").addEventListener("change", (event) => {
+    selectedFocusSeed = event.target.value || "none";
+    renderFocusSeed();
+  });
   renderFocusCategories();
+  renderFocusSeed();
   renderFocusDurationOptions();
   renderTimer();
 }
@@ -1557,6 +2166,7 @@ function logFocusSession(minutes, source) {
     minutes,
     source,
     category: focusCategory,
+    habitSeed: selectedFocusSeed === "none" ? "" : selectedFocusSeed,
     task: $("#focusTask").value.trim(),
   });
   saveState();
@@ -1567,6 +2177,13 @@ function renderFocusCategories() {
     button.textContent = displayFocusCategory(button.dataset.focusCategory);
     button.classList.toggle("active", button.dataset.focusCategory === focusCategory);
   });
+}
+
+function renderFocusSeed() {
+  const select = $("#focusHabitSeed");
+  if (!select) return;
+  select.value = selectedFocusSeed;
+  select.closest(".focus-seed-control")?.classList.toggle("has-seed", selectedFocusSeed !== "none");
 }
 
 function setFocusDuration(minutes) {
@@ -1601,7 +2218,7 @@ function bindNight() {
 
   $("#startNight").addEventListener("click", () => {
     startAudio("night");
-    nightIndex = 0;
+    nightIndex = Math.min(nightIndex + 1, getNightMode().steps.length - 1);
     renderNightStep();
     clearInterval(nightInterval);
     const mode = getNightMode();
@@ -1649,6 +2266,8 @@ function renderNightStep() {
   $("#nightHint").textContent = getNightModeHint(state.settings.nightMode);
   $("#nightProgressBar").style.width = `${(nightIndex / Math.max(mode.steps.length - 1, 1)) * 100}%`;
   $("#completeNight").textContent = nightIndex >= mode.steps.length - 1 ? t().night.complete : t().common.next;
+  $("#startNight").hidden = nightIndex !== 0;
+  $("#completeNight").hidden = nightIndex === 0;
   animateStep("#view-night .night-stage");
 }
 
@@ -1746,6 +2365,8 @@ function advanceNightStep() {
 
 function completeNight() {
   clearInterval(nightInterval);
+  $("#startNight").hidden = true;
+  $("#completeNight").hidden = true;
   $("#nightProgressBar").style.width = "100%";
   state.nightEntries = state.nightEntries.filter((item) => item.date !== todayKey());
   state.nightEntries.push({ date: todayKey(), createdAt: new Date().toISOString(), completed: true, mode: state.settings.nightMode });
@@ -2001,6 +2622,134 @@ function formatShortDate(dateText) {
   return new Intl.DateTimeFormat(getLanguage() === "zh" ? "zh-CN" : "en-US", { month: "short", day: "numeric" }).format(date);
 }
 
+function bindHabitGarden() {
+  if (!$("#view-habits")) return;
+  $("#habitCustomTask").addEventListener("input", (event) => {
+    selectedHabitStart = { task: event.target.value.trim(), category: "工作" };
+  });
+
+  $("#startHabitFocus").addEventListener("click", () => {
+    const customTask = $("#habitCustomTask").value.trim();
+    const task = customTask || selectedHabitStart.task || (getLanguage() === "zh" ? "第一个 25 分钟" : "First 25-minute block");
+    recordHabitEntry("start", task);
+    $("#focusTask").value = task;
+    focusCategory = selectedHabitStart.category || "工作";
+    setFocusDuration(25);
+    renderFocusCategories();
+    showView("focus");
+  });
+
+  $$(".habit-energy-options button").forEach((button) => {
+    button.addEventListener("click", () => {
+      button.classList.add("is-selected");
+      setTimeout(() => {
+        button.classList.remove("is-selected");
+        showView("low-energy");
+      }, 140);
+    });
+  });
+
+  $(".habit-seed-status-button")?.addEventListener("click", () => {
+    $(".habit-seed-status-button")?.classList.add("is-selected");
+    $("#habitSeedList")?.classList.add("is-highlighted");
+    setTimeout(() => {
+      $(".habit-seed-status-button")?.classList.remove("is-selected");
+      $("#habitSeedList")?.classList.remove("is-highlighted");
+    }, 900);
+  });
+
+}
+
+function bindLowEnergyMode() {
+  if (!$("#view-low-energy")) return;
+  $(".low-energy-back")?.addEventListener("click", () => showView("habits"));
+  $("#lowEnergyCore")?.addEventListener("click", () => {
+    recordHabitEntry("lowEnergy", "Work for 25 minutes");
+    $("#focusTask").value = getLanguage() === "zh" ? "低能量模式：工作 25 分钟" : "Low-energy mode: work for 25 minutes";
+    focusCategory = "工作";
+    setFocusDuration(25);
+    renderFocusCategories();
+    showView("focus");
+  });
+  $$(".low-energy-option-grid button").forEach((button) => {
+    button.addEventListener("click", () => {
+      recordHabitEntry("lowEnergy", button.dataset.lowEnergyTask);
+      button.classList.toggle("completed");
+    });
+  });
+  $(".low-energy-seed-button")?.addEventListener("click", () => {
+    showView("habits");
+    setTimeout(() => {
+      $("#habitSeedList")?.classList.add("is-highlighted");
+      setTimeout(() => $("#habitSeedList")?.classList.remove("is-highlighted"), 900);
+    }, 0);
+  });
+}
+
+function recordHabitEntry(type, detail) {
+  state.habitEntries = state.habitEntries || [];
+  state.habitEntries.push({
+    date: todayKey(),
+    createdAt: new Date().toISOString(),
+    type,
+    detail,
+  });
+  saveState();
+}
+
+function renderHabitGarden() {
+  if (!$("#view-habits")) return;
+  const entries = state.habitEntries || [];
+  const todayEntries = entries.filter((entry) => entry.date === todayKey());
+  $("#habitTodayStatus").textContent = todayEntries.some((entry) => entry.type === "start")
+    ? t().habits.started
+    : t().habits.notStarted;
+  renderHabitSeeds();
+}
+
+function renderHabitSeeds() {
+  const weekDates = new Set(lastSevenDays());
+  const entries = (state.habitEntries || []).filter((entry) => weekDates.has(entry.date));
+  $("#habitSeedList").innerHTML = getHabitSeeds().map((seed) => {
+    const count = entries.filter((entry) => getHabitSeedKey(entry) === seed.key).length;
+    const label = getLanguage() === "zh" ? seed.label : seed.labelEn;
+    return `
+      <article class="habit-seed">
+        <span>${seed.icon}</span>
+        <div class="work-goal-content">
+          <b>${escapeHtml(label)}</b>
+          <small>${count} ${escapeHtml(t().habits.cared)}</small>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+function getHabitSeeds() {
+  return [
+    { key: "health", label: "Health", labelEn: "Health", icon: "01" },
+    { key: "tech", label: "Tech", labelEn: "Tech", icon: "02" },
+    { key: "softSkills", label: "Soft Skills", labelEn: "Soft Skills", icon: "03" },
+  ];
+}
+
+function getHabitSeedKey(entry) {
+  if (entry.type === "lowEnergy") return "health";
+  if (entry.detail?.includes("JD") || entry.detail?.includes("简历")) return "job";
+  if (entry.detail?.includes("口语") || entry.detail?.includes("面试")) return "speaking";
+  if (entry.detail?.includes("技术") || entry.detail?.includes("笔记")) return "tech";
+  return "start";
+}
+
+function getHabitSeedKey(entry) {
+  const detail = String(entry.detail || "").toLowerCase();
+  if (entry.type === "lowEnergy") return "health";
+  if (detail.includes("health") || detail.includes("sleep") || detail.includes("walk") || detail.includes("stretch")) return "health";
+  if (detail.includes("tech") || detail.includes("技术") || detail.includes("note") || detail.includes("笔记")) return "tech";
+  if (detail.includes("soft") || detail.includes("skill") || detail.includes("speaking") || detail.includes("interview") || detail.includes("resume") || detail.includes("jd") || detail.includes("口语") || detail.includes("面试") || detail.includes("简历")) return "softSkills";
+  return "health";
+}
+
 function bindWorkGoals() {
   if (!$("#workGoalForm")) return;
   $$(".work-view-option").forEach((button) => {
@@ -2008,6 +2757,14 @@ function bindWorkGoals() {
       state.settings.workGoalView = button.dataset.workView;
       saveState();
       renderWorkGoalView();
+    });
+  });
+
+  $$(".work-goal-filter").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.settings.workGoalFilter = button.dataset.goalFilter;
+      saveState();
+      renderWorkGoals();
     });
   });
 
@@ -2031,6 +2788,7 @@ function bindWorkGoals() {
     $("#workGoalCategory").value = "";
     $("#workGoalDeadline").value = "";
     state.settings.workGoalView = "list";
+    state.settings.workGoalFilter = "current";
     saveState();
     renderWorkGoalView();
     renderWorkGoals();
@@ -2089,16 +2847,27 @@ function getWorkGoal(goalId) {
 function renderWorkGoals() {
   if (!$("#workGoalList")) return;
   state.workGoals = state.workGoals || [];
+  const filter = state.settings.workGoalFilter === "finished" ? "finished" : "current";
   const goals = [...state.workGoals].sort((a, b) => {
     if (a.status !== b.status) return a.status === "open" ? -1 : 1;
     return String(a.deadline || "").localeCompare(String(b.deadline || ""));
   });
   const open = goals.filter((goal) => goal.status !== "done").length;
   const done = goals.length - open;
+  const visibleGoals = goals.filter((goal) => filter === "finished"
+    ? goal.status === "done"
+    : goal.status !== "done");
+  $$(".work-goal-filter").forEach((button) => {
+    const isActive = button.dataset.goalFilter === filter;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-selected", String(isActive));
+  });
   $("#workGoalSummary").textContent = interpolate(t().work.openSummary, { open, done });
-  $("#workGoalList").innerHTML = goals.length
-    ? goals.map(renderWorkGoalCard).join("")
-    : `<div class="empty-note work-empty-state"><p>${t().work.empty}</p><button class="primary" data-work-action="showAdd" type="button">${t().work.emptyCta}</button></div>`;
+  $("#workGoalList").innerHTML = visibleGoals.length
+    ? visibleGoals.map(renderWorkGoalCard).join("")
+    : filter === "finished"
+      ? `<div class="empty-note work-empty-state"><p>${t().work.finishedEmpty}</p></div>`
+      : `<div class="empty-note work-empty-state"><p>${goals.length ? t().work.currentEmpty : t().work.empty}</p><button class="primary" data-work-action="showAdd" type="button">${t().work.emptyCta}</button></div>`;
 }
 
 function renderWorkGoalCard(goal) {
@@ -2107,23 +2876,26 @@ function renderWorkGoalCard(goal) {
   return `
     <article class="work-goal-card ${isDone ? "done" : ""}" data-goal-id="${escapeHtml(goal.id)}">
       <div class="work-goal-main">
-        <div>
+        <div class="work-goal-content">
           <p class="eyebrow">${escapeHtml(goal.category || t().work.currentTitle)}</p>
           <h3>${escapeHtml(goal.title)}</h3>
+          <details class="work-note-wrap" ${goal.note ? "open" : ""}>
+            <summary>${escapeHtml(goal.note ? t().work.editNote : t().work.addNote)}</summary>
+            <label>
+              <span>${escapeHtml(t().work.noteLabel)}</span>
+              <textarea class="work-goal-note" rows="3" placeholder="${escapeHtml(t().work.notePlaceholder)}">${escapeHtml(goal.note || "")}</textarea>
+            </label>
+          </details>
+          <div class="work-goal-actions">
+            ${isDone
+              ? `<span class="work-completed">${escapeHtml(t().work.completed)} · ${escapeHtml(formatShortDate(goal.completedAt?.slice(0, 10)))}</span><button class="secondary" data-work-action="reopen" type="button">${escapeHtml(t().work.reopen)}</button>`
+              : `<button class="primary" data-work-action="complete" type="button">${escapeHtml(t().work.complete)}</button>`}
+          </div>
         </div>
         <span class="work-deadline ${deadline.className}">
           <b>${escapeHtml(deadline.status)}</b>
           <small>${escapeHtml(deadline.date)}</small>
         </span>
-      </div>
-      <label class="work-note-wrap">
-        <span>${escapeHtml(t().work.noteLabel)}</span>
-        <textarea class="work-goal-note" rows="3" placeholder="${escapeHtml(t().work.notePlaceholder)}">${escapeHtml(goal.note || "")}</textarea>
-      </label>
-      <div class="work-goal-actions">
-        ${isDone
-          ? `<span class="work-completed">${escapeHtml(t().work.completed)} · ${escapeHtml(formatShortDate(goal.completedAt?.slice(0, 10)))}</span><button class="secondary" data-work-action="reopen" type="button">${escapeHtml(t().work.reopen)}</button>`
-          : `<button class="primary" data-work-action="complete" type="button">${escapeHtml(t().work.complete)}</button>`}
       </div>
     </article>
   `;
@@ -2180,6 +2952,13 @@ function escapeHtml(value) {
 function bindStats() {
   $("#healthImport")?.addEventListener("change", handleImport);
   $("#exportData").addEventListener("click", exportData);
+  $$(".stats-range").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedStatsRange = button.dataset.statsRange || "7";
+      $$(".stats-range").forEach((item) => item.classList.toggle("active", item === button));
+      drawCharts();
+    });
+  });
 }
 
 function handleImport(event) {
@@ -2286,20 +3065,42 @@ function renderFocusCategorySummary(focusToday) {
     : `<span>${t().focus.emptyCategory}</span>`;
 }
 
-function lastSevenDays() {
-  return Array.from({ length: 7 }, (_, index) => {
+function recentDays(count) {
+  return Array.from({ length: count }, (_, index) => {
     const date = new Date();
-    date.setDate(date.getDate() - (6 - index));
+    date.setDate(date.getDate() - (count - 1 - index));
     return date.toISOString().slice(0, 10);
   });
 }
 
+function lastSevenDays() {
+  return recentDays(7);
+}
+
+function getStatsDays() {
+  if (selectedStatsRange !== "all") return recentDays(Number(selectedStatsRange) || 7);
+  const dates = [
+    ...state.morningEntries.map((item) => item.date),
+    ...state.focusSessions.map((item) => item.date),
+    ...(state.workGoals || []).flatMap((item) => [item.createdAt?.slice(0, 10), item.completedAt?.slice(0, 10)]),
+  ].filter(Boolean).sort();
+  if (!dates.length) return recentDays(7);
+  const first = new Date(`${dates[0]}T00:00:00`);
+  const today = new Date(`${todayKey()}T00:00:00`);
+  const count = Math.max(1, Math.round((today - first) / 86400000) + 1);
+  return recentDays(count);
+}
+
 function drawCharts() {
-  const days = lastSevenDays();
+  const days = getStatsDays();
+  const focusSessions = state.focusSessions.filter((item) => days.includes(item.date));
   drawLineChart($("#hungerChart"), days, days.map((day) => state.morningEntries.find((item) => item.date === day)?.hunger ?? null), 10);
-  drawLineChart($("#focusChart"), days, days.map((day) => state.focusSessions.filter((item) => item.date === day).reduce((sum, item) => sum + item.minutes, 0)), 120);
+  drawFocusBarChart($("#focusChart"), days, days.map((day) => focusSessions.filter((item) => item.date === day).reduce((sum, item) => sum + item.minutes, 0)));
   drawCategoryChart($("#categoryChart"), days);
-  renderSummary(days);
+  renderSkinTimeline(days);
+  renderStatsSummaries(days, focusSessions);
+  renderGoalStats(days);
+  renderSeedStats(days, focusSessions);
 }
 
 function drawCategoryChart(canvas, days) {
@@ -2316,27 +3117,24 @@ function drawCategoryChart(canvas, days) {
     }, {});
   const entries = Object.entries(totals).sort((a, b) => b[1] - a[1]).slice(0, 6);
   if (!entries.length) {
-    ctx.fillStyle = "#62756a";
-    ctx.font = "22px Noto Sans SC";
-    ctx.textAlign = "center";
-    ctx.fillText(t().stats.noCategory, width / 2, height / 2);
+    drawCanvasEmpty(ctx, width, height, getLanguage() === "zh" ? "还没有分类专注记录" : "No categorized focus yet");
     return;
   }
   const max = Math.max(...entries.map(([, minutes]) => minutes), 1);
-  const colors = ["#496f52", "#7fb38c", "#9fc8bd", "#d9c77a", "#b9dbc8", "#365f49"];
-  ctx.font = "18px Noto Sans SC";
+  const colors = ["#8994b3", "#91b6bd", "#b2a3bf", "#c6ad87", "#a6b5c3", "#c2a6aa"];
+  ctx.font = "16px Noto Sans SC";
   entries.forEach(([category, minutes], index) => {
-    const y = 34 + index * 36;
-    const barWidth = Math.max(8, ((width - 190) * minutes) / max);
-    ctx.fillStyle = "#183228";
+    const y = 30 + index * 38;
+    const barWidth = Math.max(8, ((width - 235) * minutes) / max);
+    ctx.fillStyle = "#315b3e";
     ctx.textAlign = "left";
-    ctx.fillText(displayFocusCategory(category), 34, y + 18);
+    ctx.fillText(displayFocusCategory(category), 26, y + 16);
     ctx.fillStyle = colors[index % colors.length];
-    roundRect(ctx, 118, y, barWidth, 18, 9);
+    roundRect(ctx, 126, y + 2, barWidth, 13, 7);
     ctx.fill();
-    ctx.fillStyle = "#62756a";
+    ctx.fillStyle = "rgba(98, 117, 106, 0.75)";
     ctx.textAlign = "right";
-    ctx.fillText(`${minutes} ${t().focus.minuteUnit}`, width - 28, y + 18);
+    ctx.fillText(`${minutes} ${t().focus.minuteUnit}`, width - 22, y + 16);
   });
 }
 
@@ -2356,29 +3154,32 @@ function drawLineChart(canvas, labels, values, maxValue) {
   const width = canvas.width;
   const height = canvas.height;
   ctx.clearRect(0, 0, width, height);
-  ctx.strokeStyle = "rgba(73, 111, 82, 0.16)";
+  ctx.strokeStyle = "rgba(73, 111, 82, 0.1)";
   ctx.lineWidth = 1;
   for (let i = 0; i < 4; i += 1) {
-    const y = 34 + i * 52;
+    const y = 34 + i * 56;
     ctx.beginPath();
-    ctx.moveTo(44, y);
+    ctx.moveTo(30, y);
     ctx.lineTo(width - 24, y);
     ctx.stroke();
   }
 
   const points = values.map((value, index) => {
-    const x = 54 + index * ((width - 92) / 6);
+    const x = 38 + index * ((width - 76) / Math.max(values.length - 1, 1));
     const normalized = value === null ? null : Math.min(value / maxValue, 1);
-    const y = normalized === null ? null : height - 48 - normalized * (height - 84);
+    const y = normalized === null ? null : height - 46 - normalized * (height - 82);
     return { x, y, value };
   });
 
-  ctx.strokeStyle = "#496f52";
-  ctx.lineWidth = 4;
+  ctx.strokeStyle = "#7fabb8";
+  ctx.lineWidth = 3;
   ctx.beginPath();
   let started = false;
   points.forEach((point) => {
-    if (point.y === null) return;
+    if (point.y === null) {
+      started = false;
+      return;
+    }
     if (!started) {
       ctx.moveTo(point.x, point.y);
       started = true;
@@ -2388,29 +3189,240 @@ function drawLineChart(canvas, labels, values, maxValue) {
   ctx.stroke();
 
   points.forEach((point, index) => {
-    ctx.fillStyle = point.y === null ? "#cfddd4" : "#7fb38c";
+    ctx.fillStyle = point.y === null ? "#dce7e9" : "#8eb7c2";
     ctx.beginPath();
-    ctx.arc(point.x, point.y ?? height - 48, 6, 0, Math.PI * 2);
+    ctx.arc(point.x, point.y ?? height - 46, values.length > 30 ? 2 : 5, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "#6b7280";
-    ctx.font = "18px Segoe UI";
-    ctx.textAlign = "center";
-    ctx.fillText(labels[index].slice(5), point.x, height - 14);
+    if (shouldDrawAxisLabel(index, labels.length)) {
+      ctx.fillStyle = "rgba(98, 117, 106, 0.68)";
+      ctx.font = "14px Segoe UI";
+      ctx.textAlign = "center";
+      ctx.fillText(formatChartDate(labels[index]), point.x, height - 13);
+    }
   });
 }
 
-function renderSummary(days) {
-  const morningCount = state.morningEntries.filter((item) => days.includes(item.date)).length;
-  const focusMinutes = state.focusSessions.filter((item) => days.includes(item.date)).reduce((sum, item) => sum + item.minutes, 0);
-  const nightCount = state.nightEntries.filter((item) => days.includes(item.date)).length;
-  const healthCount = state.healthRecords.length;
-  const text = t().stats;
-  $("#summaryList").innerHTML = [
-    [text.summary.morning, `${morningCount}/7`],
-    [text.summary.focus, `${focusMinutes} ${t().focus.minuteUnit}`],
-    [text.summary.night, `${nightCount}/7`],
-    [text.summary.health, `${healthCount} ${text.records}`],
-  ].map(([label, value]) => `<div><b>${value}</b><span>${label}</span></div>`).join("");
+function drawFocusBarChart(canvas, labels, values) {
+  const ctx = canvas.getContext("2d");
+  const width = canvas.width;
+  const height = canvas.height;
+  ctx.clearRect(0, 0, width, height);
+  const max = Math.max(...values, 1);
+  if (!values.some(Boolean)) {
+    drawCanvasEmpty(ctx, width, height, getLanguage() === "zh" ? "还没有专注记录" : "No focus sessions yet");
+    return;
+  }
+  const space = (width - 62) / Math.max(values.length, 1);
+  const barWidth = Math.max(2, Math.min(24, space * 0.56));
+  values.forEach((value, index) => {
+    const x = 32 + index * space + (space - barWidth) / 2;
+    const barHeight = Math.max(value ? 5 : 0, (value / max) * (height - 72));
+    ctx.fillStyle = "rgba(145, 151, 187, 0.72)";
+    roundRect(ctx, x, height - 42 - barHeight, barWidth, barHeight, Math.min(6, barWidth / 2));
+    ctx.fill();
+    if (shouldDrawAxisLabel(index, labels.length)) {
+      ctx.fillStyle = "rgba(98, 117, 106, 0.68)";
+      ctx.font = "14px Segoe UI";
+      ctx.textAlign = "center";
+      ctx.fillText(formatChartDate(labels[index]), x + barWidth / 2, height - 14);
+    }
+  });
+}
+
+function shouldDrawAxisLabel(index, count) {
+  const step = count <= 7 ? 1 : count <= 30 ? 5 : Math.max(1, Math.ceil(count / 6));
+  return index === 0 || index === count - 1 || index % step === 0;
+}
+
+function formatChartDate(dateText) {
+  return dateText?.slice(5).replace("-", "/") || "";
+}
+
+function drawCanvasEmpty(ctx, width, height, message) {
+  ctx.fillStyle = "rgba(98, 117, 106, 0.62)";
+  ctx.font = "16px Noto Sans SC";
+  ctx.textAlign = "center";
+  ctx.fillText(message, width / 2, height / 2);
+}
+
+function renderSkinTimeline(days) {
+  const target = $("#skinTimeline");
+  const zh = getLanguage() === "zh";
+  const records = state.morningEntries.filter((item) => days.includes(item.date) && item.skinState).slice(-7).reverse();
+  if (!records.length) {
+    target.innerHTML = `<div class="stats-empty">${zh ? "还没有皮肤状态记录" : "No skin records yet"}</div>`;
+    return;
+  }
+  const colors = ["#8eb7c2", "#c8b28b", "#a8c0b6", "#c9a6aa", "#aaa1c2"];
+  target.innerHTML = records.map((item, index) => `
+    <div class="skin-timeline-row">
+      <time>${escapeHtml(formatShortDate(item.date))}</time>
+      <span class="skin-dot" style="--skin-color:${colors[index % colors.length]}"></span>
+      <strong>${escapeHtml(item.skinState)}</strong>
+    </div>
+  `).join("");
+}
+
+function renderStatsSummaries(days, focusSessions) {
+  const zh = getLanguage() === "zh";
+  const morning = state.morningEntries.filter((item) => days.includes(item.date));
+  const hungerValues = morning.map((item) => Number(item.hunger)).filter(Number.isFinite);
+  const averageHunger = hungerValues.length ? (hungerValues.reduce((sum, value) => sum + value, 0) / hungerValues.length).toFixed(1) : "—";
+  const skinRecords = morning.filter((item) => item.skinState).length;
+  const focusMinutes = focusSessions.reduce((sum, item) => sum + Number(item.minutes || 0), 0);
+  const seedSessions = focusSessions.filter((item) => item.habitSeed);
+  $("#healthStatsSummary").innerHTML = summaryPills([
+    [averageHunger, zh ? "平均饥饿值" : "Avg hunger"],
+    [skinRecords, zh ? "皮肤记录" : "Skin records"],
+  ]);
+  $("#focusStatsSummary").innerHTML = summaryPills([
+    [`${focusMinutes} ${t().focus.minuteUnit}`, zh ? "总专注" : "Total focus"],
+    [focusSessions.length, zh ? "完成轮数" : "Sessions"],
+  ]);
+  $("#seedStatsSummary").innerHTML = summaryPills([
+    [seedSessions.length, zh ? "照顾次数" : "Care sessions"],
+    [`${seedSessions.reduce((sum, item) => sum + Number(item.minutes || 0), 0)} ${t().focus.minuteUnit}`, zh ? "投入时间" : "Time invested"],
+  ]);
+}
+
+function summaryPills(items) {
+  return items.map(([value, label]) => `<span><b>${escapeHtml(value)}</b>${escapeHtml(label)}</span>`).join("");
+}
+
+function renderGoalStats(days) {
+  const zh = getLanguage() === "zh";
+  const goals = state.workGoals || [];
+  const today = new Date(`${todayKey()}T00:00:00`);
+  const completedInRange = goals.filter((goal) => goal.status === "done" && days.includes(goal.completedAt?.slice(0, 10)));
+  const openGoals = goals.filter((goal) => goal.status !== "done");
+  const relevantGoals = selectedStatsRange === "all"
+    ? goals
+    : [...openGoals, ...completedInRange.filter((goal) => !openGoals.includes(goal))];
+  const getDaysUntilDue = (goal) => Math.round((new Date(`${goal.deadline}T00:00:00`) - today) / 86400000);
+  const overdue = openGoals.filter((goal) => goal.deadline && getDaysUntilDue(goal) < 0);
+  const dueSoon = openGoals.filter((goal) => goal.deadline && getDaysUntilDue(goal) >= 0 && getDaysUntilDue(goal) <= 7);
+  const inProgress = openGoals.filter((goal) => !overdue.includes(goal) && !dueSoon.includes(goal));
+  const leadDays = completedInRange
+    .filter((goal) => goal.deadline && goal.completedAt)
+    .map((goal) => Math.round((new Date(`${goal.deadline}T00:00:00`) - new Date(goal.completedAt)) / 86400000));
+  const averageLead = leadDays.length ? Math.round(leadDays.reduce((sum, value) => sum + value, 0) / leadDays.length) : null;
+
+  $("#goalsStatsSummary").innerHTML = summaryPills([
+    [openGoals.length, zh ? "进行中" : "Open"],
+    [completedInRange.length, zh ? "已完成" : "Completed"],
+    [dueSoon.length, zh ? "临近 Deadline" : "Due soon"],
+    [averageLead === null ? "—" : `${Math.abs(averageLead)} ${zh ? "天" : "days"}`, averageLead === null
+      ? (zh ? "提前完成" : "Finished early")
+      : averageLead >= 0
+        ? (zh ? "平均提前" : "Avg early")
+        : (zh ? "平均延后" : "Avg late")],
+  ]);
+
+  const statuses = [
+    { label: zh ? "已完成" : "Completed", count: completedInRange.length, color: "#9eb39f" },
+    { label: zh ? "进行中" : "In progress", count: inProgress.length, color: "#94aabd" },
+    { label: zh ? "临近 Deadline" : "Due soon", count: dueSoon.length, color: "#c7ad82" },
+    { label: zh ? "已逾期" : "Overdue", count: overdue.length, color: "#c4a3a8" },
+  ];
+  const maxStatus = Math.max(...statuses.map((item) => item.count), 1);
+  $("#goalStatusChart").innerHTML = statuses.some((item) => item.count)
+    ? statuses.map((item) => `
+      <div class="goal-status-row">
+        <strong>${item.label}</strong>
+        <div class="goal-status-track"><span style="--goal-width:${(item.count / maxStatus) * 100}%;--goal-color:${item.color}"></span></div>
+        <small>${item.count}</small>
+      </div>
+    `).join("")
+    : `<div class="stats-empty">${zh ? "还没有目标记录" : "No goals yet"}</div>`;
+
+  const categoryTotals = relevantGoals.reduce((acc, goal) => {
+    const category = goal.category?.trim() || (zh ? "未分类" : "Uncategorized");
+    acc[category] = acc[category] || { total: 0, completed: 0 };
+    acc[category].total += 1;
+    if (goal.status === "done") acc[category].completed += 1;
+    return acc;
+  }, {});
+  const categories = Object.entries(categoryTotals).sort((a, b) => b[1].total - a[1].total).slice(0, 6);
+  const maxCategory = Math.max(...categories.map(([, value]) => value.total), 1);
+  $("#goalCategoryChart").innerHTML = categories.length
+    ? categories.map(([label, value]) => `
+      <div class="goal-category-row">
+        <strong>${escapeHtml(label)}</strong>
+        <div class="goal-category-track">
+          <span style="--goal-width:${(value.total / maxCategory) * 100}%;--goal-complete-width:${(value.completed / Math.max(value.total, 1)) * 100}%"></span>
+        </div>
+        <small>${value.total} ${zh ? "个" : "goals"} · ${value.completed} ${zh ? "完成" : "done"}</small>
+      </div>
+    `).join("")
+    : `<div class="stats-empty">${zh ? "还没有目标类别记录" : "No goal categories yet"}</div>`;
+
+  renderGoalDeadlineTimeline(openGoals, getDaysUntilDue);
+}
+
+function renderGoalDeadlineTimeline(openGoals, getDaysUntilDue) {
+  const zh = getLanguage() === "zh";
+  const futureGoals = openGoals
+    .filter((goal) => goal.deadline && getDaysUntilDue(goal) >= 0)
+    .sort((a, b) => String(a.deadline).localeCompare(String(b.deadline)));
+  const rangeDays = selectedStatsRange === "all"
+    ? Math.max(30, ...futureGoals.map((goal) => getDaysUntilDue(goal)))
+    : Number(selectedStatsRange) || 7;
+  const visibleGoals = futureGoals.filter((goal) => getDaysUntilDue(goal) <= rangeDays);
+  if (!visibleGoals.length) {
+    $("#goalDeadlineTimeline").innerHTML = `<div class="stats-empty">${zh ? "这个时间范围内没有临近的 Deadline" : "No upcoming deadlines in this range"}</div>`;
+    return;
+  }
+  const points = visibleGoals.map((goal) => {
+    const days = getDaysUntilDue(goal);
+    const position = rangeDays ? (days / rangeDays) * 100 : 0;
+    const color = days <= 3 ? "#c4a3a8" : days <= 7 ? "#c7ad82" : "#94aabd";
+    return `<i class="goal-deadline-point" style="--goal-position:${position}%;--goal-color:${color}" title="${escapeHtml(goal.title)} · ${escapeHtml(formatShortDate(goal.deadline))}"></i>`;
+  }).join("");
+  const list = visibleGoals.slice(0, 6).map((goal) => {
+    const days = getDaysUntilDue(goal);
+    const dueText = days === 0 ? (zh ? "今天到期" : "Due today") : `${days} ${zh ? "天后" : "days left"}`;
+    return `<div class="goal-deadline-item"><b>${escapeHtml(goal.title)}</b><span>${escapeHtml(dueText)} · ${escapeHtml(formatShortDate(goal.deadline))}</span></div>`;
+  }).join("");
+  $("#goalDeadlineTimeline").innerHTML = `
+    <div class="goal-deadline-axis">${points}</div>
+    <div class="goal-deadline-labels"><span>${zh ? "今天" : "Today"}</span><span>${rangeDays} ${zh ? "天" : "days"}</span></div>
+    <div class="goal-deadline-list">${list}</div>
+  `;
+}
+
+function renderSeedStats(days, focusSessions) {
+  const zh = getLanguage() === "zh";
+  const seeds = [
+    { key: "health", label: "Health", color: "#9eb39f" },
+    { key: "tech", label: "Tech", color: "#8faebe" },
+    { key: "soft-skills", label: "Soft Skills", color: "#ad9fbe" },
+  ];
+  const totals = seeds.map((seed) => {
+    const sessions = focusSessions.filter((item) => item.habitSeed === seed.key);
+    return {
+      ...seed,
+      count: sessions.length,
+      minutes: sessions.reduce((sum, item) => sum + Number(item.minutes || 0), 0),
+      dates: sessions.map((item) => item.date),
+    };
+  });
+  const maxMinutes = Math.max(...totals.map((item) => item.minutes), 1);
+  $("#seedComparison").innerHTML = totals.map((item) => `
+    <div class="seed-stat-row">
+      <strong>${item.label}</strong>
+      <div class="seed-stat-track"><span style="--seed-width:${(item.minutes / maxMinutes) * 100}%;--seed-color:${item.color}"></span></div>
+      <small>${item.count} ${zh ? "次" : "sessions"} · ${item.minutes} ${t().focus.minuteUnit}</small>
+    </div>
+  `).join("");
+  const dayIndex = new Map(days.map((day, index) => [day, index]));
+  $("#seedTimeline").innerHTML = totals.map((item) => {
+    const dots = [...new Set(item.dates)].map((date) => {
+      const index = dayIndex.get(date) ?? 0;
+      const position = days.length <= 1 ? 50 : (index / (days.length - 1)) * 100;
+      return `<i class="seed-timeline-dot" style="--seed-position:${position}%;--seed-color:${item.color}" title="${escapeHtml(formatShortDate(date))}"></i>`;
+    }).join("");
+    return `<div class="seed-timeline-row"><strong>${item.label}</strong><div class="seed-timeline-track">${dots}</div></div>`;
+  }).join("");
 }
 
 function exportData() {
