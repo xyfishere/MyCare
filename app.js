@@ -251,6 +251,7 @@ const copy = {
       focus: "专注",
       night: "睡前",
       stats: "统计",
+      selfCare: "自我照顾",
     },
     paperEntry: {
       script: "To future me",
@@ -329,9 +330,12 @@ const copy = {
       cards: {
         work: ["工作目标", "清单、deadline 和完成 note"],
         focus: ["专注打卡", "心流专注与认真休息"],
-        morning: ["晨间 selfcare", "短句、身体记录、冥想、Goals / Calendar"],
-        night: ["睡前 selfcare", "跟着温柔步骤慢慢收尾"],
+        selfCare: ["Self-care", "选择晨间开启新一天，或在睡前温柔收尾。"],
         stats: ["统计板块", "查看记录、趋势和专注分类"],
+      },
+      selfCareActions: {
+        morning: "晨间",
+        night: "睡前",
       },
     },
     morning: {
@@ -507,6 +511,7 @@ const copy = {
       focus: "Focus",
       night: "Night",
       stats: "Stats",
+      selfCare: "Self-care",
     },
     paperEntry: {
       script: "To future me",
@@ -586,9 +591,12 @@ const copy = {
       cards: {
         work: ["Work Goals", "Lists, deadlines, and completion notes"],
         focus: ["Focus sprint", "Flow sessions with mindful breaks"],
-        morning: ["Morning selfcare", "Quotes, body check-in, meditation, Goals / Calendar"],
-        night: ["Night selfcare", "Wind down with gentle bedtime steps"],
+        selfCare: ["Self-care", "Start gently in the morning or wind down softly at night."],
         stats: ["Stats", "Review records, trends, and focus categories"],
+      },
+      selfCareActions: {
+        morning: "Morning",
+        night: "Night",
       },
     },
     morning: {
@@ -1459,10 +1467,16 @@ function pickMorningQuotes() {
 }
 
 function bindNavigation() {
-  $$(".nav-tab, .module-card, .immersive-home, .paper-entry").forEach((button) => {
+  $$(".nav-tab, .module-card[data-view], .self-care-action, .immersive-home, .paper-entry").forEach((button) => {
     button.addEventListener("click", () => {
       showView(button.dataset.view);
     });
+  });
+  $("#selfCareNavToggle")?.addEventListener("click", () => {
+    const dropdown = $("#selfCareNav");
+    const isOpen = !dropdown.classList.contains("open");
+    dropdown.classList.toggle("open", isOpen);
+    $("#selfCareNavToggle").setAttribute("aria-expanded", String(isOpen));
   });
 
   $("#calendarUrl").addEventListener("change", (event) => {
@@ -1513,6 +1527,8 @@ function renderLanguage() {
     button.setAttribute("aria-label", label);
     button.setAttribute("title", label);
   });
+  $("#selfCareNavToggle strong").textContent = text.nav.selfCare;
+  $("#selfCareNavToggle").setAttribute("aria-label", text.nav.selfCare);
 
   $(".paper-entry span").textContent = text.paperEntry.script;
   $(".paper-entry strong").textContent = text.paperEntry.title;
@@ -1532,10 +1548,16 @@ function renderLanguage() {
   $("#view-home .home-copy p:not(.eyebrow)").textContent = text.home.subtitle;
   ensureHomeModuleCards();
   Object.entries(text.home.cards).forEach(([view, [title, description]]) => {
-    const card = $(`.module-card[data-view="${view}"]`);
+    const card = view === "selfCare"
+      ? $(`.module-card[data-home-card="${view}"]`)
+      : $(`.module-card[data-view="${view}"]`);
     if (!card) return;
-    card.querySelector("strong").textContent = title;
+    card.querySelector(":scope > strong").textContent = title;
     card.querySelector("small").textContent = description;
+  });
+  Object.entries(text.home.selfCareActions).forEach(([view, label]) => {
+    const action = $(`.self-care-action[data-view="${view}"] b`);
+    if (action) action.textContent = label;
   });
 
   $$("#languageToggle [data-lang-label]").forEach((item) => {
@@ -1829,6 +1851,12 @@ function renderTodayPanelLabels() {
 
 function showView(viewName) {
   $$(".nav-tab").forEach((item) => item.classList.toggle("active", item.dataset.view === viewName));
+  const isSelfCareView = viewName === "morning" || viewName === "night";
+  $("#selfCareNav")?.classList.toggle("active", isSelfCareView);
+  if (isSelfCareView) {
+    $("#selfCareNav")?.classList.add("open");
+    $("#selfCareNavToggle")?.setAttribute("aria-expanded", "true");
+  }
   $$(".paper-entry").forEach((item) => item.classList.toggle("active", item.dataset.view === viewName));
   $$(".view").forEach((view) => view.classList.remove("active"));
   $(`#view-${viewName}`).classList.add("active");

@@ -76,39 +76,17 @@ a {
 .about-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  width: 230px;
+  height: 58px;
+  overflow: hidden;
   text-decoration: none;
 }
 
-.about-brand > span:last-child {
-  display: grid;
-}
-
-.about-brand strong {
-  font-family: var(--font-script);
-  font-size: 1.75rem;
-  font-weight: 400;
-}
-
-.about-brand small {
-  color: var(--muted);
-  font-size: 0.7rem;
-}
-
-.brand-mark {
-  width: 42px;
-  height: 42px;
-  padding: 4px;
-  border-radius: 10px;
-  background: conic-gradient(from 130deg, var(--moss), var(--leaf), #d9ead6, #d9c77a, #b9dbc8, var(--moss));
-}
-
-.brand-mark i {
+.about-brand-logo {
   display: block;
-  width: 100%;
-  height: 100%;
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.78);
+  width: 230px;
+  max-width: none;
+  height: auto;
 }
 
 .nav-actions {
@@ -413,7 +391,6 @@ a {
     align-items: flex-start;
   }
 
-  .about-brand small,
   .back-link span:first-child {
     display: none;
   }

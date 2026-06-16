@@ -3,8 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta property="og:image" content="assets/images/my-care-logo.png?v=20260609-2" />
     <title>My Care</title>
-    <link rel="stylesheet" href="styles.css?v=20260609-4" />
+    <link rel="icon" type="image/png" href="assets/images/my-care-logo.png?v=20260609-2" />
+    <link rel="stylesheet" href="styles.css?v=20260614-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -16,10 +18,8 @@
       </button>
       <aside class="sidebar" aria-label="主导航">
         <div class="brand">
-          <div class="brand-mark" aria-hidden="true">
-            <span></span>
-          </div>
-          <div>
+          <img class="brand-logo" src="assets/images/my-care-logo.png?v=20260609-2" alt="My Care · private growth room" />
+          <div class="brand-copy">
             <h1>My Care</h1>
             <p>private growth room</p>
           </div>
@@ -30,18 +30,27 @@
             <span aria-hidden="true">◎</span>
             <strong>目标</strong>
           </button>
-          <button class="nav-tab" data-view="morning" aria-label="晨间 selfcare" title="晨间 selfcare">
-            <span aria-hidden="true">☼</span>
-            <strong>晨间</strong>
-          </button>
           <button class="nav-tab" data-view="focus" aria-label="专注打卡" title="专注打卡">
             <span aria-hidden="true">◷</span>
             <strong>专注</strong>
           </button>
-          <button class="nav-tab" data-view="night" aria-label="睡前 selfcare" title="睡前 selfcare">
-            <span aria-hidden="true">☾</span>
-            <strong>睡前</strong>
-          </button>
+          <div class="nav-dropdown" id="selfCareNav">
+            <button class="nav-group-toggle" id="selfCareNavToggle" type="button" aria-expanded="false" aria-controls="selfCareNavMenu">
+              <span aria-hidden="true">♡</span>
+              <strong>自我照顾</strong>
+              <i aria-hidden="true">⌄</i>
+            </button>
+            <div class="nav-submenu" id="selfCareNavMenu">
+              <button class="nav-tab nav-subtab" data-view="morning" aria-label="晨间 selfcare" title="晨间 selfcare">
+                <span aria-hidden="true">☼</span>
+                <strong>晨间</strong>
+              </button>
+              <button class="nav-tab nav-subtab" data-view="night" aria-label="睡前 selfcare" title="睡前 selfcare">
+                <span aria-hidden="true">☾</span>
+                <strong>睡前</strong>
+              </button>
+            </div>
+          </div>
           <button class="nav-tab" data-view="stats" aria-label="统计板块" title="统计">
             <span aria-hidden="true">▦</span>
             <strong>统计</strong>
@@ -93,21 +102,20 @@
               <p>不要着急，一步一步来。</p>
             </div>
             <div class="home-grid">
-              <button class="module-card" data-view="morning">
-                <span aria-hidden="true">☼</span>
-                <strong>晨间 selfcare</strong>
-                <small>短句、身体记录、冥想、Goals / Calendar</small>
-              </button>
               <button class="module-card" data-view="focus">
                 <span aria-hidden="true">◷</span>
                 <strong>专注打卡</strong>
                 <small>30 分钟专注，5 分钟休息</small>
               </button>
-              <button class="module-card" data-view="night">
-                <span aria-hidden="true">☾</span>
-                <strong>睡前 selfcare</strong>
-                <small>跟着自定义步骤慢慢收尾</small>
-              </button>
+              <article class="module-card self-care-card" data-home-card="selfCare">
+                <span aria-hidden="true">♡</span>
+                <strong>Self-care</strong>
+                <small>选择晨间开启新一天，或在睡前温柔收尾。</small>
+                <div class="self-care-actions">
+                  <button class="self-care-action" data-view="morning" type="button">☼ <b>晨间</b></button>
+                  <button class="self-care-action" data-view="night" type="button">☾ <b>睡前</b></button>
+                </div>
+              </article>
               <button class="module-card" data-view="stats">
                 <span aria-hidden="true">▦</span>
                 <strong>统计板块</strong>
@@ -828,6 +836,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-config.js?v=20260608-2"></script>
-    <script src="app.js?v=20260609-3"></script>
+    <script src="app.js?v=20260614-1"></script>
   </body>
 </html>
