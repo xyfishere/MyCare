@@ -204,6 +204,7 @@ let selectedStatsRange = "7";
 let morningIndex = 0;
 let nightIndex = 0;
 let nightInterval = null;
+let wakeTimeDraft = "08:00";
 let selectedNoteMood = "平静";
 let selectedNoteDelay = { type: "days", days: 7 };
 let selectedNoteRecipient = "self";
@@ -361,6 +362,15 @@ const copy = {
       notePlaceholder: "例如：今天先完成最小的一步。",
       meditation: "选择一个晨间冥想",
       calendar: "Calendar 链接",
+      timePicker: {
+        eyebrow: "晨间记录",
+        title: "起床时间",
+        hour: "时",
+        minute: "分",
+        now: "现在",
+        confirm: "确认",
+        close: "关闭时间选择",
+      },
       meditations: {
         focus: "专注冥想",
         emotion: "情绪冥想",
@@ -622,6 +632,15 @@ const copy = {
       notePlaceholder: "For example: start with the smallest possible step.",
       meditation: "Choose a morning meditation",
       calendar: "Calendar link",
+      timePicker: {
+        eyebrow: "Morning check-in",
+        title: "Wake-up time",
+        hour: "Hour",
+        minute: "Minute",
+        now: "Now",
+        confirm: "Confirm",
+        close: "Close time picker",
+      },
       meditations: {
         focus: "Focus meditation",
         emotion: "Emotion meditation",
@@ -1178,7 +1197,7 @@ async function reconcileCloudState() {
     return;
   }
   if (localIsNewer) {
-    await syncToCloud({ force: true });
+    await syncToCloud();
     return;
   }
   setAccountMessage(getLanguage() === "zh" ? "已与云端同步。" : "Synced with the cloud.");
@@ -1196,11 +1215,65 @@ async function syncToCloud({ announce = false, force = false } = {}) {
   if (announce) setAccountMessage(getLanguage() === "zh" ? "正在同步..." : "Syncing...");
   renderAccountUI("syncing");
   const payload = JSON.parse(JSON.stringify(state));
-  const { data, error } = await supabaseClient
+  const { data: currentCloud, error: readError } = await supabaseClient
     .from("app_states")
-    .upsert({ user_id: currentUser.id, payload }, { onConflict: "user_id" })
-    .select("revision, updated_at")
-    .single();
+    .select("payload, revision, updated_at")
+    .eq("user_id", currentUser.id)
+    .maybeSingle();
+
+  if (readError) {
+    cloudSyncInProgress = false;
+    setAccountMessage(readError.message, true);
+    renderAccountUI("error");
+    return;
+  }
+
+  const currentRevision = Number(currentCloud?.revision || 0);
+  if (currentCloud && !force && currentRevision !== cloudRevision) {
+    cloudSyncInProgress = false;
+    showCloudConflict(currentCloud);
+    return;
+  }
+
+  let data;
+  let error;
+  if (!currentCloud) {
+    ({ data, error } = await supabaseClient
+      .from("app_states")
+      .insert({ user_id: currentUser.id, payload })
+      .select("revision, updated_at")
+      .single());
+  } else if (force) {
+    ({ data, error } = await supabaseClient
+      .from("app_states")
+      .update({ payload })
+      .eq("user_id", currentUser.id)
+      .select("revision, updated_at")
+      .single());
+  } else {
+    ({ data, error } = await supabaseClient
+      .from("app_states")
+      .update({ payload })
+      .eq("user_id", currentUser.id)
+      .eq("revision", cloudRevision)
+      .select("revision, updated_at")
+      .maybeSingle());
+    if (!error && !data) {
+      const { data: latestCloud, error: latestError } = await supabaseClient
+        .from("app_states")
+        .select("payload, revision, updated_at")
+        .eq("user_id", currentUser.id)
+        .single();
+      cloudSyncInProgress = false;
+      if (latestError) {
+        setAccountMessage(latestError.message, true);
+        renderAccountUI("error");
+      } else {
+        showCloudConflict(latestCloud);
+      }
+      return;
+    }
+  }
   cloudSyncInProgress = false;
   if (error) {
     setAccountMessage(error.message, true);
@@ -1214,6 +1287,15 @@ async function syncToCloud({ announce = false, force = false } = {}) {
   setAccountMessage(getLanguage() === "zh" ? "已安全同步到云端。" : "Safely synced to the cloud.");
   renderAccountUI("synced");
   loadCloudHistory();
+}
+
+function showCloudConflict(snapshot) {
+  cloudSnapshot = snapshot;
+  cloudRevision = Number(snapshot?.revision || cloudRevision);
+  setAccountMessage(getLanguage() === "zh"
+    ? "云端已有较新的数据。为避免覆盖，请选择要保留的版本。"
+    : "The cloud has newer data. Choose which version to keep to avoid overwriting it.");
+  renderAccountUI("conflict");
 }
 
 function applyPendingCloudState() {
@@ -1613,6 +1695,13 @@ function renderMorningLanguage() {
   });
   $("#morningFinalActionLabel").textContent = text.finalActionLabel;
   $("#morningCalendarLabel").textContent = text.calendar;
+  $("#wakeTimePickerEyebrow").textContent = text.timePicker.eyebrow;
+  $("#wakeTimePickerTitle").textContent = text.timePicker.title;
+  $("#wakeHourLabel").textContent = text.timePicker.hour;
+  $("#wakeMinuteLabel").textContent = text.timePicker.minute;
+  $("#wakeTimeNow").textContent = text.timePicker.now;
+  $("#wakeTimeConfirm").textContent = text.timePicker.confirm;
+  $("#wakeTimeClose").setAttribute("aria-label", text.timePicker.close);
   $("[data-morning-final-action='goals']").textContent = text.goalsOption;
   $("[data-morning-final-action='calendar']").textContent = text.calendarOption;
   const skinOptions = getLanguage() === "en"
@@ -1877,6 +1966,8 @@ function setImmersiveMode(viewName) {
 }
 
 function bindMorning() {
+  bindWakeTimePicker();
+
   $("#hunger").addEventListener("input", (event) => {
     $("#hungerOut").textContent = `${event.target.value} / 10`;
   });
@@ -1951,6 +2042,99 @@ function bindMorning() {
       if (audio[kind]?.playing) stopAudio(kind);
       else startAudio(kind);
     });
+  });
+}
+
+function bindWakeTimePicker() {
+  const input = $("#wakeTime");
+  const trigger = $("#wakeTimeTrigger");
+  const popover = $("#wakeTimePopover");
+  if (!input || !trigger || !popover) return;
+
+  buildWakeTimeOptions();
+  wakeTimeDraft = normalizeWakeTime(input.value);
+  input.value = wakeTimeDraft;
+  renderWakeTimePicker();
+
+  trigger.addEventListener("click", () => {
+    if (popover.hidden) openWakeTimePicker();
+    else closeWakeTimePicker();
+  });
+  $("#wakeTimeClose").addEventListener("click", closeWakeTimePicker);
+  $("#wakeTimeConfirm").addEventListener("click", () => {
+    input.value = wakeTimeDraft;
+    renderWakeTimePicker();
+    closeWakeTimePicker();
+  });
+  $("#wakeTimeNow").addEventListener("click", () => {
+    wakeTimeDraft = normalizeWakeTime(new Date().toTimeString().slice(0, 5));
+    renderWakeTimePicker();
+    scrollWakeTimeSelectionIntoView();
+  });
+
+  popover.addEventListener("click", (event) => {
+    const option = event.target.closest(".wake-time-option");
+    if (!option) return;
+    const [hour, minute] = wakeTimeDraft.split(":");
+    wakeTimeDraft = option.dataset.timePart === "hour"
+      ? `${option.dataset.value}:${minute}`
+      : `${hour}:${option.dataset.value}`;
+    renderWakeTimePicker();
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!popover.hidden && !event.target.closest(".wake-time-picker")) closeWakeTimePicker();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !popover.hidden) {
+      closeWakeTimePicker();
+      trigger.focus();
+    }
+  });
+}
+
+function buildWakeTimeOptions() {
+  const createOptions = (container, count, part) => {
+    container.innerHTML = Array.from({ length: count }, (_, value) => {
+      const padded = String(value).padStart(2, "0");
+      return `<button class="wake-time-option" type="button" role="option" data-time-part="${part}" data-value="${padded}" aria-selected="false">${padded}</button>`;
+    }).join("");
+  };
+  createOptions($("#wakeHourOptions"), 24, "hour");
+  createOptions($("#wakeMinuteOptions"), 60, "minute");
+}
+
+function normalizeWakeTime(value) {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value || "");
+  return match ? `${match[1]}:${match[2]}` : "08:00";
+}
+
+function openWakeTimePicker() {
+  wakeTimeDraft = normalizeWakeTime($("#wakeTime").value);
+  $("#wakeTimePopover").hidden = false;
+  $("#wakeTimeTrigger").setAttribute("aria-expanded", "true");
+  renderWakeTimePicker();
+  requestAnimationFrame(scrollWakeTimeSelectionIntoView);
+}
+
+function closeWakeTimePicker() {
+  $("#wakeTimePopover").hidden = true;
+  $("#wakeTimeTrigger").setAttribute("aria-expanded", "false");
+}
+
+function renderWakeTimePicker() {
+  const [hour, minute] = normalizeWakeTime(wakeTimeDraft).split(":");
+  $("#wakeTimeDisplay").textContent = `${hour}:${minute}`;
+  $$(".wake-time-option").forEach((option) => {
+    const selected = option.dataset.value === (option.dataset.timePart === "hour" ? hour : minute);
+    option.classList.toggle("is-selected", selected);
+    option.setAttribute("aria-selected", String(selected));
+  });
+}
+
+function scrollWakeTimeSelectionIntoView() {
+  $$(".wake-time-option.is-selected").forEach((option) => {
+    option.scrollIntoView({ block: "center" });
   });
 }
 

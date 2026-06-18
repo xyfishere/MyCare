@@ -4633,6 +4633,311 @@ body.block-mode[data-block-theme="dark"] .app-shell::before {
   display: grid;
 }
 
+.wake-time-picker {
+  position: relative;
+  display: block;
+}
+
+.wake-time-trigger {
+  width: 100%;
+  min-height: 54px;
+  border: 1px solid rgba(73, 111, 82, 0.16);
+  border-radius: 8px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(240, 248, 237, 0.64)),
+    rgba(249, 253, 247, 0.76);
+  color: #244535;
+  padding: 8px 12px;
+  display: grid;
+  grid-template-columns: 32px 1fr 22px;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  outline: none;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    0 10px 24px rgba(24, 50, 40, 0.055);
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background 180ms ease;
+}
+
+.wake-time-trigger:hover,
+.wake-time-trigger:focus-visible,
+.wake-time-trigger[aria-expanded="true"] {
+  border-color: rgba(73, 111, 82, 0.3);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 14px 32px rgba(24, 50, 40, 0.09);
+  transform: translateY(-1px);
+}
+
+.wake-time-trigger strong {
+  font-family: var(--font-display);
+  font-size: 1.12rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.wake-time-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid rgba(73, 111, 82, 0.18);
+  background: rgba(127, 179, 140, 0.11);
+  position: relative;
+}
+
+.wake-time-icon::before,
+.wake-time-icon::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1px;
+  border-radius: 999px;
+  background: #52765b;
+  transform-origin: center bottom;
+}
+
+.wake-time-icon::before {
+  height: 7px;
+  transform: translate(-50%, -100%);
+}
+
+.wake-time-icon::after {
+  height: 6px;
+  transform: translate(-50%, -100%) rotate(120deg);
+}
+
+.wake-time-chevron {
+  width: 8px;
+  height: 8px;
+  justify-self: center;
+  border-right: 1.5px solid rgba(52, 82, 64, 0.72);
+  border-bottom: 1.5px solid rgba(52, 82, 64, 0.72);
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 180ms ease;
+}
+
+.wake-time-trigger[aria-expanded="true"] .wake-time-chevron {
+  transform: rotate(225deg) translate(-2px, -2px);
+}
+
+.wake-time-popover {
+  position: absolute;
+  z-index: 18;
+  left: 0;
+  top: calc(100% + 10px);
+  width: min(340px, calc(100vw - 72px));
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: 8px;
+  background:
+    linear-gradient(150deg, rgba(251, 254, 249, 0.96), rgba(231, 242, 228, 0.9)),
+    rgba(247, 251, 245, 0.94);
+  color: #244535;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 24px 60px rgba(20, 48, 34, 0.18);
+  backdrop-filter: blur(20px);
+  animation: wakeTimeReveal 180ms ease both;
+}
+
+.wake-time-popover[hidden] {
+  display: none;
+}
+
+@keyframes wakeTimeReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.wake-time-popover-head,
+.wake-time-columns,
+.wake-time-actions {
+  display: flex;
+}
+
+.wake-time-popover-head {
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding-bottom: 13px;
+  border-bottom: 1px solid rgba(73, 111, 82, 0.1);
+}
+
+.wake-time-popover-head > span {
+  display: grid;
+  gap: 2px;
+}
+
+.wake-time-popover-head small {
+  color: rgba(73, 111, 82, 0.58);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.wake-time-popover-head strong {
+  font-family: var(--font-display);
+  font-size: 1rem;
+}
+
+.wake-time-close {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(73, 111, 82, 0.07);
+  position: relative;
+  outline: none;
+}
+
+.wake-time-close::before,
+.wake-time-close::after {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: 14px;
+  width: 12px;
+  height: 1px;
+  background: rgba(38, 71, 53, 0.72);
+}
+
+.wake-time-close::before {
+  transform: rotate(45deg);
+}
+
+.wake-time-close::after {
+  transform: rotate(-45deg);
+}
+
+.wake-time-columns {
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 0;
+}
+
+.wake-time-column {
+  min-width: 96px;
+  display: grid;
+  gap: 6px;
+}
+
+.wake-time-column > small {
+  color: rgba(73, 111, 82, 0.62);
+  font-size: 0.68rem;
+  text-align: center;
+}
+
+.wake-time-options {
+  height: 164px;
+  padding: 54px 5px;
+  display: grid;
+  gap: 5px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(73, 111, 82, 0.2) transparent;
+  border-block: 1px solid rgba(73, 111, 82, 0.09);
+  background: rgba(255, 255, 255, 0.34);
+}
+
+.wake-time-option {
+  min-height: 42px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: rgba(52, 82, 64, 0.56);
+  font-family: var(--font-display);
+  font-size: 1rem;
+  outline: none;
+  scroll-snap-align: center;
+  transition:
+    color 150ms ease,
+    background 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.wake-time-option:hover {
+  color: #315c42;
+  background: rgba(127, 179, 140, 0.09);
+}
+
+.wake-time-option.is-selected {
+  border-color: rgba(73, 111, 82, 0.18);
+  background: rgba(255, 255, 255, 0.78);
+  color: #244535;
+  font-weight: 700;
+  box-shadow: 0 7px 18px rgba(24, 50, 40, 0.07);
+  transform: scale(1.02);
+}
+
+.wake-time-separator {
+  color: rgba(73, 111, 82, 0.46);
+  font-family: var(--font-display);
+  font-size: 1.28rem;
+}
+
+.wake-time-actions {
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 13px;
+  border-top: 1px solid rgba(73, 111, 82, 0.1);
+}
+
+.wake-time-now,
+.wake-time-confirm {
+  min-height: 38px;
+  border-radius: 999px;
+  padding: 0 16px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  outline: none;
+}
+
+.wake-time-close:focus-visible,
+.wake-time-option:focus-visible,
+.wake-time-now:focus-visible,
+.wake-time-confirm:focus-visible {
+  box-shadow: 0 0 0 3px rgba(127, 179, 140, 0.18);
+}
+
+.wake-time-now {
+  border: 1px solid rgba(73, 111, 82, 0.14);
+  background: rgba(255, 255, 255, 0.55);
+  color: #496f52;
+}
+
+.wake-time-confirm {
+  min-width: 112px;
+  border: 1px solid rgba(73, 111, 82, 0.3);
+  background: linear-gradient(135deg, #638a67, #496f52);
+  color: #fff;
+  box-shadow: 0 9px 22px rgba(73, 111, 82, 0.16);
+}
+
+.wake-time-now:active,
+.wake-time-confirm:active,
+.wake-time-close:active,
+.wake-time-option:active {
+  transform: translateY(1px);
+}
+
 .action-row {
   display: flex;
   gap: 12px;

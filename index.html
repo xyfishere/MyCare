@@ -6,7 +6,7 @@
     <meta property="og:image" content="assets/images/my-care-logo.png?v=20260609-2" />
     <title>My Care</title>
     <link rel="icon" type="image/png" href="assets/images/my-care-logo.png?v=20260609-2" />
-    <link rel="stylesheet" href="styles.css?v=20260614-1" />
+    <link rel="stylesheet" href="styles.css?v=20260618-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -157,7 +157,38 @@
                 </label>
                 <label class="morning-field" data-morning-field="wake">
                   起床时间
-                  <input id="wakeTime" type="time" />
+                  <span class="wake-time-picker">
+                    <input id="wakeTime" type="hidden" />
+                    <button class="wake-time-trigger" id="wakeTimeTrigger" type="button" aria-haspopup="dialog" aria-expanded="false">
+                      <span class="wake-time-icon" aria-hidden="true"></span>
+                      <strong id="wakeTimeDisplay">08:00</strong>
+                      <span class="wake-time-chevron" aria-hidden="true"></span>
+                    </button>
+                    <span class="wake-time-popover" id="wakeTimePopover" role="dialog" aria-modal="false" aria-labelledby="wakeTimePickerTitle" hidden>
+                      <span class="wake-time-popover-head">
+                        <span>
+                          <small id="wakeTimePickerEyebrow">Morning check-in</small>
+                          <strong id="wakeTimePickerTitle">Wake-up time</strong>
+                        </span>
+                        <button class="wake-time-close" id="wakeTimeClose" type="button" aria-label="Close"></button>
+                      </span>
+                      <span class="wake-time-columns">
+                        <span class="wake-time-column">
+                          <small id="wakeHourLabel">Hour</small>
+                          <span class="wake-time-options" id="wakeHourOptions" role="listbox" aria-labelledby="wakeHourLabel"></span>
+                        </span>
+                        <span class="wake-time-separator" aria-hidden="true">:</span>
+                        <span class="wake-time-column">
+                          <small id="wakeMinuteLabel">Minute</small>
+                          <span class="wake-time-options" id="wakeMinuteOptions" role="listbox" aria-labelledby="wakeMinuteLabel"></span>
+                        </span>
+                      </span>
+                      <span class="wake-time-actions">
+                        <button class="wake-time-now" id="wakeTimeNow" type="button">Now</button>
+                        <button class="wake-time-confirm" id="wakeTimeConfirm" type="button">Confirm</button>
+                      </span>
+                    </span>
+                  </span>
                 </label>
                 <label class="morning-field" data-morning-field="hunger">
                   饥饿值
@@ -836,6 +867,6 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-config.js?v=20260608-2"></script>
-    <script src="app.js?v=20260614-1"></script>
+    <script src="app.js?v=20260618-1"></script>
   </body>
 </html>
