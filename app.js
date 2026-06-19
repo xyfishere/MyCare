@@ -42,6 +42,20 @@ const legacyNightMusicPlaylists = {
   rain: "https://www.youtube.com/results?search_query=gentle+rain+sleep+music+playlist",
 };
 
+const defaultFocusCategories = [
+  { id: "learning", labelZh: "学习", labelEn: "Learning", color: "#91a9bd", active: true, builtIn: true },
+  { id: "work", labelZh: "工作", labelEn: "Work", color: "#8eae98", active: true, builtIn: true },
+  { id: "reading", labelZh: "阅读", labelEn: "Reading", color: "#b4a2bd", active: true, builtIn: true },
+  { id: "creative", labelZh: "创作", labelEn: "Creative", color: "#c3aa86", active: true, builtIn: true },
+  { id: "life", labelZh: "生活", labelEn: "Life", color: "#a7b8b0", active: true, builtIn: true },
+];
+
+const defaultHabitSeeds = [
+  { id: "health", labelZh: "Health", labelEn: "Health", color: "#9eb39f", active: true, builtIn: true },
+  { id: "tech", labelZh: "Tech", labelEn: "Tech", color: "#8faebe", active: true, builtIn: true },
+  { id: "soft-skills", labelZh: "Soft Skills", labelEn: "Soft Skills", color: "#ad9fbe", active: true, builtIn: true },
+];
+
 const defaults = {
   settings: {
     calendarUrl: "https://calendar.google.com/calendar/u/0/r/day",
@@ -55,6 +69,9 @@ const defaults = {
     workGoalView: "list",
     workGoalFilter: "current",
     language: "zh",
+    focusCategories: defaultFocusCategories,
+    habitSeedTypes: defaultHabitSeeds,
+    selfCareQuotes: [],
     recordDataResetVersion: RECORD_DATA_RESET_VERSION,
     lastLocalChangeAt: "",
     lastCloudSyncAt: "",
@@ -197,7 +214,7 @@ let focusTimer = {
   endAt: null,
   cycle: 1,
 };
-let focusCategory = "学习";
+let focusCategory = "learning";
 let selectedFocusSeed = "none";
 let selectedFocusMinutes = 30;
 let selectedStatsRange = "7";
@@ -209,16 +226,10 @@ let selectedNoteMood = "平静";
 let selectedNoteDelay = { type: "days", days: 7 };
 let selectedNoteRecipient = "self";
 let noteCalendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let workDeadlineMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let pendingDeleteGoalId = "";
 let currentBackgroundCredit = "";
 let selectedHabitStart = { task: "", category: "工作" };
-
-const habitSeeds = [
-  { key: "start", label: "启动", labelEn: "Start", icon: "01" },
-  { key: "job", label: "求职", labelEn: "Job", icon: "02" },
-  { key: "speaking", label: "口语", labelEn: "Speaking", icon: "03" },
-  { key: "tech", label: "技术", labelEn: "Tech", icon: "04" },
-  { key: "health", label: "健康", labelEn: "Health", icon: "05" },
-];
 
 const personalBlockThemeCredits = {
   iceland: "背景：冰湖雪山 · Unsplash",
@@ -293,6 +304,11 @@ const copy = {
       categoryLabel: "分类",
       categoryPlaceholder: "求职 / 技术 / 健康",
       deadlineLabel: "Deadline",
+      chooseDeadline: "选择日期",
+      calendarToday: "今天",
+      calendarClear: "清除",
+      previousMonth: "上个月",
+      nextMonth: "下个月",
       add: "加入目标列表",
       currentTitle: "当前目标",
       finishedTitle: "已完成目标",
@@ -312,6 +328,46 @@ const copy = {
       currentEmpty: "暂时没有进行中的目标。",
       finishedEmpty: "还没有完成的目标。",
       emptyCta: "添加一个目标",
+      resetHint: "准备好重新开始时，可以清空当前旅程。",
+      resetEyebrow: "New journey",
+      resetTitle: "你确定要开始新的 journey 吗？",
+      resetCopy: "这意味着你所有的 task 即将被清空。",
+      resetCancel: "取消",
+      resetConfirm: "确认清空",
+      delete: "删除 goal",
+      deleteEyebrow: "Remove goal",
+      deleteTitle: "确定要删除这个 goal 吗？",
+      deleteCopy: "删除后，这个 goal 和它的 note 将无法恢复。",
+      deleteCancel: "取消",
+      deleteConfirm: "删除 goal",
+    },
+    personalization: {
+      title: "个性化设置",
+      copy: "让分类更贴近你的生活，同时保持页面轻盈。",
+      focusTab: "Focus Categories",
+      seedTab: "Habit Seeds",
+      quotesTab: "Self-care Quotes",
+      calendarTab: "Calendar",
+      custom: "＋ 自定义",
+      customizeQuotes: "＋ 自定义语录",
+      customizeCalendar: "自定义 Calendar",
+      add: "添加",
+      addQuote: "添加语录",
+      focusPlaceholder: "新的分类",
+      seedPlaceholder: "新的 Habit Seed",
+      quoteLabel: "语录",
+      quotePlaceholder: "写一句想在晨间读到的话",
+      active: "启用",
+      note: "停用后不会出现在选择器中，过去的数据仍会保留。",
+      quoteNote: "每天会从启用的语录中随机选择两句。至少保留两句启用。",
+      calendarEyebrow: "Your personal calendar",
+      calendarTitle: "选择晨间流程接下来打开的页面",
+      calendarCopy: "填写你平时安排一天所使用的页面，例如 Google Calendar、Notion Calendar 或其他日历服务。",
+      calendarLabel: "Calendar 页面链接",
+      calendarPlaceholder: "https://calendar.google.com/...",
+      calendarNote: "修改会自动保存。晨间流程结束时会打开这个页面。",
+      settings: "个性化设置",
+      none: "不关联",
     },
     today: {
       eyebrow: "今日",
@@ -346,10 +402,10 @@ const copy = {
       start: "开始晨间流程",
       restart: "从头开始",
       chooseMeditation: "选择冥想",
-      openCalendar: "打开 Calendar",
+      openCalendar: "打开你的个人日历",
       openGoals: "打开 Goals",
       goalsOption: "Goals",
-      calendarOption: "Calendar",
+      calendarOption: "你的个人日历",
       finalActionLabel: "冥想后的下一步",
       completeTitle: "晨间流程完成。今天不用完美，只要能回来就好。",
       completeHint: "你已经把今天打开了。",
@@ -563,6 +619,11 @@ const copy = {
       categoryLabel: "Category",
       categoryPlaceholder: "Job search / Tech / Health",
       deadlineLabel: "Deadline",
+      chooseDeadline: "Choose a date",
+      calendarToday: "Today",
+      calendarClear: "Clear",
+      previousMonth: "Previous month",
+      nextMonth: "Next month",
       add: "Add to goals",
       currentTitle: "Current goals",
       finishedTitle: "Finished goals",
@@ -582,6 +643,46 @@ const copy = {
       currentEmpty: "No current goals.",
       finishedEmpty: "No finished goals yet.",
       emptyCta: "Add New Goal",
+      resetHint: "When you are ready to begin again, you can clear this journey.",
+      resetEyebrow: "New journey",
+      resetTitle: "Are you sure you want to begin a new journey?",
+      resetCopy: "This will clear all of your tasks.",
+      resetCancel: "Cancel",
+      resetConfirm: "Clear all tasks",
+      delete: "Delete goal",
+      deleteEyebrow: "Remove goal",
+      deleteTitle: "Delete this goal?",
+      deleteCopy: "This goal and its note cannot be restored after deletion.",
+      deleteCancel: "Cancel",
+      deleteConfirm: "Delete goal",
+    },
+    personalization: {
+      title: "Personalization",
+      copy: "Shape the categories around your life while keeping the interface light.",
+      focusTab: "Focus Categories",
+      seedTab: "Habit Seeds",
+      quotesTab: "Self-care Quotes",
+      calendarTab: "Calendar",
+      custom: "+ Customize",
+      customizeQuotes: "+ Customize quotes",
+      customizeCalendar: "Customize calendar",
+      add: "Add",
+      addQuote: "Add quote",
+      focusPlaceholder: "New category",
+      seedPlaceholder: "New Habit Seed",
+      quoteLabel: "Quote",
+      quotePlaceholder: "Write something you would like to read in the morning",
+      active: "Active",
+      note: "Inactive items disappear from selectors, while past records stay intact.",
+      quoteNote: "Two active quotes are selected at random each morning. Keep at least two active.",
+      calendarEyebrow: "Your personal calendar",
+      calendarTitle: "Choose where your morning flow continues",
+      calendarCopy: "Add the page you use to plan your day, such as Google Calendar, Notion Calendar, or another calendar service.",
+      calendarLabel: "Calendar page URL",
+      calendarPlaceholder: "https://calendar.google.com/...",
+      calendarNote: "Changes save automatically. This page opens when your morning flow is complete.",
+      settings: "Personalization settings",
+      none: "None",
     },
     today: {
       eyebrow: "Today",
@@ -616,10 +717,10 @@ const copy = {
       start: "Start morning flow",
       restart: "Start over",
       chooseMeditation: "Choose meditation",
-      openCalendar: "Open Calendar",
+      openCalendar: "Open your personal calendar",
       openGoals: "Open Goals",
       goalsOption: "Goals",
-      calendarOption: "Calendar",
+      calendarOption: "Your personal calendar",
       finalActionLabel: "After meditation",
       completeTitle: "Morning flow complete. Today does not need to be perfect. Coming back is enough.",
       completeHint: "You have gently opened the day.",
@@ -857,55 +958,31 @@ const defaultMorningQuotes = [
   {
     label: "先读一句",
     prompt: "爱自己是一生浪漫的开始。",
-    promptEn: "Loving yourself is the beginning of a lifelong romance.",
+    promptEn: "To love oneself is the beginning of a lifelong romance.",
     hint: "",
   },
   {
     label: "再读一句",
-    prompt: "人不可以逃避苦难，亦不可以放弃希望。",
-    promptEn: "We cannot escape hardship, nor can we give up hope.",
+    prompt: "如果一个人一直足够坚定，就能实现他的愿望。",
+    promptEn: "If a person remains steadfast enough, they can make their dreams come true.",
     hint: "",
   },
   {
     label: "启动提醒",
-    prompt: "唯有“美”能让生命拥意义。",
-    promptEn: "Only beauty can give life meaning.",
+    prompt: "我始终沉浸在自己之中，我的注意力永远朝向内心。",
+    promptEn: "My attention has always been drawn inward, where I continue to discover myself.",
     hint: "",
   },
   {
     label: "短句 4",
-    prompt: "我们体内住着一个存在，他无所不知，他知道自己想要什么，它比我们更懂得如何生活得更好。",
-    promptEn: "There is something within us that knows what it wants and understands how we might live more fully.",
+    prompt: "读书，痛苦，爱着从痛苦中滋生出来的那份喜悦，这是一个永无止境的过程。",
+    promptEn: "Reading, suffering, and loving the joy that grows from suffering—this is a journey without end.",
     hint: "",
   },
   {
     label: "短句 5",
-    prompt: "如果一个人一直足够坚定，就能实现他的愿望。",
-    promptEn: "If a person remains steadfast enough, they can bring their wish to life.",
-    hint: "",
-  },
-  {
-    label: "短句 6",
-    prompt: "我始终沉浸在自己之中，我的注意力永远朝向内心。",
-    promptEn: "I remain immersed in myself, with my attention always turned inward.",
-    hint: "",
-  },
-  {
-    label: "短句 7",
-    prompt: "寻找自己，在自己内心扎根，试探着走出自己的道路，无论这条路将通向何方。",
-    promptEn: "Find yourself, take root within, and gently make your own path wherever it may lead.",
-    hint: "",
-  },
-  {
-    label: "短句 8",
-    prompt: "读书，痛苦，爱着从痛苦中滋生出来的那份喜悦，这是一个永无止境的过程。",
-    promptEn: "To read, to endure, and to love the joy that grows from hardship is an endless process.",
-    hint: "",
-  },
-  {
-    label: "短句 9",
     prompt: "我遇见的每一个人，街头的每一丝气味，都让我有了无限去爱的理由。",
-    promptEn: "Every person I meet and every scent in the street gives me endless reasons to love.",
+    promptEn: "Every person I meet and every scent that drifts through the streets gives me another reason to love this world.",
     hint: "",
   },
 ];
@@ -968,6 +1045,7 @@ function loadState() {
       settings: { ...cloneDefaults().settings, ...(parsed.settings || {}) },
     };
     loaded.settings.nightMusicPlaylists = migrateNightMusicPlaylists(parsed.settings?.nightMusicPlaylists);
+    normalizePersonalizationSettings(loaded.settings);
     if (!loaded.settings.nightMusicPlaylists[loaded.settings.nightMusicTheme]) {
       loaded.settings.nightMusicTheme = defaults.settings.nightMusicTheme;
     }
@@ -1010,6 +1088,44 @@ function migrateNightMusicPlaylists(savedPlaylists = {}) {
   return merged;
 }
 
+function normalizePersonalizationSettings(settings) {
+  settings.focusCategories = normalizeDefinitionList(settings.focusCategories, defaultFocusCategories);
+  settings.habitSeedTypes = normalizeDefinitionList(settings.habitSeedTypes, defaultHabitSeeds);
+  settings.selfCareQuotes = normalizeQuoteDefinitions(settings.selfCareQuotes);
+}
+
+function normalizeDefinitionList(saved, fallback) {
+  const source = Array.isArray(saved) && saved.length ? saved : fallback;
+  const seen = new Set();
+  return source.map((item, index) => {
+    const fallbackItem = fallback.find((entry) => entry.id === item?.id) || fallback[index];
+    const rawId = String(item?.id || fallbackItem?.id || `custom-${Date.now()}-${index}`);
+    const id = seen.has(rawId) ? `${rawId}-${index}` : rawId;
+    seen.add(id);
+    return {
+      id,
+      labelZh: String(item?.labelZh || item?.label || fallbackItem?.labelZh || "自定义").trim(),
+      labelEn: String(item?.labelEn || item?.label || fallbackItem?.labelEn || "Custom").trim(),
+      color: /^#[0-9a-f]{6}$/i.test(item?.color || "") ? item.color : (fallbackItem?.color || "#9eb39f"),
+      active: item?.active !== false,
+      builtIn: Boolean(item?.builtIn ?? fallbackItem?.builtIn),
+    };
+  });
+}
+
+function normalizeQuoteDefinitions(saved) {
+  if (!Array.isArray(saved)) return [];
+  return saved.map((item, index) => {
+    const text = String(item?.text || item?.zh || item?.prompt || item?.en || item?.promptEn || "").trim();
+    return {
+      id: String(item?.id || `quote-${index + 1}`),
+      text,
+      active: item?.active !== false,
+      builtIn: item?.builtIn !== false,
+    };
+  }).filter((item) => item.text);
+}
+
 function cloneDefaults() {
   return JSON.parse(JSON.stringify(defaults));
 }
@@ -1043,6 +1159,7 @@ function init() {
   bindStats();
   bindTimerAccuracy();
   bindAccount();
+  bindPersonalization();
   renderLanguage();
   showView("home");
   refreshDashboard();
@@ -1067,6 +1184,237 @@ function bindAccount() {
     const button = event.target.closest("[data-history-id]");
     if (button) restoreCloudHistory(button.dataset.historyId);
   });
+}
+
+function bindPersonalization() {
+  $("#globalSettingsToggle")?.addEventListener("click", () => openPersonalization("focus"));
+  $("#morningQuoteCustomize")?.addEventListener("click", () => openPersonalization("quotes"));
+  $("#personalizationLanguageToggle")?.addEventListener("click", toggleLanguage);
+  $$("[data-settings-section]").forEach((button) => {
+    button.addEventListener("click", () => openPersonalization(button.dataset.settingsSection));
+  });
+  $$(".personalization-tab").forEach((button) => {
+    button.addEventListener("click", () => selectPersonalizationTab(button.dataset.personalizationTab));
+  });
+  $("#addFocusCategory")?.addEventListener("click", () => addPersonalizationItem("focus"));
+  $("#addHabitSeed")?.addEventListener("click", () => addPersonalizationItem("seed"));
+  $("#addSelfCareQuote")?.addEventListener("click", addSelfCareQuote);
+  $("#personalizationDialog")?.addEventListener("input", handlePersonalizationEdit);
+  $("#personalizationDialog")?.addEventListener("change", handlePersonalizationEdit);
+}
+
+function openPersonalization(section = "focus") {
+  selectPersonalizationTab(section);
+  renderPersonalizationSettings();
+  $("#personalizationDialog")?.showModal();
+}
+
+function selectPersonalizationTab(section) {
+  const selected = ["focus", "seed", "quotes", "calendar"].includes(section) ? section : "focus";
+  $$(".personalization-tab").forEach((button) => {
+    const active = button.dataset.personalizationTab === selected;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  $$(".personalization-section").forEach((panel) => {
+    panel.classList.toggle("active", panel.dataset.personalizationSection === selected);
+  });
+  if ($("#personalizationNote")) {
+    $("#personalizationNote").textContent = selected === "quotes"
+      ? t().personalization.quoteNote
+      : selected === "calendar"
+        ? t().personalization.calendarNote
+        : t().personalization.note;
+  }
+}
+
+function renderPersonalizationLanguage() {
+  const text = t().personalization;
+  $("#globalSettingsToggle")?.setAttribute("aria-label", text.settings);
+  $("#globalSettingsToggle")?.setAttribute("title", text.settings);
+  $(".personalization-close")?.setAttribute("aria-label", getLanguage() === "zh" ? "关闭" : "Close");
+  $(".personalization-tabs")?.setAttribute("aria-label", text.settings);
+  $("#personalizationTitle").textContent = text.title;
+  $("#personalizationCopy").textContent = text.copy;
+  $(".personalization-tab[data-personalization-tab='focus']").textContent = text.focusTab;
+  $(".personalization-tab[data-personalization-tab='seed']").textContent = text.seedTab;
+  $(".personalization-tab[data-personalization-tab='quotes']").textContent = text.quotesTab;
+  $(".personalization-tab[data-personalization-tab='calendar']").textContent = text.calendarTab;
+  $("#morningQuoteCustomize").textContent = text.customizeQuotes;
+  $("#morningCalendarCustomize b").textContent = text.customizeCalendar;
+  $("#newFocusCategoryName").placeholder = text.focusPlaceholder;
+  $("#newHabitSeedName").placeholder = text.seedPlaceholder;
+  $("#newQuoteLabel").textContent = text.quoteLabel;
+  $("#newSelfCareQuote").placeholder = text.quotePlaceholder;
+  $("#addFocusCategory").textContent = text.add;
+  $("#addHabitSeed").textContent = text.add;
+  $("#addSelfCareQuote").textContent = text.addQuote;
+  $("#calendarSettingsEyebrow").textContent = text.calendarEyebrow;
+  $("#calendarSettingsTitle").textContent = text.calendarTitle;
+  $("#calendarSettingsCopy").textContent = text.calendarCopy;
+  $("#morningCalendarLabel").textContent = text.calendarLabel;
+  $("#calendarUrl").placeholder = text.calendarPlaceholder;
+  $$("[data-settings-section]").forEach((button) => {
+    if (button.id !== "morningCalendarCustomize") button.textContent = text.custom;
+  });
+  renderPersonalizationSettings();
+  renderGoalCategorySuggestions();
+}
+
+function renderPersonalizationSettings() {
+  renderDefinitionSettings($("#focusCategorySettingsList"), getFocusCategories(), "focus");
+  renderDefinitionSettings($("#habitSeedSettingsList"), getHabitSeedTypes(), "seed");
+  renderSelfCareQuoteSettings();
+  const selectedSection = $(".personalization-section.active")?.dataset.personalizationSection;
+  $("#personalizationNote").textContent = selectedSection === "quotes"
+    ? t().personalization.quoteNote
+    : selectedSection === "calendar"
+      ? t().personalization.calendarNote
+      : t().personalization.note;
+}
+
+function renderDefinitionSettings(container, items, type) {
+  if (!container) return;
+  container.innerHTML = items.map((item) => `
+    <div class="personalization-item" data-definition-type="${type}" data-definition-id="${escapeHtml(item.id)}">
+      <input class="personalization-color" type="color" value="${escapeHtml(item.color)}" aria-label="Color" />
+      <input class="personalization-name" type="text" maxlength="24" value="${escapeHtml(getDefinitionLabel(item))}" aria-label="Name" />
+      <label class="personalization-switch">
+        <input class="personalization-active" type="checkbox" ${item.active ? "checked" : ""} />
+        <span aria-hidden="true"></span>
+        <small>${escapeHtml(t().personalization.active)}</small>
+      </label>
+    </div>
+  `).join("");
+}
+
+function renderSelfCareQuoteSettings() {
+  const container = $("#selfCareQuoteSettingsList");
+  if (!container) return;
+  container.innerHTML = state.settings.selfCareQuotes.map((quote, index) => `
+    <article class="quote-setting-item" data-quote-id="${escapeHtml(quote.id)}">
+      <div class="quote-setting-head">
+        <span>${String(index + 1).padStart(2, "0")}</span>
+        <label class="personalization-switch">
+          <input class="quote-active" type="checkbox" ${quote.active ? "checked" : ""} />
+          <span aria-hidden="true"></span>
+          <small>${escapeHtml(t().personalization.active)}</small>
+        </label>
+      </div>
+      <label>
+        <small>${escapeHtml(t().personalization.quoteLabel)}</small>
+        <textarea class="quote-text" rows="3" maxlength="220">${escapeHtml(quote.text)}</textarea>
+      </label>
+    </article>
+  `).join("");
+}
+
+function addSelfCareQuote() {
+  const input = $("#newSelfCareQuote");
+  const text = input.value.trim();
+  if (!text) {
+    input.focus();
+    return;
+  }
+  state.settings.selfCareQuotes.push({
+    id: `quote-${Date.now()}-${Math.round(Math.random() * 1000)}`,
+    text,
+    active: true,
+    builtIn: false,
+  });
+  input.value = "";
+  saveState();
+  refreshSelfCareQuotes();
+}
+
+function addPersonalizationItem(type) {
+  const isFocus = type === "focus";
+  const input = $(isFocus ? "#newFocusCategoryName" : "#newHabitSeedName");
+  const colorInput = $(isFocus ? "#newFocusCategoryColor" : "#newHabitSeedColor");
+  const name = input.value.trim();
+  if (!name) {
+    input.focus();
+    return;
+  }
+  const list = isFocus ? getFocusCategories() : getHabitSeedTypes();
+  const id = createDefinitionId(name, list);
+  list.push({
+    id,
+    labelZh: name,
+    labelEn: name,
+    color: colorInput.value,
+    active: true,
+    builtIn: false,
+  });
+  input.value = "";
+  saveState();
+  renderPersonalizationSettings();
+  renderFocusCategories();
+  renderFocusSeed();
+  renderHabitGarden();
+}
+
+function createDefinitionId(name, list) {
+  const base = name.toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^a-z0-9\u4e00-\u9fff]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "custom";
+  let id = base;
+  let suffix = 2;
+  while (list.some((item) => item.id === id)) {
+    id = `${base}-${suffix}`;
+    suffix += 1;
+  }
+  return id;
+}
+
+function handlePersonalizationEdit(event) {
+  const quoteRow = event.target.closest("[data-quote-id]");
+  if (quoteRow) {
+    if (event.type !== "change") return;
+    const quote = state.settings.selfCareQuotes.find((item) => item.id === quoteRow.dataset.quoteId);
+    if (!quote) return;
+    if (event.target.classList.contains("quote-active")) {
+      const activeCount = state.settings.selfCareQuotes.filter((item) => item.active).length;
+      if (!event.target.checked && activeCount <= 2) {
+        event.target.checked = true;
+        return;
+      }
+      quote.active = event.target.checked;
+    }
+    if (event.target.classList.contains("quote-text")) {
+      const value = event.target.value.trim();
+      if (!value) return;
+      quote.text = value;
+    }
+    saveState();
+    refreshSelfCareQuotes();
+    return;
+  }
+  const row = event.target.closest("[data-definition-id]");
+  if (!row) return;
+  const list = row.dataset.definitionType === "focus" ? getFocusCategories() : getHabitSeedTypes();
+  const item = list.find((entry) => entry.id === row.dataset.definitionId);
+  if (!item) return;
+  if (event.target.classList.contains("personalization-name")) {
+    const name = event.target.value.trim();
+    if (!name) return;
+    if (getLanguage() === "zh") item.labelZh = name;
+    else item.labelEn = name;
+  }
+  if (event.target.classList.contains("personalization-color")) item.color = event.target.value;
+  if (event.target.classList.contains("personalization-active")) {
+    if (row.dataset.definitionType === "focus" && !event.target.checked && list.filter((entry) => entry.active).length <= 1) {
+      event.target.checked = true;
+      return;
+    }
+    item.active = event.target.checked;
+  }
+  saveState();
+  renderFocusCategories();
+  renderFocusSeed();
+  renderHabitGarden();
+  if ($("#view-stats").classList.contains("active")) drawCharts();
 }
 
 function getSupabaseConfig() {
@@ -1312,6 +1660,7 @@ function applyCloudState(snapshot) {
     settings: { ...cloneDefaults().settings, ...(payload.settings || {}) },
   };
   state.settings.nightMusicPlaylists = migrateNightMusicPlaylists(payload.settings?.nightMusicPlaylists);
+  normalizePersonalizationSettings(state.settings);
   state.settings.lastCloudSyncAt = snapshot.updated_at || new Date().toISOString();
   state.settings.lastLocalChangeAt = state.settings.lastCloudSyncAt;
   cloudRevision = Number(snapshot.revision || cloudRevision);
@@ -1402,6 +1751,7 @@ async function importStateBackup(event) {
       settings: { ...cloneDefaults().settings, ...(imported.settings || {}) },
     };
     state.settings.nightMusicPlaylists = migrateNightMusicPlaylists(imported.settings?.nightMusicPlaylists);
+    normalizePersonalizationSettings(state.settings);
     applyingCloudState = false;
     saveState();
     renderLanguage();
@@ -1499,12 +1849,52 @@ async function loadMorningQuotes() {
     const quotes = await response.json();
     const normalized = normalizeMorningQuotes(quotes);
     if (!normalized.length) throw new Error("quotes file is empty");
-    morningQuotePool = normalized;
+    syncBuiltInSelfCareQuotes(normalized);
+    morningQuotePool = getActiveSelfCareQuotes();
     resetMorningSteps();
   } catch {
-    morningQuotePool = [...defaultMorningQuotes];
+    syncBuiltInSelfCareQuotes(defaultMorningQuotes);
+    morningQuotePool = getActiveSelfCareQuotes();
     resetMorningSteps();
   }
+}
+
+function syncBuiltInSelfCareQuotes(quotes) {
+  const currentBuiltIns = new Map(
+    state.settings.selfCareQuotes
+      .filter((quote) => quote.builtIn)
+      .map((quote) => [quote.id, quote]),
+  );
+  const customQuotes = state.settings.selfCareQuotes.filter((quote) => !quote.builtIn);
+  const builtInQuotes = quotes.map((quote, index) => {
+    const id = `quote-${index + 1}`;
+    const saved = currentBuiltIns.get(id);
+    return {
+      id,
+      text: saved?.text || quote.prompt || quote.promptEn,
+      active: saved?.active !== false,
+      builtIn: true,
+    };
+  });
+  state.settings.selfCareQuotes = [...builtInQuotes, ...customQuotes];
+  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+}
+
+function getActiveSelfCareQuotes() {
+  return state.settings.selfCareQuotes
+    .filter((quote) => quote.active)
+    .map((quote, index) => ({
+      label: `短句 ${index + 1}`,
+      prompt: quote.text,
+      promptEn: quote.text,
+      hint: "",
+    }));
+}
+
+function refreshSelfCareQuotes() {
+  morningQuotePool = getActiveSelfCareQuotes();
+  resetMorningSteps();
+  renderSelfCareQuoteSettings();
 }
 
 function normalizeMorningQuotes(quotes) {
@@ -1568,11 +1958,13 @@ function bindNavigation() {
 }
 
 function bindLanguageToggle() {
-  $("#languageToggle")?.addEventListener("click", () => {
-    state.settings.language = getLanguage() === "zh" ? "en" : "zh";
-    saveState();
-    renderLanguage();
-  });
+  $("#languageToggle")?.addEventListener("click", toggleLanguage);
+}
+
+function toggleLanguage() {
+  state.settings.language = getLanguage() === "zh" ? "en" : "zh";
+  saveState();
+  renderLanguage();
 }
 
 function getLanguage() {
@@ -1588,7 +1980,43 @@ function interpolate(template, values) {
 }
 
 function displayFocusCategory(category) {
-  return t().focus.categories[category] || category;
+  const id = normalizeFocusCategoryId(category);
+  const definition = getFocusCategories().find((item) => item.id === id);
+  return definition ? getDefinitionLabel(definition) : (t().focus.categories[category] || category);
+}
+
+function getDefinitionLabel(definition) {
+  return getLanguage() === "zh" ? definition.labelZh : definition.labelEn;
+}
+
+function getFocusCategories({ includeInactive = true } = {}) {
+  normalizePersonalizationSettings(state.settings);
+  return includeInactive
+    ? state.settings.focusCategories
+    : state.settings.focusCategories.filter((item) => item.active);
+}
+
+function getHabitSeedTypes({ includeInactive = true } = {}) {
+  normalizePersonalizationSettings(state.settings);
+  return includeInactive
+    ? state.settings.habitSeedTypes
+    : state.settings.habitSeedTypes.filter((item) => item.active);
+}
+
+function normalizeFocusCategoryId(value) {
+  const legacy = {
+    "学习": "learning",
+    "工作": "work",
+    "阅读": "reading",
+    "创作": "creative",
+    "生活": "life",
+    Learning: "learning",
+    Work: "work",
+    Reading: "reading",
+    Creative: "creative",
+    Life: "life",
+  };
+  return legacy[value] || value || "learning";
 }
 
 function displayMood(mood) {
@@ -1647,6 +2075,11 @@ function renderLanguage() {
     item.classList.toggle("active", item.dataset.langLabel === lang);
   });
   $("#languageToggle").setAttribute("aria-label", lang === "zh" ? "Switch to English" : "Switch to Chinese");
+  $$("#personalizationLanguageToggle [data-lang-label]").forEach((item) => {
+    item.textContent = item.dataset.langLabel === "zh" ? "中文" : "EN";
+    item.classList.toggle("active", item.dataset.langLabel === lang);
+  });
+  $("#personalizationLanguageToggle")?.setAttribute("aria-label", lang === "zh" ? "Switch to English" : "Switch to Chinese");
   renderMorningLanguage();
   renderFocusLanguage();
   renderNightLanguage();
@@ -1656,6 +2089,7 @@ function renderLanguage() {
   renderWorkLanguage();
   renderStatsLanguage();
   renderAccountUI();
+  renderPersonalizationLanguage();
   refreshDashboard();
 }
 
@@ -1694,7 +2128,6 @@ function renderMorningLanguage() {
     if (button) button.textContent = label;
   });
   $("#morningFinalActionLabel").textContent = text.finalActionLabel;
-  $("#morningCalendarLabel").textContent = text.calendar;
   $("#wakeTimePickerEyebrow").textContent = text.timePicker.eyebrow;
   $("#wakeTimePickerTitle").textContent = text.timePicker.title;
   $("#wakeHourLabel").textContent = text.timePicker.hour;
@@ -1729,17 +2162,15 @@ function renderFocusLanguage() {
     button.textContent = `${button.dataset.duration} ${text.minuteUnit}`;
   });
   $("#view-focus .panel-title h3").textContent = text.taskTitle;
-  $("#view-focus .panel > .focus-control-label").textContent = text.categoryLabel;
+  $(".focus-control-heading .focus-control-label").textContent = text.categoryLabel;
   $("#focusSeedLabel").innerHTML = `${text.seedLabel} <small>${text.seedOptional}</small>`;
-  $$("#focusHabitSeed option").forEach((option) => {
-    option.textContent = text.seeds[option.value] || option.textContent;
-  });
   $("#focusTask").placeholder = text.taskPlaceholder;
   const metricLabels = $$("#view-focus .focus-metrics span");
   if (metricLabels[0]) metricLabels[0].textContent = text.todayMinutes;
   if (metricLabels[1]) metricLabels[1].textContent = text.roundsDone;
   $("#logFocus").textContent = text.manualLog;
   renderFocusCategories();
+  renderFocusSeed();
   renderTimer();
 }
 
@@ -1866,13 +2297,26 @@ function renderWorkLanguage() {
   $("#workGoalForm .panel-title h3").textContent = text.formTitle;
   $("#workGoalForm .panel-title span").textContent = text.formMeta;
   $("[data-work-label='title']").childNodes[0].textContent = `${text.goalLabel} `;
-  $("[data-work-label='category']").childNodes[0].textContent = `${text.categoryLabel} `;
-  $("[data-work-label='deadline']").childNodes[0].textContent = `${text.deadlineLabel} `;
+  $("#workGoalCategoryLabel").textContent = text.categoryLabel;
+  $("#workGoalDeadlineLabel").textContent = text.deadlineLabel;
   $("#workGoalTitle").placeholder = text.goalPlaceholder;
   $("#workGoalCategory").placeholder = text.categoryPlaceholder;
+  renderGoalCategorySuggestions();
   $("#workGoalForm button[type='submit']").textContent = text.add;
   $("[data-goal-filter='current']").textContent = text.currentTitle;
   $("[data-goal-filter='finished']").textContent = text.finishedTitle;
+  $("#workResetHint").textContent = text.resetHint;
+  $("#workResetEyebrow").textContent = text.resetEyebrow;
+  $("#workResetTitle").textContent = text.resetTitle;
+  $("#workResetCopy").textContent = text.resetCopy;
+  $("#workResetCancel").textContent = text.resetCancel;
+  $("#workResetConfirm").textContent = text.resetConfirm;
+  $("#workDeleteEyebrow").textContent = text.deleteEyebrow;
+  $("#workDeleteTitle").textContent = text.deleteTitle;
+  $("#workDeleteCopy").textContent = text.deleteCopy;
+  $("#workDeleteCancel").textContent = text.deleteCancel;
+  $("#workDeleteConfirm").textContent = text.deleteConfirm;
+  renderWorkDeadlinePicker();
   renderWorkGoalView();
   renderWorkGoals();
 }
@@ -2149,6 +2593,7 @@ function setAudioButtonState(kind, isPlaying) {
 
 function renderMorningPrompt() {
   const step = getLocalizedMorningStep(morningSteps[morningIndex]);
+  $("#morningQuoteCustomize").hidden = Boolean(step.field);
   $("#morningStepLabel").textContent = `${step.label} · ${morningIndex + 1} / ${morningSteps.length}`;
   $("#morningPrompt").textContent = step.prompt;
   $("#morningHint").textContent = step.hint || "";
@@ -2164,15 +2609,17 @@ function renderMorningPrompt() {
 }
 
 function getLocalizedMorningStep(step) {
-  if (getLanguage() === "zh") return step;
   if (!step?.field) {
     return {
       ...step,
-      label: morningIndex === 0 ? "Read one line" : "Read another line",
-      prompt: step.promptEn,
+      label: getLanguage() === "zh"
+        ? (morningIndex === 0 ? "先读一句" : "再读一句")
+        : (morningIndex === 0 ? "Read one line" : "Read another line"),
+      prompt: step.prompt,
       hint: "",
     };
   }
+  if (getLanguage() === "zh") return step;
   const translations = {
     skin: {
       label: "Skin status",
@@ -2225,10 +2672,10 @@ function renderMorningFinalAction() {
     button.classList.toggle("active", isActive);
     button.setAttribute("aria-pressed", String(isActive));
   });
-  $(".morning-calendar-setting").classList.toggle("is-hidden", action !== "calendar");
 }
 
 function renderMorningComplete() {
+  $("#morningQuoteCustomize").hidden = true;
   $("#startMorning").hidden = true;
   $("#nextMorning").hidden = true;
   $("#morningForm").classList.add("is-hidden");
@@ -2268,11 +2715,11 @@ function bindFocus() {
   $("#skipFocus").addEventListener("click", finishFocusSegment);
   $("#resetFocus").addEventListener("click", resetFocusTimer);
   $("#logFocus").addEventListener("click", () => logFocusSession(selectedFocusMinutes, "manual"));
-  $$(".focus-category").forEach((button) => {
-    button.addEventListener("click", () => {
-      focusCategory = button.dataset.focusCategory;
-      renderFocusCategories();
-    });
+  $("#focusCategories").addEventListener("click", (event) => {
+    const button = event.target.closest(".focus-category");
+    if (!button) return;
+    focusCategory = button.dataset.focusCategory;
+    renderFocusCategories();
   });
   $$(".duration-option").forEach((button) => {
     button.addEventListener("click", () => setFocusDuration(Number(button.dataset.duration)));
@@ -2281,6 +2728,11 @@ function bindFocus() {
     setFocusDuration(Number(event.target.value));
   });
   $("#focusHabitSeed").addEventListener("change", (event) => {
+    if (event.target.value === "__manage__") {
+      openPersonalization("seed");
+      renderFocusSeed();
+      return;
+    }
     selectedFocusSeed = event.target.value || "none";
     renderFocusSeed();
   });
@@ -2401,15 +2853,39 @@ function logFocusSession(minutes, source) {
 }
 
 function renderFocusCategories() {
-  $$(".focus-category").forEach((button) => {
-    button.textContent = displayFocusCategory(button.dataset.focusCategory);
-    button.classList.toggle("active", button.dataset.focusCategory === focusCategory);
-  });
+  const categories = getFocusCategories({ includeInactive: false });
+  if (!categories.some((item) => item.id === focusCategory)) {
+    focusCategory = categories[0]?.id || "learning";
+  }
+  $("#focusCategories").innerHTML = categories.map((category) => `
+    <button class="focus-category ${category.id === focusCategory ? "active" : ""}"
+      data-focus-category="${escapeHtml(category.id)}"
+      style="--category-color:${escapeHtml(category.color)}"
+      type="button">${escapeHtml(getDefinitionLabel(category))}</button>
+  `).join("");
+  renderGoalCategorySuggestions();
+}
+
+function renderGoalCategorySuggestions() {
+  const list = $("#workGoalCategoryOptions");
+  if (!list) return;
+  list.innerHTML = getFocusCategories({ includeInactive: false })
+    .map((category) => `<option value="${escapeHtml(getDefinitionLabel(category))}"></option>`)
+    .join("");
 }
 
 function renderFocusSeed() {
   const select = $("#focusHabitSeed");
   if (!select) return;
+  const seeds = getHabitSeedTypes({ includeInactive: false });
+  if (selectedFocusSeed !== "none" && !seeds.some((item) => item.id === selectedFocusSeed)) {
+    selectedFocusSeed = "none";
+  }
+  select.innerHTML = `
+    <option value="none">${escapeHtml(t().personalization.none)}</option>
+    ${seeds.map((seed) => `<option value="${escapeHtml(seed.id)}">${escapeHtml(getDefinitionLabel(seed))}</option>`).join("")}
+    <option value="__manage__">${escapeHtml(t().personalization.custom)}</option>
+  `;
   select.value = selectedFocusSeed;
   select.closest(".focus-seed-control")?.classList.toggle("has-seed", selectedFocusSeed !== "none");
 }
@@ -3049,14 +3525,15 @@ function renderHabitGarden() {
 function renderHabitSeeds() {
   const weekDates = new Set(lastSevenDays());
   const entries = (state.habitEntries || []).filter((entry) => weekDates.has(entry.date));
-  $("#habitSeedList").innerHTML = getHabitSeeds().map((seed) => {
-    const count = entries.filter((entry) => getHabitSeedKey(entry) === seed.key).length;
-    const label = getLanguage() === "zh" ? seed.label : seed.labelEn;
+  const focusEntries = (state.focusSessions || []).filter((entry) => weekDates.has(entry.date) && entry.habitSeed);
+  $("#habitSeedList").innerHTML = getHabitSeeds().map((seed, index) => {
+    const count = entries.filter((entry) => getHabitSeedKey(entry) === seed.key).length
+      + focusEntries.filter((entry) => entry.habitSeed === seed.key).length;
     return `
-      <article class="habit-seed">
-        <span>${seed.icon}</span>
+      <article class="habit-seed" style="--seed-accent:${escapeHtml(seed.color)}">
+        <span>${String(index + 1).padStart(2, "0")}</span>
         <div class="work-goal-content">
-          <b>${escapeHtml(label)}</b>
+          <b>${escapeHtml(seed.label)}</b>
           <small>${count} ${escapeHtml(t().habits.cared)}</small>
         </div>
       </article>
@@ -3065,19 +3542,11 @@ function renderHabitSeeds() {
 }
 
 function getHabitSeeds() {
-  return [
-    { key: "health", label: "Health", labelEn: "Health", icon: "01" },
-    { key: "tech", label: "Tech", labelEn: "Tech", icon: "02" },
-    { key: "softSkills", label: "Soft Skills", labelEn: "Soft Skills", icon: "03" },
-  ];
-}
-
-function getHabitSeedKey(entry) {
-  if (entry.type === "lowEnergy") return "health";
-  if (entry.detail?.includes("JD") || entry.detail?.includes("简历")) return "job";
-  if (entry.detail?.includes("口语") || entry.detail?.includes("面试")) return "speaking";
-  if (entry.detail?.includes("技术") || entry.detail?.includes("笔记")) return "tech";
-  return "start";
+  return getHabitSeedTypes({ includeInactive: false }).map((seed) => ({
+    key: seed.id,
+    label: getDefinitionLabel(seed),
+    color: seed.color,
+  }));
 }
 
 function getHabitSeedKey(entry) {
@@ -3085,15 +3554,37 @@ function getHabitSeedKey(entry) {
   if (entry.type === "lowEnergy") return "health";
   if (detail.includes("health") || detail.includes("sleep") || detail.includes("walk") || detail.includes("stretch")) return "health";
   if (detail.includes("tech") || detail.includes("技术") || detail.includes("note") || detail.includes("笔记")) return "tech";
-  if (detail.includes("soft") || detail.includes("skill") || detail.includes("speaking") || detail.includes("interview") || detail.includes("resume") || detail.includes("jd") || detail.includes("口语") || detail.includes("面试") || detail.includes("简历")) return "softSkills";
+  if (detail.includes("soft") || detail.includes("skill") || detail.includes("speaking") || detail.includes("interview") || detail.includes("resume") || detail.includes("jd") || detail.includes("口语") || detail.includes("面试") || detail.includes("简历")) return "soft-skills";
   return "health";
 }
 
 function bindWorkGoals() {
   if (!$("#workGoalForm")) return;
+  bindWorkDeadlinePicker();
+  $("#workResetButton")?.addEventListener("click", () => {
+    $("#workResetDialog")?.showModal();
+  });
+  $("#workResetConfirm")?.addEventListener("click", () => {
+    state.workGoals = [];
+    state.settings.workGoalFilter = "current";
+    saveState();
+    renderWorkGoals();
+    $("#workResetDialog")?.close("confirm");
+  });
+  $("#workDeleteDialog")?.addEventListener("close", () => {
+    pendingDeleteGoalId = "";
+  });
+  $("#workDeleteConfirm")?.addEventListener("click", () => {
+    if (!pendingDeleteGoalId) return;
+    state.workGoals = (state.workGoals || []).filter((goal) => goal.id !== pendingDeleteGoalId);
+    saveState();
+    renderWorkGoals();
+    $("#workDeleteDialog")?.close("confirm");
+  });
   $$(".work-view-option").forEach((button) => {
     button.addEventListener("click", () => {
       state.settings.workGoalView = button.dataset.workView;
+      if (state.settings.workGoalView !== "add") closeWorkDeadlinePicker();
       saveState();
       renderWorkGoalView();
     });
@@ -3111,7 +3602,15 @@ function bindWorkGoals() {
     event.preventDefault();
     const title = $("#workGoalTitle").value.trim();
     const deadline = $("#workGoalDeadline").value;
-    if (!title || !deadline) return;
+    if (!title) {
+      $("#workGoalTitle").focus();
+      return;
+    }
+    if (!deadline) {
+      $("#workGoalDeadlineTrigger").classList.add("needs-attention");
+      $("#workGoalDeadlineTrigger").click();
+      return;
+    }
     state.workGoals = state.workGoals || [];
     state.workGoals.unshift({
       id: `goal-${Date.now()}-${Math.round(Math.random() * 1000)}`,
@@ -3125,7 +3624,7 @@ function bindWorkGoals() {
     });
     $("#workGoalTitle").value = "";
     $("#workGoalCategory").value = "";
-    $("#workGoalDeadline").value = "";
+    selectWorkDeadline("");
     state.settings.workGoalView = "list";
     state.settings.workGoalFilter = "current";
     saveState();
@@ -3155,6 +3654,11 @@ function bindWorkGoals() {
       goal.status = "open";
       goal.completedAt = "";
     }
+    if (button.dataset.workAction === "delete") {
+      pendingDeleteGoalId = goal.id;
+      $("#workDeleteDialog")?.showModal();
+      return;
+    }
     saveState();
     renderWorkGoals();
   });
@@ -3167,6 +3671,117 @@ function bindWorkGoals() {
     goal.note = event.target.value.trim();
     saveState();
   });
+}
+
+function bindWorkDeadlinePicker() {
+  $("#workGoalDeadlineTrigger")?.addEventListener("click", () => {
+    const calendar = $("#workDeadlineCalendar");
+    if (!calendar) return;
+    const selected = $("#workGoalDeadline")?.value;
+    if (calendar.hidden) {
+      const reference = selected ? new Date(`${selected}T00:00:00`) : new Date();
+      workDeadlineMonth = new Date(reference.getFullYear(), reference.getMonth(), 1);
+    }
+    calendar.hidden = !calendar.hidden;
+    $("#workGoalForm")?.classList.toggle("calendar-open", !calendar.hidden);
+    $("#workGoalDeadlineTrigger").setAttribute("aria-expanded", String(!calendar.hidden));
+    renderWorkDeadlinePicker();
+  });
+  $("#workDeadlinePrev")?.addEventListener("click", () => {
+    workDeadlineMonth = new Date(workDeadlineMonth.getFullYear(), workDeadlineMonth.getMonth() - 1, 1);
+    renderWorkDeadlinePicker();
+  });
+  $("#workDeadlineNext")?.addEventListener("click", () => {
+    workDeadlineMonth = new Date(workDeadlineMonth.getFullYear(), workDeadlineMonth.getMonth() + 1, 1);
+    renderWorkDeadlinePicker();
+  });
+  $("#workDeadlineToday")?.addEventListener("click", () => selectWorkDeadline(todayKey()));
+  $("#workDeadlineClear")?.addEventListener("click", () => selectWorkDeadline(""));
+  $("#workDeadlineDays")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-work-deadline-date]");
+    if (button) selectWorkDeadline(button.dataset.workDeadlineDate);
+  });
+  document.addEventListener("click", (event) => {
+    const field = $(".work-deadline-field");
+    if (!field?.contains(event.target)) closeWorkDeadlinePicker();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeWorkDeadlinePicker();
+  });
+  renderWorkDeadlinePicker();
+}
+
+function closeWorkDeadlinePicker() {
+  const calendar = $("#workDeadlineCalendar");
+  if (!calendar || calendar.hidden) return;
+  calendar.hidden = true;
+  $("#workGoalForm")?.classList.remove("calendar-open");
+  $("#workGoalDeadlineTrigger")?.setAttribute("aria-expanded", "false");
+}
+
+function selectWorkDeadline(value) {
+  const input = $("#workGoalDeadline");
+  if (!input) return;
+  input.value = value;
+  $("#workGoalDeadlineTrigger")?.classList.remove("needs-attention");
+  if (value) {
+    const date = new Date(`${value}T00:00:00`);
+    workDeadlineMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+  }
+  closeWorkDeadlinePicker();
+  renderWorkDeadlinePicker();
+}
+
+function renderWorkDeadlinePicker() {
+  const trigger = $("#workGoalDeadlineText");
+  const title = $("#workDeadlineCalendarTitle");
+  const weekdays = $("#workDeadlineWeekdays");
+  const daysTarget = $("#workDeadlineDays");
+  if (!trigger || !title || !weekdays || !daysTarget) return;
+  const text = t().work;
+  const zh = getLanguage() === "zh";
+  const locale = zh ? "zh-CN" : "en-US";
+  const selected = $("#workGoalDeadline")?.value || "";
+  trigger.textContent = selected
+    ? new Intl.DateTimeFormat(locale, { year: "numeric", month: "short", day: "numeric" }).format(new Date(`${selected}T00:00:00`))
+    : text.chooseDeadline;
+  $("#workGoalDeadlineTrigger")?.classList.toggle("has-date", Boolean(selected));
+  title.textContent = new Intl.DateTimeFormat(locale, { year: "numeric", month: "long" }).format(workDeadlineMonth);
+  $("#workDeadlinePrev")?.setAttribute("aria-label", text.previousMonth);
+  $("#workDeadlineNext")?.setAttribute("aria-label", text.nextMonth);
+  $("#workDeadlineToday").textContent = text.calendarToday;
+  $("#workDeadlineClear").textContent = text.calendarClear;
+  weekdays.innerHTML = (zh ? ["一", "二", "三", "四", "五", "六", "日"] : ["M", "T", "W", "T", "F", "S", "S"])
+    .map((day) => `<span>${day}</span>`).join("");
+
+  const year = workDeadlineMonth.getFullYear();
+  const month = workDeadlineMonth.getMonth();
+  const firstOffset = (new Date(year, month, 1).getDay() + 6) % 7;
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const previousLastDay = new Date(year, month, 0).getDate();
+  const cells = [];
+  for (let index = 0; index < 42; index += 1) {
+    const dayNumber = index - firstOffset + 1;
+    let cellDate;
+    let muted = false;
+    if (dayNumber < 1) {
+      cellDate = new Date(year, month - 1, previousLastDay + dayNumber);
+      muted = true;
+    } else if (dayNumber > lastDay) {
+      cellDate = new Date(year, month + 1, dayNumber - lastDay);
+      muted = true;
+    } else {
+      cellDate = new Date(year, month, dayNumber);
+    }
+    const key = toLocalDateKey(cellDate);
+    const className = [
+      muted ? "is-muted" : "",
+      key === selected ? "is-selected" : "",
+      key === todayKey() ? "is-today" : "",
+    ].filter(Boolean).join(" ");
+    cells.push(`<button type="button" data-work-deadline-date="${key}" class="${className}" aria-label="${key}">${cellDate.getDate()}</button>`);
+  }
+  daysTarget.innerHTML = cells.join("");
 }
 
 function renderWorkGoalView() {
@@ -3229,6 +3844,10 @@ function renderWorkGoalCard(goal) {
             ${isDone
               ? `<span class="work-completed">${escapeHtml(t().work.completed)} · ${escapeHtml(formatShortDate(goal.completedAt?.slice(0, 10)))}</span><button class="secondary" data-work-action="reopen" type="button">${escapeHtml(t().work.reopen)}</button>`
               : `<button class="primary" data-work-action="complete" type="button">${escapeHtml(t().work.complete)}</button>`}
+            <button class="work-delete-button" data-work-action="delete" type="button" aria-label="${escapeHtml(t().work.delete)}">
+              <span aria-hidden="true"></span>
+              ${escapeHtml(t().work.delete)}
+            </button>
           </div>
         </div>
         <span class="work-deadline ${deadline.className}">
@@ -3394,7 +4013,7 @@ function renderFocusCategorySummary(focusToday) {
   const target = $("#focusCategorySummary");
   if (!target) return;
   const totals = focusToday.reduce((acc, item) => {
-    const category = item.category || "未分类";
+    const category = normalizeFocusCategoryId(item.category || "uncategorized");
     acc[category] = (acc[category] || 0) + item.minutes;
     return acc;
   }, {});
@@ -3450,7 +4069,7 @@ function drawCategoryChart(canvas, days) {
   const totals = state.focusSessions
     .filter((item) => days.includes(item.date))
     .reduce((acc, item) => {
-      const category = item.category || "未分类";
+      const category = normalizeFocusCategoryId(item.category || "uncategorized");
       acc[category] = (acc[category] || 0) + item.minutes;
       return acc;
     }, {});
@@ -3460,7 +4079,6 @@ function drawCategoryChart(canvas, days) {
     return;
   }
   const max = Math.max(...entries.map(([, minutes]) => minutes), 1);
-  const colors = ["#8994b3", "#91b6bd", "#b2a3bf", "#c6ad87", "#a6b5c3", "#c2a6aa"];
   ctx.font = "16px Noto Sans SC";
   entries.forEach(([category, minutes], index) => {
     const y = 30 + index * 38;
@@ -3468,7 +4086,8 @@ function drawCategoryChart(canvas, days) {
     ctx.fillStyle = "#315b3e";
     ctx.textAlign = "left";
     ctx.fillText(displayFocusCategory(category), 26, y + 16);
-    ctx.fillStyle = colors[index % colors.length];
+    const definition = getFocusCategories().find((item) => item.id === category);
+    ctx.fillStyle = definition?.color || ["#8994b3", "#91b6bd", "#b2a3bf", "#c6ad87", "#a6b5c3", "#c2a6aa"][index % 6];
     roundRect(ctx, 126, y + 2, barWidth, 13, 7);
     ctx.fill();
     ctx.fillStyle = "rgba(98, 117, 106, 0.75)";
@@ -3731,11 +4350,12 @@ function renderGoalDeadlineTimeline(openGoals, getDaysUntilDue) {
 
 function renderSeedStats(days, focusSessions) {
   const zh = getLanguage() === "zh";
-  const seeds = [
-    { key: "health", label: "Health", color: "#9eb39f" },
-    { key: "tech", label: "Tech", color: "#8faebe" },
-    { key: "soft-skills", label: "Soft Skills", color: "#ad9fbe" },
-  ];
+  const usedSeedIds = new Set(focusSessions.map((item) => item.habitSeed).filter(Boolean));
+  const seeds = getHabitSeedTypes().filter((seed) => seed.active || usedSeedIds.has(seed.id)).map((seed) => ({
+    key: seed.id,
+    label: getDefinitionLabel(seed),
+    color: seed.color,
+  }));
   const totals = seeds.map((seed) => {
     const sessions = focusSessions.filter((item) => item.habitSeed === seed.key);
     return {

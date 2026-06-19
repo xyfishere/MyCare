@@ -1911,6 +1911,7 @@ p {
 }
 
 .work-form label,
+.work-form-field,
 .work-note-wrap label {
   position: relative;
   z-index: 1;
@@ -1920,6 +1921,13 @@ p {
   font-family: var(--font-ui);
   font-size: 0.92rem;
   font-weight: 700;
+}
+
+.work-form-field > label,
+.work-field-heading > label {
+  display: inline;
+  color: inherit;
+  font: inherit;
 }
 
 .work-form input,
@@ -1951,6 +1959,224 @@ p {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
+  transition: margin-bottom 220ms ease;
+}
+
+.work-form.calendar-open .work-form-row {
+  z-index: 8;
+  margin-bottom: 338px;
+}
+
+.work-deadline-field {
+  position: relative;
+  z-index: 5;
+}
+
+.work-date-trigger {
+  width: 100%;
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 14px;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(73, 111, 82, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  color: rgba(73, 111, 82, 0.58);
+  padding: 0 14px;
+  text-align: left;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.work-date-trigger:hover,
+.work-date-trigger:focus-visible,
+.work-date-trigger[aria-expanded="true"] {
+  border-color: rgba(73, 111, 82, 0.3);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 0 0 4px rgba(127, 179, 140, 0.1);
+}
+
+.work-date-trigger.needs-attention {
+  border-color: rgba(174, 112, 91, 0.5);
+  box-shadow: 0 0 0 4px rgba(190, 126, 103, 0.1);
+}
+
+.work-date-trigger.has-date {
+  color: #183228;
+}
+
+.work-date-trigger b {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.94rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.work-date-icon {
+  width: 19px;
+  height: 18px;
+  border: 1.5px solid rgba(73, 111, 82, 0.62);
+  border-radius: 5px;
+  position: relative;
+}
+
+.work-date-icon::before {
+  content: "";
+  position: absolute;
+  left: -1.5px;
+  right: -1.5px;
+  top: 4px;
+  border-top: 1.5px solid rgba(73, 111, 82, 0.62);
+}
+
+.work-date-icon::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: -3px;
+  width: 7px;
+  height: 4px;
+  border-left: 1.5px solid rgba(73, 111, 82, 0.62);
+  border-right: 1.5px solid rgba(73, 111, 82, 0.62);
+}
+
+.work-date-chevron {
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid rgba(73, 111, 82, 0.55);
+  border-bottom: 1.5px solid rgba(73, 111, 82, 0.55);
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 160ms ease;
+}
+
+.work-date-trigger[aria-expanded="true"] .work-date-chevron {
+  transform: rotate(225deg) translate(-2px, -1px);
+}
+
+.work-calendar {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 20;
+  width: min(330px, calc(100vw - 40px));
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 8px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(239, 248, 236, 0.96)),
+    #f6faf3;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    0 24px 54px rgba(24, 50, 40, 0.2);
+  backdrop-filter: blur(18px);
+}
+
+.work-calendar[hidden] {
+  display: none;
+}
+
+.work-calendar-head {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.work-calendar-head strong {
+  color: #234b35;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  text-align: center;
+}
+
+.work-calendar-head button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(73, 111, 82, 0.1);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.58);
+  color: rgba(73, 111, 82, 0.76);
+  font-size: 1.25rem;
+}
+
+.work-calendar-head button:hover,
+.work-calendar-head button:focus-visible {
+  border-color: rgba(73, 111, 82, 0.24);
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.work-calendar-weekdays,
+.work-calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.work-calendar-weekdays {
+  margin-bottom: 5px;
+  color: rgba(73, 111, 82, 0.46);
+  font-size: 0.68rem;
+  font-weight: 750;
+  text-align: center;
+}
+
+.work-calendar-days button {
+  aspect-ratio: 1;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: #315542;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.work-calendar-days button:hover,
+.work-calendar-days button:focus-visible {
+  border-color: rgba(73, 111, 82, 0.18);
+  background: rgba(127, 179, 140, 0.13);
+}
+
+.work-calendar-days button.is-muted {
+  color: rgba(73, 111, 82, 0.27);
+}
+
+.work-calendar-days button.is-today {
+  border-color: rgba(73, 111, 82, 0.38);
+}
+
+.work-calendar-days button.is-selected {
+  border-color: #527d5e;
+  background: #527d5e;
+  color: #fff;
+  box-shadow: 0 7px 16px rgba(45, 82, 58, 0.2);
+}
+
+.work-calendar-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(73, 111, 82, 0.09);
+}
+
+.work-calendar-foot button {
+  min-height: 32px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(127, 179, 140, 0.1);
+  color: rgba(49, 85, 66, 0.82);
+  padding: 0 12px;
+  font-size: 0.72rem;
+  font-weight: 750;
 }
 
 .work-form .primary {
@@ -2163,6 +2389,66 @@ p {
   font-weight: 700;
 }
 
+.work-delete-button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(121, 78, 70, 0.56);
+  padding: 0 9px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.work-delete-button span {
+  width: 12px;
+  height: 14px;
+  border: 1.3px solid currentColor;
+  border-top: 0;
+  border-radius: 0 0 3px 3px;
+  position: relative;
+}
+
+.work-delete-button span::before {
+  content: "";
+  position: absolute;
+  left: -3px;
+  top: -4px;
+  width: 16px;
+  border-top: 1.3px solid currentColor;
+}
+
+.work-delete-button span::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: -7px;
+  width: 4px;
+  height: 3px;
+  border: 1.3px solid currentColor;
+  border-bottom: 0;
+  border-radius: 2px 2px 0 0;
+}
+
+.work-delete-button:hover,
+.work-delete-button:focus-visible {
+  border-color: rgba(145, 91, 82, 0.2);
+  background: rgba(255, 246, 244, 0.66);
+  color: #87574f;
+}
+
+.work-delete-button:active {
+  transform: translateY(1px);
+}
+
 .work-completed {
   color: rgba(73, 111, 82, 0.74);
   font-family: var(--font-ui);
@@ -2189,6 +2475,223 @@ p {
   max-width: 34ch;
   font-size: 1rem;
   line-height: 1.8;
+}
+
+.work-reset-zone {
+  width: min(1180px, 100%);
+  margin: 22px auto 0;
+  padding: 18px 2px 8px;
+  border-top: 1px solid rgba(73, 111, 82, 0.1);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 16px;
+}
+
+.work-reset-zone span {
+  color: rgba(73, 111, 82, 0.55);
+  font-size: 0.78rem;
+}
+
+.work-reset-button {
+  min-width: 94px;
+  min-height: 38px;
+  border: 1px solid rgba(145, 91, 82, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.4);
+  color: rgba(116, 72, 65, 0.72);
+  font-size: 0.8rem;
+  font-weight: 700;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease,
+    transform 160ms ease;
+}
+
+.work-reset-button:hover,
+.work-reset-button:focus-visible {
+  border-color: rgba(145, 91, 82, 0.32);
+  background: rgba(255, 249, 247, 0.72);
+  color: #744841;
+  transform: translateY(-1px);
+}
+
+.work-reset-button:active {
+  transform: translateY(1px);
+}
+
+.work-reset-dialog,
+.work-delete-dialog {
+  width: min(460px, calc(100vw - 28px));
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+}
+
+.work-reset-dialog::backdrop,
+.work-delete-dialog::backdrop {
+  background: rgba(24, 39, 31, 0.34);
+  backdrop-filter: blur(9px);
+}
+
+.work-reset-dialog-card,
+.work-delete-dialog-card {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  border-radius: 8px;
+  background:
+    linear-gradient(150deg, rgba(255, 255, 255, 0.96), rgba(245, 249, 241, 0.9)),
+    var(--panel);
+  text-align: center;
+  box-shadow: 0 30px 90px rgba(24, 50, 40, 0.22);
+}
+
+.work-reset-symbol {
+  width: 44px;
+  height: 44px;
+  margin-bottom: 2px;
+  border: 1px solid rgba(73, 111, 82, 0.16);
+  border-radius: 50%;
+  background: rgba(127, 179, 140, 0.1);
+  position: relative;
+}
+
+.work-reset-symbol::before {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  border: 1.5px solid rgba(73, 111, 82, 0.7);
+  border-left-color: transparent;
+  border-radius: 50%;
+  transform: rotate(-24deg);
+}
+
+.work-reset-symbol::after {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: 17px;
+  width: 7px;
+  height: 7px;
+  border-left: 1.5px solid rgba(73, 111, 82, 0.7);
+  border-bottom: 1.5px solid rgba(73, 111, 82, 0.7);
+  transform: rotate(18deg);
+}
+
+.work-reset-dialog-card .eyebrow,
+.work-delete-dialog-card .eyebrow {
+  color: rgba(73, 111, 82, 0.62);
+}
+
+.work-reset-dialog-card h2,
+.work-delete-dialog-card h2 {
+  max-width: 15ch;
+  font-family: var(--font-display);
+  font-size: clamp(1.45rem, 4vw, 1.9rem);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.work-reset-dialog-card > p:not(.eyebrow),
+.work-delete-dialog-card > p:not(.eyebrow) {
+  color: var(--muted);
+  line-height: 1.75;
+}
+
+.work-reset-dialog-actions,
+.work-delete-dialog-actions {
+  width: 100%;
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.work-reset-dialog-actions button,
+.work-delete-dialog-actions button {
+  min-height: 44px;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.work-reset-confirm {
+  border: 1px solid rgba(131, 76, 68, 0.32);
+  background: rgba(131, 76, 68, 0.88);
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(116, 72, 65, 0.14);
+}
+
+.work-reset-confirm:hover,
+.work-reset-confirm:focus-visible {
+  background: #744841;
+}
+
+.work-delete-symbol {
+  width: 44px;
+  height: 44px;
+  margin-bottom: 2px;
+  border: 1px solid rgba(145, 91, 82, 0.16);
+  border-radius: 50%;
+  background: rgba(181, 118, 104, 0.08);
+  position: relative;
+}
+
+.work-delete-symbol::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  width: 14px;
+  height: 17px;
+  border: 1.5px solid rgba(121, 78, 70, 0.72);
+  border-top: 0;
+  border-radius: 0 0 4px 4px;
+}
+
+.work-delete-symbol::after {
+  content: "";
+  position: absolute;
+  left: 11px;
+  top: 11px;
+  width: 20px;
+  border-top: 1.5px solid rgba(121, 78, 70, 0.72);
+  box-shadow: 6px -3px 0 -2px rgba(121, 78, 70, 0.72);
+}
+
+.work-delete-confirm {
+  border: 1px solid rgba(131, 76, 68, 0.28);
+  background: rgba(131, 76, 68, 0.86);
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(116, 72, 65, 0.12);
+}
+
+.work-delete-confirm:hover,
+.work-delete-confirm:focus-visible {
+  background: #744841;
+}
+
+@media (max-width: 620px) {
+  .work-reset-zone {
+    align-items: flex-end;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .work-reset-dialog-card,
+  .work-delete-dialog-card {
+    padding: 28px 22px;
+  }
+
+  .work-form.calendar-open .work-form-row {
+    margin-bottom: 350px;
+  }
 }
 
 .today-panel,
@@ -2577,6 +3080,60 @@ p {
   padding-top: clamp(58px, 12vh, 120px);
 }
 
+.morning-stage-meta {
+  width: min(760px, 90vw);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 4px;
+}
+
+.morning-stage-meta .stage-label {
+  margin-bottom: 0;
+}
+
+.morning-quote-customize {
+  min-height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.44);
+  border-radius: 999px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.24), rgba(219, 238, 217, 0.15)),
+    rgba(247, 251, 245, 0.14);
+  color: rgba(255, 255, 255, 0.94);
+  padding: 0 14px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-shadow: 0 1px 12px rgba(10, 24, 18, 0.46);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 10px 24px rgba(10, 24, 18, 0.12);
+  backdrop-filter: blur(14px);
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.morning-quote-customize:hover,
+.morning-quote-customize:focus-visible {
+  border-color: rgba(255, 255, 255, 0.7);
+  background: rgba(247, 251, 245, 0.26);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.44),
+    0 14px 30px rgba(10, 24, 18, 0.18);
+  transform: translateY(-1px);
+}
+
+.morning-quote-customize:active {
+  transform: translateY(1px);
+}
+
+.morning-quote-customize[hidden] {
+  display: none;
+}
+
 .morning-mode #view-morning .ritual-stage h3 {
   max-width: min(760px, 90vw);
   font-size: clamp(1.55rem, 3.2vw, 2.8rem);
@@ -2740,7 +3297,7 @@ p {
 
 .morning-final-options {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.25fr);
   gap: 10px;
 }
 
@@ -2761,13 +3318,85 @@ p {
   border-color: rgba(247, 255, 247, 0.52);
 }
 
-.morning-calendar-setting {
-  display: grid;
+.morning-calendar-customize {
+  grid-column: 1 / -1;
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   gap: 8px;
+  min-height: 46px;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 999px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.25), rgba(219, 238, 217, 0.14)),
+    rgba(247, 251, 245, 0.13);
+  color: rgba(255, 255, 255, 0.96);
+  padding: 0 17px 0 11px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+  text-shadow: 0 1px 12px rgba(10, 24, 18, 0.46);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 10px 24px rgba(10, 24, 18, 0.12);
+  backdrop-filter: blur(14px);
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
 }
 
-.morning-calendar-setting.is-hidden {
-  display: none;
+.morning-calendar-customize span {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 50%;
+  background: rgba(247, 251, 245, 0.14);
+}
+
+.morning-calendar-customize span::before {
+  content: "";
+  position: absolute;
+  inset: 6px 5px 5px;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+}
+
+.morning-calendar-customize span::after {
+  content: "";
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  top: 9px;
+  border-top: 1.5px solid currentColor;
+  box-shadow:
+    -2px -5px 0 -0.5px currentColor,
+    2px -5px 0 -0.5px currentColor;
+}
+
+.morning-calendar-customize b {
+  font-weight: 700;
+}
+
+.morning-calendar-customize:hover,
+.morning-calendar-customize:focus-visible {
+  border-color: rgba(255, 255, 255, 0.7);
+  background: rgba(247, 251, 245, 0.27);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.44),
+    0 14px 30px rgba(10, 24, 18, 0.18);
+  transform: translateY(-1px);
+}
+
+.morning-calendar-customize:active {
+  box-shadow:
+    inset 0 3px 8px rgba(10, 24, 18, 0.18),
+    0 5px 14px rgba(10, 24, 18, 0.12);
+  transform: translateY(1px) scale(0.985);
 }
 
 .morning-mode #view-morning .primary,
@@ -2943,6 +3572,54 @@ p {
   opacity: 1;
 }
 
+.global-settings-toggle {
+  position: fixed;
+  top: 60px;
+  right: 25px;
+  z-index: 29;
+  width: 31px;
+  height: 31px;
+  border: 1px solid rgba(73, 111, 82, 0.12);
+  border-radius: 50%;
+  background: rgba(249, 252, 248, 0.56);
+  color: rgba(38, 71, 53, 0.65);
+  box-shadow: 0 8px 22px rgba(24, 50, 40, 0.05);
+  backdrop-filter: blur(12px);
+  opacity: 0.72;
+  transition: opacity 160ms ease, transform 160ms ease, background 160ms ease;
+}
+
+.global-settings-toggle:hover,
+.global-settings-toggle:focus-visible {
+  opacity: 1;
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.global-settings-toggle span,
+.global-settings-toggle span::before,
+.global-settings-toggle span::after {
+  position: absolute;
+  border: 1.5px solid currentColor;
+  border-radius: 50%;
+}
+
+.global-settings-toggle span {
+  inset: 8px;
+}
+
+.global-settings-toggle span::before {
+  content: "";
+  inset: 4px;
+  border-width: 1px;
+}
+
+.global-settings-toggle span::after {
+  content: "";
+  inset: -4px;
+  border-style: dotted;
+}
+
 .immersive-mode .global-language-toggle {
   top: clamp(18px, 4vw, 48px);
   right: clamp(76px, 8vw, 112px);
@@ -2951,6 +3628,14 @@ p {
   color: rgba(255, 255, 255, 0.74);
   box-shadow: 0 10px 26px rgba(18, 42, 30, 0.08);
   backdrop-filter: blur(14px);
+}
+
+.immersive-mode .global-settings-toggle {
+  top: clamp(62px, 8vw, 92px);
+  right: clamp(82px, 8vw, 116px);
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(247, 251, 245, 0.16);
+  color: rgba(255, 255, 255, 0.76);
 }
 
 .immersive-mode .global-language-toggle [data-lang-label].active {
@@ -5442,11 +6127,56 @@ output {
   font-size: 0.86rem;
   font-weight: 600;
   letter-spacing: 0;
+  white-space: pre-line;
+}
+
+.focus-control-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.inline-manage-button {
+  min-height: 30px;
+  border: 1px solid rgba(73, 111, 82, 0.2);
+  border-radius: 999px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.78), rgba(224, 239, 221, 0.72)),
+    rgba(239, 248, 236, 0.76);
+  color: #3d6748;
+  padding: 0 11px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    0 7px 16px rgba(45, 82, 58, 0.07);
+  transition:
+    color 160ms ease,
+    background 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.inline-manage-button:hover,
+.inline-manage-button:focus-visible {
+  border-color: rgba(73, 111, 82, 0.36);
+  background: rgba(255, 255, 255, 0.94);
+  color: #244f34;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.88),
+    0 10px 22px rgba(45, 82, 58, 0.12);
+  transform: translateY(-1px);
+}
+
+.inline-manage-button:active {
+  transform: translateY(1px);
 }
 
 .focus-categories {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
   gap: 6px;
   padding: 6px;
   border: 1px solid rgba(73, 111, 82, 0.1);
@@ -5478,10 +6208,459 @@ output {
 }
 
 .focus-category.active {
-  background: rgba(255, 255, 255, 0.88);
-  border-color: rgba(73, 111, 82, 0.24);
+  background: color-mix(in srgb, var(--category-color, #8eae98) 12%, white);
+  border-color: color-mix(in srgb, var(--category-color, #8eae98) 42%, transparent);
   color: var(--ink);
   box-shadow: 0 12px 28px rgba(45, 82, 58, 0.1);
+}
+
+.focus-seed-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.focus-seed-actions select {
+  flex: 1 1 auto;
+}
+
+.seed-manage-button {
+  white-space: nowrap;
+}
+
+.work-field-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.goal-manage-button {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+}
+
+.personalization-dialog {
+  width: min(680px, calc(100vw - 28px));
+  max-height: min(760px, calc(100vh - 28px));
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+}
+
+.personalization-dialog::backdrop {
+  background: rgba(25, 42, 33, 0.3);
+  backdrop-filter: blur(9px);
+}
+
+.personalization-card {
+  position: relative;
+  display: grid;
+  gap: 16px;
+  max-height: min(760px, calc(100vh - 28px));
+  overflow-y: auto;
+  overflow-x: hidden;
+  width: 100%;
+  min-width: 0;
+  padding: clamp(26px, 4vw, 38px);
+  border: 1px solid rgba(255, 255, 255, 0.74);
+  border-radius: 8px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(239, 248, 236, 0.9)),
+    var(--panel);
+  box-shadow: 0 30px 90px rgba(24, 50, 40, 0.22);
+}
+
+.personalization-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(73, 111, 82, 0.07);
+  color: var(--moss);
+  font-size: 1.1rem;
+}
+
+.personalization-language-toggle {
+  position: absolute;
+  top: 16px;
+  right: 56px;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid rgba(73, 111, 82, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.54);
+  color: rgba(73, 111, 82, 0.46);
+  padding: 0 10px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  box-shadow: 0 6px 16px rgba(24, 50, 40, 0.04);
+}
+
+.personalization-language-toggle [data-lang-label].active {
+  color: #315c3d;
+}
+
+.personalization-language-toggle:hover,
+.personalization-language-toggle:focus-visible {
+  border-color: rgba(73, 111, 82, 0.24);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.personalization-card h2 {
+  font-family: var(--font-display);
+  font-size: clamp(1.65rem, 4vw, 2.25rem);
+  font-weight: 600;
+}
+
+.personalization-copy,
+.personalization-note {
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.personalization-tabs {
+  width: fit-content;
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid rgba(73, 111, 82, 0.1);
+  border-radius: 999px;
+  background: rgba(244, 250, 241, 0.72);
+}
+
+.personalization-tab {
+  min-height: 36px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  padding: 0 16px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.personalization-tab.active {
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
+  box-shadow: 0 8px 20px rgba(24, 50, 40, 0.07);
+}
+
+.personalization-section {
+  display: none;
+}
+
+.personalization-section.active {
+  display: grid;
+  gap: 14px;
+}
+
+.calendar-settings-panel {
+  display: grid;
+  gap: 22px;
+  padding: clamp(20px, 3vw, 30px);
+  border: 1px solid rgba(73, 111, 82, 0.1);
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 94% 0%, rgba(185, 219, 200, 0.52), transparent 34%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(239, 248, 236, 0.56));
+}
+
+.calendar-settings-panel h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.25rem, 2.5vw, 1.75rem);
+  font-weight: 600;
+}
+
+.calendar-settings-panel > div > p:last-child {
+  max-width: 620px;
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.75;
+}
+
+.calendar-url-field {
+  display: grid;
+  gap: 8px;
+  color: var(--moss);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.calendar-url-field input {
+  min-height: 46px;
+  border-color: rgba(73, 111, 82, 0.14);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.personalization-list {
+  display: grid;
+  gap: 8px;
+}
+
+.personalization-item {
+  width: 100%;
+  min-width: 0;
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px;
+  border: 1px solid rgba(73, 111, 82, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.56);
+}
+
+.personalization-color,
+.personalization-add-row input[type="color"] {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  padding: 0;
+  overflow: hidden;
+}
+
+.personalization-color::-webkit-color-swatch,
+.personalization-add-row input[type="color"]::-webkit-color-swatch {
+  border: 2px solid rgba(255, 255, 255, 0.88);
+  border-radius: 50%;
+}
+
+.personalization-name {
+  min-width: 0;
+  min-height: 38px;
+  border-color: transparent;
+  background: transparent;
+  padding: 7px 8px;
+  font-weight: 600;
+}
+
+.personalization-name:focus {
+  border-color: rgba(73, 111, 82, 0.16);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.personalization-switch {
+  display: inline-flex;
+  grid-template-columns: none;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.personalization-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.personalization-switch > span {
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(98, 117, 106, 0.2);
+  position: relative;
+  transition: background 160ms ease;
+}
+
+.personalization-switch > span::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 7px rgba(24, 50, 40, 0.16);
+  transition: transform 160ms ease;
+}
+
+.personalization-switch input:checked + span {
+  background: rgba(73, 111, 82, 0.7);
+}
+
+.personalization-switch input:checked + span::after {
+  transform: translateX(14px);
+}
+
+.personalization-add-row {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 36px auto;
+  align-items: center;
+  gap: 9px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(73, 111, 82, 0.09);
+}
+
+.personalization-add-row > input[type="text"] {
+  min-width: 0;
+  min-height: 42px;
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.personalization-add {
+  min-height: 42px;
+  border: 1px solid rgba(73, 111, 82, 0.2);
+  border-radius: 8px;
+  background: rgba(73, 111, 82, 0.88);
+  color: #fff;
+  padding: 0 18px;
+  font-weight: 700;
+}
+
+.personalization-note {
+  padding-top: 13px;
+  border-top: 1px solid rgba(73, 111, 82, 0.09);
+  font-size: 0.76rem;
+}
+
+.quote-settings-list {
+  display: grid;
+  gap: 10px;
+}
+
+.quote-setting-item {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(73, 111, 82, 0.1);
+  border-radius: 8px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.72), rgba(239, 248, 236, 0.46)),
+    rgba(255, 255, 255, 0.56);
+}
+
+.quote-setting-head {
+  display: grid;
+  align-content: space-between;
+  justify-items: start;
+  gap: 10px;
+}
+
+.quote-setting-head > span {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(73, 111, 82, 0.14);
+  border-radius: 50%;
+  background: rgba(127, 179, 140, 0.1);
+  color: #496f52;
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+}
+
+.quote-setting-head .personalization-switch {
+  display: grid;
+  justify-items: start;
+}
+
+.quote-setting-item > label,
+.quote-add-panel label {
+  display: grid;
+  gap: 6px;
+}
+
+.quote-setting-item label > small,
+.quote-add-panel label > span {
+  color: rgba(73, 111, 82, 0.66);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.quote-setting-item textarea,
+.quote-add-panel textarea {
+  min-height: 84px;
+  resize: vertical;
+  border-color: rgba(73, 111, 82, 0.12);
+  background: rgba(255, 255, 255, 0.68);
+  line-height: 1.6;
+}
+
+.quote-setting-item textarea:focus,
+.quote-add-panel textarea:focus {
+  border-color: rgba(73, 111, 82, 0.3);
+  box-shadow: 0 0 0 4px rgba(127, 179, 140, 0.1);
+}
+
+.quote-add-panel {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(73, 111, 82, 0.09);
+}
+
+.quote-add-panel .personalization-add {
+  grid-column: 1 / -1;
+  justify-self: end;
+  min-width: 132px;
+}
+
+@media (max-width: 620px) {
+  .personalization-item {
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .personalization-switch {
+    grid-column: 2;
+  }
+
+  .personalization-add-row {
+    grid-template-columns: minmax(0, 1fr) 36px;
+  }
+
+  .personalization-add {
+    grid-column: 1 / -1;
+  }
+
+  .personalization-tabs {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+    border-radius: 8px;
+  }
+
+  .quote-setting-item,
+  .quote-add-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .quote-setting-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .morning-stage-meta {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .morning-final-options {
+    grid-template-columns: 1fr;
+  }
+
+  .morning-calendar-customize {
+    white-space: normal;
+  }
 }
 
 .focus-duration-wrap {
