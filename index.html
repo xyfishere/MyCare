@@ -6,7 +6,7 @@
     <meta property="og:image" content="assets/images/my-care-logo.png?v=20260609-2" />
     <title>My Care</title>
     <link rel="icon" type="image/png" href="assets/images/my-care-logo.png?v=20260609-2" />
-    <link rel="stylesheet" href="styles.css?v=20260618-12" />
+    <link rel="stylesheet" href="styles.css?v=20260619-4" />
   </head>
   <body>
     <div class="app-shell">
@@ -100,7 +100,7 @@
         <section class="view active" id="view-home" aria-labelledby="homeTitle">
           <div class="home-view">
             <div class="home-copy">
-              <p class="eyebrow">Choose your room</p>
+              <p class="eyebrow">选择你的空间</p>
               <h2 id="homeTitle">现在想要做些什么呢？</h2>
               <p>不要着急，一步一步来。</p>
             </div>
@@ -216,11 +216,11 @@
                 <div class="morning-field" data-morning-field="finalAction">
                   <span id="morningFinalActionLabel">冥想后的下一步</span>
                   <div class="morning-final-options" role="group" aria-label="冥想后的下一步">
-                    <button class="morning-final-option active" data-morning-final-action="goals" type="button">Goals</button>
+                    <button class="morning-final-option active" data-morning-final-action="goals" type="button">目标</button>
                     <button class="morning-final-option" data-morning-final-action="calendar" type="button">你的个人日历</button>
                     <button class="morning-calendar-customize" id="morningCalendarCustomize" data-settings-section="calendar" type="button">
                       <span aria-hidden="true"></span>
-                      <b>自定义 Calendar</b>
+                      <b>自定义日历</b>
                     </button>
                   </div>
                 </div>
@@ -620,7 +620,7 @@
           <div class="section-head work-head">
             <div>
               <p class="eyebrow">Work Goals</p>
-              <h2 id="workTitle">工作目标和 Deadline</h2>
+              <h2 id="workTitle">工作目标和期限</h2>
               <p class="muted">把现在最重要的事情放在这里，完成后打卡并留一句 note。</p>
             </div>
             <div class="work-view-switch" role="group" aria-label="目标页面切换">
@@ -931,17 +931,20 @@
         <p class="personalization-copy" id="personalizationCopy">让分类更贴近你的生活，同时保持页面轻盈。</p>
 
         <div class="personalization-tabs" role="tablist" aria-label="设置类型">
-          <button class="personalization-tab active" data-personalization-tab="focus" role="tab" aria-selected="true" type="button">Focus Categories</button>
-          <button class="personalization-tab" data-personalization-tab="seed" role="tab" aria-selected="false" type="button">Habit Seeds</button>
-          <button class="personalization-tab" data-personalization-tab="quotes" role="tab" aria-selected="false" type="button">Self-care Quotes</button>
-          <button class="personalization-tab" data-personalization-tab="calendar" role="tab" aria-selected="false" type="button">Calendar</button>
+          <button class="personalization-tab active" data-personalization-tab="focus" role="tab" aria-selected="true" type="button">专注分类</button>
+          <button class="personalization-tab" data-personalization-tab="seed" role="tab" aria-selected="false" type="button">习惯种子</button>
+          <button class="personalization-tab" data-personalization-tab="quotes" role="tab" aria-selected="false" type="button">自我照顾语录</button>
+          <button class="personalization-tab" data-personalization-tab="calendar" role="tab" aria-selected="false" type="button">日历</button>
         </div>
 
         <section class="personalization-section active" data-personalization-section="focus">
           <div class="personalization-list" id="focusCategorySettingsList"></div>
           <div class="personalization-add-row">
             <input id="newFocusCategoryName" type="text" maxlength="24" placeholder="新的分类" />
-            <input id="newFocusCategoryColor" type="color" value="#91a9bd" aria-label="分类颜色" />
+            <div class="definition-color-picker" data-color-picker>
+              <input id="newFocusCategoryColor" type="hidden" value="#91a9bd" />
+              <button class="definition-color-trigger" type="button" aria-label="选择 Focus Category 颜色" aria-expanded="false" style="--selected-color:#91a9bd"></button>
+            </div>
             <button class="personalization-add" id="addFocusCategory" type="button">添加</button>
           </div>
         </section>
@@ -950,7 +953,10 @@
           <div class="personalization-list" id="habitSeedSettingsList"></div>
           <div class="personalization-add-row">
             <input id="newHabitSeedName" type="text" maxlength="24" placeholder="新的 Habit Seed" />
-            <input id="newHabitSeedColor" type="color" value="#9eb39f" aria-label="Habit Seed 颜色" />
+            <div class="definition-color-picker" data-color-picker>
+              <input id="newHabitSeedColor" type="hidden" value="#9eb39f" />
+              <button class="definition-color-trigger" type="button" aria-label="选择 Habit Seed 颜色" aria-expanded="false" style="--selected-color:#9eb39f"></button>
+            </div>
             <button class="personalization-add" id="addHabitSeed" type="button">添加</button>
           </div>
         </section>
@@ -969,12 +975,12 @@
         <section class="personalization-section" data-personalization-section="calendar">
           <div class="calendar-settings-panel">
             <div>
-              <p class="eyebrow" id="calendarSettingsEyebrow">Your personal calendar</p>
+              <p class="eyebrow" id="calendarSettingsEyebrow">你的个人日历</p>
               <h3 id="calendarSettingsTitle">Choose where your morning flow continues</h3>
               <p id="calendarSettingsCopy">Add the page you use to plan your day, such as Google Calendar, Notion Calendar, or another calendar service.</p>
             </div>
             <label class="calendar-url-field">
-              <span id="morningCalendarLabel">Calendar page URL</span>
+              <span id="morningCalendarLabel">日历页面链接</span>
               <input id="calendarUrl" type="url" inputmode="url" placeholder="https://calendar.google.com/..." />
             </label>
           </div>
@@ -982,10 +988,11 @@
 
         <p class="personalization-note" id="personalizationNote">停用后不会出现在选择器中，过去的数据仍会保留。</p>
       </form>
+      <div class="definition-color-palette" id="definitionColorPalette" role="listbox" aria-label="颜色选择" hidden></div>
     </dialog>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-config.js?v=20260608-2"></script>
-    <script src="app.js?v=20260618-12"></script>
+    <script src="app.js?v=20260619-4"></script>
   </body>
 </html>

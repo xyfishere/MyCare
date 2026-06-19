@@ -12,6 +12,6 @@
 
 ## Release Check
 
-- [ ] Test desktop, mobile, Chinese, and English layouts.
-- [ ] Verify existing personal data remains unchanged.
-- [ ] Update `STATE.md` and rewrite `PLAN.md` at the milestone.
+- [x] Test desktop, mobile, Chinese, and English layouts.
+- [x] Verify existing personal data remains unchanged.
+- [x] Update `STATE.md`; `PLAN.md` already reflects the Version 2 milestone.

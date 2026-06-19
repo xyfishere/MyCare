@@ -56,6 +56,13 @@ const defaultHabitSeeds = [
   { id: "soft-skills", labelZh: "Soft Skills", labelEn: "Soft Skills", color: "#ad9fbe", active: true, builtIn: true },
 ];
 
+const personalizationColorPalette = [
+  "#9eb39f", "#7fa98d", "#b4c49b", "#8faebe",
+  "#a8bec6", "#9ba7c2", "#ad9fbe", "#c0a8c0",
+  "#c7aab2", "#d1b49a", "#c8bd8e", "#a8b7ad",
+];
+let activeColorPicker = null;
+
 const defaults = {
   settings: {
     calendarUrl: "https://calendar.google.com/calendar/u/0/r/day",
@@ -280,12 +287,12 @@ const copy = {
       firstBlock: "今日第一个 25 分钟",
       notStarted: "还没有启动",
       started: "今天已经启动",
-      firstBlockCopy: "小小的开始会慢慢塑造稳定的改变。你可以的。",
+      firstBlockCopy: "小小的开始会慢慢塑造稳定的改变，你可以的!",
       customPlaceholder: "这 25 分钟里，最重要的一件事是...",
       startFocus: "开始 25 分钟",
       lowEnergy: "低能量模式",
       keepSystem: "保留系统",
-      lowEnergyCopy: "状态差的时候，只做最低版本也算回到系统。",
+      lowEnergyCopy: "状态不好也没关系哦！深呼吸，放轻松！",
       seedsTitle: "Habit tree",
       seedsMeta: "你的习惯是种子。慢慢照顾它们。",
       cared: "已照顾",
@@ -293,10 +300,10 @@ const copy = {
     },
     work: {
       eyebrow: "Work Goals",
-      title: "工作目标和 Deadline",
+      title: "工作目标和期限",
       subtitle: "把现在最重要的事情放在这里，完成后打卡并留一句 note。",
-      listLabel: "List",
-      addNewLabel: "Add New",
+      listLabel: "清单",
+      addNewLabel: "新增",
       formTitle: "新增目标",
       formMeta: "轻量记录",
       goalLabel: "目标",
@@ -344,13 +351,13 @@ const copy = {
     personalization: {
       title: "个性化设置",
       copy: "让分类更贴近你的生活，同时保持页面轻盈。",
-      focusTab: "Focus Categories",
-      seedTab: "Habit Seeds",
-      quotesTab: "Self-care Quotes",
-      calendarTab: "Calendar",
+      focusTab: "专注分类",
+      seedTab: "习惯种子",
+      quotesTab: "自我照顾语录",
+      calendarTab: "日历",
       custom: "＋ 自定义",
       customizeQuotes: "＋ 自定义语录",
-      customizeCalendar: "自定义 Calendar",
+      customizeCalendar: "自定义日历",
       add: "添加",
       addQuote: "添加语录",
       focusPlaceholder: "新的分类",
@@ -360,10 +367,10 @@ const copy = {
       active: "启用",
       note: "停用后不会出现在选择器中，过去的数据仍会保留。",
       quoteNote: "每天会从启用的语录中随机选择两句。至少保留两句启用。",
-      calendarEyebrow: "Your personal calendar",
+      calendarEyebrow: "你的个人日历",
       calendarTitle: "选择晨间流程接下来打开的页面",
       calendarCopy: "填写你平时安排一天所使用的页面，例如 Google Calendar、Notion Calendar 或其他日历服务。",
-      calendarLabel: "Calendar 页面链接",
+      calendarLabel: "日历页面链接",
       calendarPlaceholder: "https://calendar.google.com/...",
       calendarNote: "修改会自动保存。晨间流程结束时会打开这个页面。",
       settings: "个性化设置",
@@ -381,11 +388,11 @@ const copy = {
       incomplete: "未完成",
     },
     home: {
-      eyebrow: "Choose your room",
+      eyebrow: "选择你的空间",
       title: "现在想要做些什么呢？",
       subtitle: "不要着急，一步一步来。",
       cards: {
-        work: ["工作目标", "清单、deadline 和完成 note"],
+        work: ["工作目标", "清单、期限和完成记录"],
         focus: ["专注打卡", "心流专注与认真休息"],
         selfCare: ["Self-care", "选择晨间开启新一天，或在睡前温柔收尾。"],
         stats: ["统计板块", "查看记录、趋势和专注分类"],
@@ -397,14 +404,14 @@ const copy = {
     },
     morning: {
       eyebrow: "Morning selfcare",
-      title: "Congratulations on starting your new day!",
+      title: "恭喜你开启了新的一天！",
       subtitle: "我的灵魂再次呼吸，我的双眼再次看见。",
       start: "开始晨间流程",
       restart: "从头开始",
       chooseMeditation: "选择冥想",
       openCalendar: "打开你的个人日历",
-      openGoals: "打开 Goals",
-      goalsOption: "Goals",
+      openGoals: "打开目标",
+      goalsOption: "目标",
       calendarOption: "你的个人日历",
       finalActionLabel: "冥想后的下一步",
       completeTitle: "晨间流程完成。今天不用完美，只要能回来就好。",
@@ -1120,6 +1127,8 @@ function normalizeQuoteDefinitions(saved) {
     return {
       id: String(item?.id || `quote-${index + 1}`),
       text,
+      zh: String(item?.zh || "").trim(),
+      en: String(item?.en || "").trim(),
       active: item?.active !== false,
       builtIn: item?.builtIn !== false,
     };
@@ -1201,6 +1210,10 @@ function bindPersonalization() {
   $("#addSelfCareQuote")?.addEventListener("click", addSelfCareQuote);
   $("#personalizationDialog")?.addEventListener("input", handlePersonalizationEdit);
   $("#personalizationDialog")?.addEventListener("change", handlePersonalizationEdit);
+  $("#personalizationDialog")?.addEventListener("click", handleColorPicker);
+  $("#personalizationDialog")?.addEventListener("close", closeColorPalettes);
+  $(".personalization-card")?.addEventListener("scroll", closeColorPalettes, { passive: true });
+  window.addEventListener("resize", closeColorPalettes);
 }
 
 function openPersonalization(section = "focus") {
@@ -1210,6 +1223,7 @@ function openPersonalization(section = "focus") {
 }
 
 function selectPersonalizationTab(section) {
+  closeColorPalettes();
   const selected = ["focus", "seed", "quotes", "calendar"].includes(section) ? section : "focus";
   $$(".personalization-tab").forEach((button) => {
     const active = button.dataset.personalizationTab === selected;
@@ -1264,6 +1278,7 @@ function renderPersonalizationLanguage() {
 function renderPersonalizationSettings() {
   renderDefinitionSettings($("#focusCategorySettingsList"), getFocusCategories(), "focus");
   renderDefinitionSettings($("#habitSeedSettingsList"), getHabitSeedTypes(), "seed");
+  renderColorPalettes();
   renderSelfCareQuoteSettings();
   const selectedSection = $(".personalization-section.active")?.dataset.personalizationSection;
   $("#personalizationNote").textContent = selectedSection === "quotes"
@@ -1277,7 +1292,10 @@ function renderDefinitionSettings(container, items, type) {
   if (!container) return;
   container.innerHTML = items.map((item) => `
     <div class="personalization-item" data-definition-type="${type}" data-definition-id="${escapeHtml(item.id)}">
-      <input class="personalization-color" type="color" value="${escapeHtml(item.color)}" aria-label="Color" />
+      <div class="definition-color-picker" data-color-picker>
+        <input class="personalization-color" type="hidden" value="${escapeHtml(item.color)}" />
+        <button class="definition-color-trigger" type="button" aria-label="选择颜色" aria-expanded="false" style="--selected-color:${escapeHtml(item.color)}"></button>
+      </div>
       <input class="personalization-name" type="text" maxlength="24" value="${escapeHtml(getDefinitionLabel(item))}" aria-label="Name" />
       <label class="personalization-switch">
         <input class="personalization-active" type="checkbox" ${item.active ? "checked" : ""} />
@@ -1286,6 +1304,103 @@ function renderDefinitionSettings(container, items, type) {
       </label>
     </div>
   `).join("");
+}
+
+function renderColorPalettes() {
+  $$("[data-color-picker]").forEach((picker) => {
+    const input = picker.querySelector("input");
+    const trigger = picker.querySelector(".definition-color-trigger");
+    if (!input || !trigger) return;
+    trigger.style.setProperty("--selected-color", input.value);
+  });
+}
+
+function closeColorPalettes() {
+  const palette = $("#definitionColorPalette");
+  if (palette) palette.hidden = true;
+  activeColorPicker?.querySelector(".definition-color-trigger")?.setAttribute("aria-expanded", "false");
+  activeColorPicker = null;
+}
+
+function positionColorPalette(trigger, palette) {
+  const rect = trigger.getBoundingClientRect();
+  const width = 190;
+  const height = 150;
+  const gap = 10;
+  const viewportPadding = 12;
+  const left = Math.min(
+    Math.max(viewportPadding, rect.left - 10),
+    window.innerWidth - width - viewportPadding,
+  );
+  const roomBelow = window.innerHeight - rect.bottom;
+  const top = roomBelow >= height + gap
+    ? rect.bottom + gap
+    : Math.max(viewportPadding, rect.top - height - gap);
+  palette.style.left = `${left}px`;
+  palette.style.top = `${top}px`;
+}
+
+function handleColorPicker(event) {
+  const trigger = event.target.closest(".definition-color-trigger");
+  if (trigger) {
+    const picker = trigger.closest("[data-color-picker]");
+    const palette = $("#definitionColorPalette");
+    if (!palette) return;
+    const willOpen = palette.hidden || activeColorPicker !== picker;
+    closeColorPalettes();
+    if (!willOpen) return;
+    activeColorPicker = picker;
+    const input = picker.querySelector("input");
+    palette.innerHTML = personalizationColorPalette.map((color) => {
+      const selected = color.toLowerCase() === input.value.toLowerCase();
+      return `
+        <button class="definition-color-swatch ${selected ? "is-selected" : ""}"
+          type="button"
+          role="option"
+          aria-selected="${selected}"
+          aria-label="${color}"
+          data-definition-color="${color}"
+          style="--swatch-color:${color}"></button>
+      `;
+    }).join("");
+    palette.hidden = false;
+    trigger.setAttribute("aria-expanded", "true");
+    positionColorPalette(trigger, palette);
+    return;
+  }
+
+  const swatch = event.target.closest("[data-definition-color]");
+  if (!swatch) {
+    closeColorPalettes();
+    return;
+  }
+  const picker = activeColorPicker;
+  const input = picker?.querySelector("input");
+  const color = swatch.dataset.definitionColor;
+  if (!input || !color) return;
+  input.value = color;
+  const colorTrigger = picker.querySelector(".definition-color-trigger");
+  colorTrigger?.style.setProperty("--selected-color", color);
+  colorTrigger?.setAttribute("aria-expanded", "false");
+  $("#definitionColorPalette").hidden = true;
+  $("#definitionColorPalette").querySelectorAll(".definition-color-swatch").forEach((item) => {
+    const selected = item.dataset.definitionColor === color;
+    item.classList.toggle("is-selected", selected);
+    item.setAttribute("aria-selected", String(selected));
+  });
+  activeColorPicker = null;
+
+  const row = picker.closest("[data-definition-id]");
+  if (!row) return;
+  const list = row.dataset.definitionType === "focus" ? getFocusCategories() : getHabitSeedTypes();
+  const item = list.find((entry) => entry.id === row.dataset.definitionId);
+  if (!item) return;
+  item.color = color;
+  saveState();
+  renderFocusCategories();
+  renderFocusSeed();
+  renderHabitGarden();
+  if ($("#view-stats").classList.contains("active")) drawCharts();
 }
 
 function renderSelfCareQuoteSettings() {
@@ -1303,7 +1418,7 @@ function renderSelfCareQuoteSettings() {
       </div>
       <label>
         <small>${escapeHtml(t().personalization.quoteLabel)}</small>
-        <textarea class="quote-text" rows="3" maxlength="220">${escapeHtml(quote.text)}</textarea>
+        <textarea class="quote-text" rows="3" maxlength="220">${escapeHtml(getQuoteText(quote))}</textarea>
       </label>
     </article>
   `).join("");
@@ -1385,7 +1500,12 @@ function handlePersonalizationEdit(event) {
     if (event.target.classList.contains("quote-text")) {
       const value = event.target.value.trim();
       if (!value) return;
-      quote.text = value;
+      if (quote.builtIn) {
+        if (getLanguage() === "zh") quote.zh = value;
+        else quote.en = value;
+      } else {
+        quote.text = value;
+      }
     }
     saveState();
     refreshSelfCareQuotes();
@@ -1869,9 +1989,15 @@ function syncBuiltInSelfCareQuotes(quotes) {
   const builtInQuotes = quotes.map((quote, index) => {
     const id = `quote-${index + 1}`;
     const saved = currentBuiltIns.get(id);
+    const savedText = String(saved?.text || "").trim();
+    const hasCustomSingleText = savedText
+      && savedText !== quote.prompt
+      && savedText !== quote.promptEn;
     return {
       id,
-      text: saved?.text || quote.prompt || quote.promptEn,
+      text: "",
+      zh: saved?.zh || (hasCustomSingleText ? savedText : quote.prompt),
+      en: saved?.en || (hasCustomSingleText ? savedText : quote.promptEn),
       active: saved?.active !== false,
       builtIn: true,
     };
@@ -1885,10 +2011,17 @@ function getActiveSelfCareQuotes() {
     .filter((quote) => quote.active)
     .map((quote, index) => ({
       label: `短句 ${index + 1}`,
-      prompt: quote.text,
-      promptEn: quote.text,
+      prompt: quote.builtIn ? (quote.zh || quote.en) : quote.text,
+      promptEn: quote.builtIn ? (quote.en || quote.zh) : quote.text,
       hint: "",
     }));
+}
+
+function getQuoteText(quote) {
+  if (!quote.builtIn) return quote.text;
+  return getLanguage() === "zh"
+    ? (quote.zh || quote.en || quote.text)
+    : (quote.en || quote.zh || quote.text);
 }
 
 function refreshSelfCareQuotes() {
@@ -2262,12 +2395,12 @@ function renderLowEnergyLanguage() {
   $(".low-energy-back").textContent = zh ? "← 返回 Habit Garden" : "← Back to Habit Garden";
   $("#lowEnergyTitle").textContent = zh ? "低能量模式" : "Low-energy mode";
   $(".low-energy-hero > div > p").textContent = zh
-    ? "低能量日的目标不是表现良好，而是温柔地回来。"
+    ? "如果今天没有太多力气，也没关系。慢一点，轻一点，慢慢找回自己的节奏。"
     : "On low-energy days, the goal is not to perform well. The goal is to return.";
   $(".low-energy-keep").textContent = zh ? "保留系统" : "Keep the system";
   const rules = $$(".low-energy-rules span");
-  if (rules[0]) rules[0].textContent = zh ? "完成 1 个 = 没断线" : "Complete 1 = keep the chain";
-  if (rules[1]) rules[1].textContent = zh ? "完成 2 个 = 今天足够了" : "Complete 2 = enough for today";
+  if (rules[0]) rules[0].textContent = zh ? "感受值得被认真对待" : "Your feelings deserve to be heard.";
+  if (rules[1]) rules[1].textContent = zh ? "情绪值得被温柔回应" : "Your emotions deserve compassion.";
   $(".low-energy-core .low-energy-label").textContent = zh ? "核心任务" : "Core task";
   $("#lowEnergyCore").lastChild.textContent = zh ? " 工作 25 分钟" : " Work for 25 minutes";
   $(".low-energy-core small").textContent = zh ? "专注 25 分钟已经是一种胜利。" : "One focused 25 minutes is a win.";
@@ -3444,7 +3577,7 @@ function bindHabitGarden() {
   $("#startHabitFocus").addEventListener("click", () => {
     const customTask = $("#habitCustomTask").value.trim();
     const task = customTask || selectedHabitStart.task || (getLanguage() === "zh" ? "第一个 25 分钟" : "First 25-minute block");
-    recordHabitEntry("start", task);
+    recordHabitEntry("start", task, "");
     $("#focusTask").value = task;
     focusCategory = selectedHabitStart.category || "工作";
     setFocusDuration(25);
@@ -3472,7 +3605,7 @@ function bindLowEnergyMode() {
   if (!$("#view-low-energy")) return;
   $(".low-energy-back")?.addEventListener("click", () => showView("habits"));
   $("#lowEnergyCore")?.addEventListener("click", () => {
-    recordHabitEntry("lowEnergy", "Work for 25 minutes");
+    recordHabitEntry("lowEnergy", "Work for 25 minutes", getActiveHealthSeedId());
     $("#focusTask").value = getLanguage() === "zh" ? "低能量模式：工作 25 分钟" : "Low-energy mode: work for 25 minutes";
     focusCategory = "工作";
     setFocusDuration(25);
@@ -3481,7 +3614,7 @@ function bindLowEnergyMode() {
   });
   $$(".low-energy-option-grid button").forEach((button) => {
     button.addEventListener("click", () => {
-      recordHabitEntry("lowEnergy", button.dataset.lowEnergyTask);
+      recordHabitEntry("lowEnergy", button.dataset.lowEnergyTask, getActiveHealthSeedId());
       button.classList.toggle("completed");
     });
   });
@@ -3501,13 +3634,14 @@ function openHabitSeedStats() {
   });
 }
 
-function recordHabitEntry(type, detail) {
+function recordHabitEntry(type, detail, habitSeed = "") {
   state.habitEntries = state.habitEntries || [];
   state.habitEntries.push({
     date: todayKey(),
     createdAt: new Date().toISOString(),
     type,
     detail,
+    habitSeed,
   });
   saveState();
 }
@@ -3527,7 +3661,7 @@ function renderHabitSeeds() {
   const entries = (state.habitEntries || []).filter((entry) => weekDates.has(entry.date));
   const focusEntries = (state.focusSessions || []).filter((entry) => weekDates.has(entry.date) && entry.habitSeed);
   $("#habitSeedList").innerHTML = getHabitSeeds().map((seed, index) => {
-    const count = entries.filter((entry) => getHabitSeedKey(entry) === seed.key).length
+    const count = entries.filter((entry) => resolveHabitEntrySeed(entry) === seed.key).length
       + focusEntries.filter((entry) => entry.habitSeed === seed.key).length;
     return `
       <article class="habit-seed" style="--seed-accent:${escapeHtml(seed.color)}">
@@ -3549,7 +3683,20 @@ function getHabitSeeds() {
   }));
 }
 
-function getHabitSeedKey(entry) {
+function getActiveHealthSeedId() {
+  return getHabitSeedTypes({ includeInactive: false }).some((seed) => seed.id === "health")
+    ? "health"
+    : "";
+}
+
+function resolveHabitEntrySeed(entry) {
+  if (Object.prototype.hasOwnProperty.call(entry, "habitSeed")) {
+    return entry.habitSeed || "";
+  }
+  return getLegacyHabitSeedKey(entry);
+}
+
+function getLegacyHabitSeedKey(entry) {
   const detail = String(entry.detail || "").toLowerCase();
   if (entry.type === "lowEnergy") return "health";
   if (detail.includes("health") || detail.includes("sleep") || detail.includes("walk") || detail.includes("stretch")) return "health";

@@ -1,6 +1,6 @@
 # Current State
 
-Last updated: 2026-06-18
+Last updated: 2026-06-19
 
 ## Product
 
@@ -11,7 +11,10 @@ Last updated: 2026-06-18
 - Morning wake-up time uses a custom bilingual time picker that matches the app style.
 - Goals can be cleared through a guarded, bilingual new-journey reset flow.
 - Focus categories and Habit Seed types can be added, renamed, recolored, and deactivated from one personalization panel.
-- Morning self-care quotes use one language-independent text field and can be edited, added, or deactivated from personalization settings.
+- Focus Categories and Habit Seeds share a custom color palette that stays above the personalization dialog.
+- Morning self-care includes five bilingual default quotes, and quotes can be edited, added, or deactivated from personalization settings.
+- The Morning flow can open a user-defined personal calendar URL configured from personalization settings.
+- The Low Energy Mode content uses a responsive, soft wellness layout with bilingual typography.
 - Goals use a custom bilingual deadline calendar and support guarded single-goal deletion.
 - Focus timing continues accurately when the page is not active.
 - User data is stored locally first.
@@ -38,6 +41,8 @@ Last updated: 2026-06-18
 ## Latest Validation
 
 - JavaScript syntax and diff checks pass.
+- The local backend regression suite passes all four authentication, state, and revision-conflict tests.
+- Desktop and 390px mobile layouts load successfully in a real headless browser.
 - Legacy Goals, notes, custom definitions, and bilingual Quote records migrate into the current state.
 - Cloud sync and JSON backup serialize the full application state and normalize restored settings.
-- Goals calendar, single-goal deletion, personalization, and language flows were regression checked locally.
+- Goals calendar, single-goal deletion, personalization, color selection, personal calendar, and language flows were regression checked locally.
