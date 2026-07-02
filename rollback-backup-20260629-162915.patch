@@ -1,0 +1,3443 @@
+﻿diff --git a/README.md b/README.md
+index 56c14f0..4b53970 100644
+--- a/README.md
++++ b/README.md
+@@ -57,6 +57,16 @@ Example redirect URLs:
+ - Third-party license information is recorded in
+   [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+ 
++## Family Sharing
++
++Family Sharing uses separate relational tables for family spaces, members,
++invitations, and shared goals. Personal app state remains in the user's private
++`app_states` row and is never exposed to family members.
++
++Run the latest [`supabase/schema.sql`](supabase/schema.sql) before testing this
++feature. Invitations are currently in-app: invite the email address the other
++person uses for My Care, then have them sign in and accept it from Family Goals.
++
+ ## Local Prototype Backend
+ 
+ An authenticated SQLite REST API is available in [`backend/`](backend/README.md).
+diff --git a/STATE.md b/STATE.md
+index 15bc822..d80380f 100644
+--- a/STATE.md
++++ b/STATE.md
+@@ -1,6 +1,6 @@
+ # Current State
+ 
+-Last updated: 2026-06-19
++Last updated: 2026-06-22
+ 
+ ## Product
+ 
+@@ -18,6 +18,7 @@ Last updated: 2026-06-19
+ - Goals use a custom bilingual deadline calendar and support guarded single-goal deletion.
+ - Focus timing continues accurately when the page is not active.
+ - User data is stored locally first.
++- Family Sharing is implemented locally with family groups, email-based in-app invitations, shared Family Goals, and calm family statistics.
+ 
+ ## Data and Deployment
+ 
+@@ -29,7 +30,7 @@ Last updated: 2026-06-19
+ 
+ ## Current Limitations
+ 
+-- Family sharing is not implemented.
++- The production Supabase project still needs the latest family-sharing schema and a two-account permission test.
+ - External health and wearable data cannot yet be imported.
+ 
+ ## Repository
+diff --git a/TASKS.md b/TASKS.md
+index 7143a09..640a17b 100644
+--- a/TASKS.md
++++ b/TASKS.md
+@@ -2,12 +2,14 @@
+ 
+ ## Version 2 - Family Sharing
+ 
+-- [ ] Define family spaces, membership, and invitation flows.
+-- [ ] Decide which Goal and Habit Seed fields can be shared.
+-- [ ] Design shared progress without rankings or streak punishment.
+-- [ ] Keep notes, self-care records, and health data private by default.
+-- [ ] Add Supabase tables and Row Level Security policies.
+-- [ ] Build create, join, leave, and remove-member flows.
++- [x] Define family spaces, membership, and invitation flows.
++- [x] Keep Family Goals separate from personal Goal and Habit Seed data.
++- [x] Design shared progress without rankings or streak punishment.
++- [x] Keep notes, self-care records, and health data private by default.
++- [x] Add Supabase tables and Row Level Security policies.
++- [x] Build create, invite, join, leave, and shared-goal flows.
++- [ ] Add owner controls for removing another member.
++- [ ] Run the latest schema in the production Supabase project.
+ - [ ] Test two-account synchronization and permission boundaries.
+ 
+ ## Release Check
+diff --git a/app.js b/app.js
+index 4a87ded..60a7b11 100644
+--- a/app.js
++++ b/app.js
+@@ -73,8 +73,11 @@ const defaults = {
+     personalBlockTheme: "iceland",
+     personalBlockTab: "write",
+     personalNoteFilter: "all",
++    goalScope: "personal",
+     workGoalView: "list",
+     workGoalFilter: "current",
++    familyGoalView: "list",
++    familyGoalFilter: "current",
+     language: "zh",
+     focusCategories: defaultFocusCategories,
+     habitSeedTypes: defaultHabitSeeds,
+@@ -225,6 +228,16 @@ let focusCategory = "learning";
+ let selectedFocusSeed = "none";
+ let selectedFocusMinutes = 30;
+ let selectedStatsRange = "7";
++let selectedFamilyGoalUrgency = "normal";
++let familyState = {
++  loading: false,
++  activeFamily: null,
++  membership: null,
++  members: [],
++  invitations: [],
++  goals: [],
++  error: "",
++};
+ let morningIndex = 0;
+ let nightIndex = 0;
+ let nightInterval = null;
+@@ -316,7 +329,7 @@ const copy = {
+       calendarClear: "清除",
+       previousMonth: "上个月",
+       nextMonth: "下个月",
+-      add: "加入目标列表",
++      add: "添加目标",
+       currentTitle: "当前目标",
+       finishedTitle: "已完成目标",
+       openSummary: "{open} open · {done} done",
+@@ -631,7 +644,7 @@ const copy = {
+       calendarClear: "Clear",
+       previousMonth: "Previous month",
+       nextMonth: "Next month",
+-      add: "Add to goals",
++      add: "Add goal",
+       currentTitle: "Current goals",
+       finishedTitle: "Finished goals",
+       openSummary: "{open} open · {done} done",
+@@ -1165,6 +1178,7 @@ function init() {
+   bindHabitGarden();
+   bindLowEnergyMode();
+   bindWorkGoals();
++  bindFamilyGoals();
+   bindStats();
+   bindTimerAccuracy();
+   bindAccount();
+@@ -1566,15 +1580,20 @@ async function initSupabase() {
+   if (currentUser) {
+     await reconcileCloudState();
+     await loadCloudHistory();
++    await loadFamilyData();
+   }
+ 
+   supabaseClient.auth.onAuthStateChange((event, session) => {
+     currentUser = session?.user || null;
++    if (!currentUser) resetFamilyState();
+     renderAccountUI();
++    renderFamilyWorkspace();
++    renderWorkGoalView();
+     if (currentUser && event !== "INITIAL_SESSION") {
+       window.setTimeout(async () => {
+         await reconcileCloudState();
+         await loadCloudHistory();
++        await loadFamilyData();
+       }, 0);
+     }
+   });
+@@ -1613,10 +1632,12 @@ async function signOut() {
+     return;
+   }
+   currentUser = null;
++  resetFamilyState();
+   cloudRevision = 0;
+   cloudSnapshot = null;
+   setAccountMessage(getLanguage() === "zh" ? "已退出。数据仍保存在此设备。" : "Signed out. Your data remains on this device.");
+   renderAccountUI();
++  renderFamilyWorkspace();
+ }
+ 
+ function queueCloudSync() {
+@@ -2422,11 +2443,15 @@ function renderLowEnergyLanguage() {
+ function renderWorkLanguage() {
+   if (!$("#view-work")) return;
+   const text = t().work;
++  const shared = familyText();
+   $("#view-work .section-head .eyebrow").textContent = text.eyebrow;
+   $("#workTitle").textContent = text.title;
+   $("#view-work .section-head .muted").textContent = text.subtitle;
+-  $(".work-view-option[data-work-view='list']").textContent = text.listLabel;
+-  $(".work-view-option[data-work-view='add']").textContent = text.addNewLabel;
++  $(".goal-scope-option[data-goal-scope='personal']").textContent = shared.personalScope;
++  $(".goal-scope-option[data-goal-scope='family']").textContent = shared.familyScope;
++  $(".work-view-option[data-work-view='list']").textContent = shared.list;
++  $(".work-view-option[data-work-view='add']").textContent = shared.add;
++  $(".work-view-dropdown-prefix").textContent = getLanguage() === "zh" ? "视图" : "View";
+   $("#workGoalForm .panel-title h3").textContent = text.formTitle;
+   $("#workGoalForm .panel-title span").textContent = text.formMeta;
+   $("[data-work-label='title']").childNodes[0].textContent = `${text.goalLabel} `;
+@@ -2452,6 +2477,49 @@ function renderWorkLanguage() {
+   renderWorkDeadlinePicker();
+   renderWorkGoalView();
+   renderWorkGoals();
++  renderFamilyLanguage();
++}
++
++function renderFamilyLanguage() {
++  if (!$("#familyGoalSpace")) return;
++  const text = familyText();
++  const labels = {
++    familySignInEyebrow: text.signInEyebrow,
++    familySignInTitle: text.signInTitle,
++    familySignInCopy: text.signInCopy,
++    familySignInButton: text.signIn,
++    familyCreateEyebrow: text.createEyebrow,
++    familyCreateTitle: text.createTitle,
++    familyCreateCopy: text.createCopy,
++    familyNameLabel: text.familyName,
++    familyCreateButton: text.createButton,
++    familyInvitesEyebrow: text.invitesEyebrow,
++    familyInvitesTitle: text.invitesTitle,
++    familyRoomEyebrow: text.roomEyebrow,
++    familyRefreshButton: text.refresh,
++    familyMembersToggle: text.members,
++    familyLeaveButton: text.leave,
++    familyMembersTitle: text.membersTitle,
++    familyInviteEmailLabel: text.inviteEmail,
++    familyInviteButton: text.inviteButton,
++    familyGoalFormTitle: text.formTitle,
++    familyGoalFormMeta: text.formMeta,
++    familyGoalTitleLabel: text.goal,
++    familyGoalCategoryLabel: text.category,
++    familyGoalDeadlineLabel: text.deadline,
++    familyGoalAddButton: text.addGoal,
++  };
++  Object.entries(labels).forEach(([id, label]) => {
++    const target = $(`#${id}`);
++    if (target) target.textContent = label;
++  });
++  $("#familyNameInput").placeholder = text.familyPlaceholder;
++  $("#familyGoalTitle").placeholder = text.goalPlaceholder;
++  $("[data-family-goal-filter='current']").textContent = text.current;
++  $("[data-family-goal-filter='finished']").textContent = text.finished;
++  renderFamilyCategoryControls();
++  renderFamilyUrgencyOptions();
++  renderFamilyWorkspace();
+ }
+ 
+ function renderStatsLanguage() {
+@@ -2483,6 +2551,12 @@ function renderStatsLanguage() {
+     goalCategoryMeta: zh ? "目标数量与已完成数量" : "Total and completed goals",
+     goalDeadlineTitle: zh ? "Deadline 时间线" : "Deadline timeline",
+     goalDeadlineMeta: zh ? "接下来值得留意的目标" : "What deserves attention next",
++    familyStatsTitle: familyText().statsTitle,
++    familyStatsSubtitle: familyText().statsSubtitle,
++    familyGoalStatusTitle: familyText().statsStatusTitle,
++    familyGoalStatusMeta: familyText().statsStatusMeta,
++    familyActivityTitle: familyText().statsActivityTitle,
++    familyActivityMeta: familyText().statsActivityMeta,
+     seedStatsTitle: zh ? "习惯种子" : "Habit Seeds",
+     seedStatsSubtitle: zh ? "看看最近把注意力温柔地放在了哪里。" : "See where your attention has been gently placed.",
+     seedCompareTitle: zh ? "Seed 对比" : "Seed comparison",
+@@ -2530,9 +2604,16 @@ function showView(viewName) {
+   if (viewName !== "morning") stopMorningBackgroundTrack();
+   if (viewName === "block") renderPersonalBlock();
+   if (viewName === "habits") renderHabitGarden();
+-  if (viewName === "work") renderWorkGoals();
++  if (viewName === "work") {
++    renderWorkGoals();
++    renderFamilyWorkspace();
++    if (state.settings.goalScope === "family" && currentUser) loadFamilyData();
++  }
+   if (viewName !== "block") $("#backgroundCredit").textContent = currentBackgroundCredit;
+-  if (viewName === "stats") drawCharts();
++  if (viewName === "stats") {
++    drawCharts();
++    if (currentUser) loadFamilyData();
++  }
+ }
+ 
+ function setImmersiveMode(viewName) {
+@@ -3730,12 +3811,28 @@ function bindWorkGoals() {
+   });
+   $$(".work-view-option").forEach((button) => {
+     button.addEventListener("click", () => {
+-      state.settings.workGoalView = button.dataset.workView;
+-      if (state.settings.workGoalView !== "add") closeWorkDeadlinePicker();
++      if (state.settings.goalScope === "family") {
++        state.settings.familyGoalView = button.dataset.workView;
++        if (state.settings.familyGoalView === "add") {
++          const panel = $("#familyMembersPanel");
++          if (panel) panel.hidden = true;
++        }
++      } else {
++        state.settings.workGoalView = button.dataset.workView;
++        if (state.settings.workGoalView !== "add") closeWorkDeadlinePicker();
++      }
+       saveState();
+       renderWorkGoalView();
++      closeWorkViewMenu();
+     });
+   });
++  $("#workViewDropdownToggle")?.addEventListener("click", (event) => {
++    event.stopPropagation();
++    toggleWorkViewMenu();
++  });
++  document.addEventListener("click", (event) => {
++    if (!event.target.closest(".work-view-menu")) closeWorkViewMenu();
++  });
+ 
+   $$(".work-goal-filter").forEach((button) => {
+     button.addEventListener("click", () => {
+@@ -3820,6 +3917,694 @@ function bindWorkGoals() {
+   });
+ }
+ 
++function familyText() {
++  const zh = getLanguage() === "zh";
++  return zh ? {
++    personalScope: "个人目标",
++    familyScope: "家庭目标",
++    list: "清单",
++    add: "新增",
++    signInEyebrow: "共享空间",
++    signInTitle: "登录后使用家庭目标",
++    signInCopy: "你的个人记录仍然保持私密，只有在这里创建的目标会与家人共享。",
++    signIn: "登录",
++    createEyebrow: "开启共享空间",
++    createTitle: "创建家庭群组",
++    createCopy: "给这个共同空间一个熟悉、轻松的名字。",
++    familyName: "家庭名称",
++    familyPlaceholder: "我们的小花园",
++    createButton: "创建家庭",
++    invitesEyebrow: "邀请",
++    invitesTitle: "正在等待你的空间",
++    noInvites: "目前没有待接受的邀请。",
++    accept: "接受邀请",
++    roomEyebrow: "家庭空间",
++    members: "成员",
++    refresh: "刷新",
++    memberCount: "{count} 位成员",
++    leave: "退出",
++    membersTitle: "家庭成员",
++    inviteEmail: "通过邮箱邀请",
++    inviteButton: "创建邀请",
++    inviteHint: "对方使用这个邮箱登录后，就能看到邀请。",
++    current: "当前目标",
++    finished: "已完成",
++    summary: "{open} 进行中 · {done} 已完成",
++    empty: "还没有家庭目标。先添加一件大家愿意一起完成的小事。",
++    finishedEmpty: "还没有已完成的家庭目标。",
++    addFirst: "添加家庭目标",
++    formTitle: "新增家庭目标",
++    formMeta: "轻轻地一起推进",
++    goal: "目标",
++    goalPlaceholder: "例如：周末一起散步",
++    category: "分类",
++    categoryPlaceholder: "家庭 / 健康 / 一起完成",
++    deadline: "期限",
++    addGoal: "加入家庭目标",
++    addNote: "添加 note",
++    editNote: "编辑 note",
++    noteLabel: "完成后的 note",
++    notePlaceholder: "留下一句简单的记录...",
++    complete: "完成并打卡",
++    reopen: "重新打开",
++    delete: "删除",
++    owner: "创建者",
++    joined: "成员",
++    loading: "正在整理家庭空间...",
++    schemaError: "请先在 Supabase SQL Editor 运行最新版 supabase/schema.sql。",
++    created: "家庭空间已创建。",
++    invited: "邀请已保存，对方登录后即可接受。",
++    accepted: "已经加入家庭空间。",
++    left: "已退出家庭空间。",
++    ownerLeave: "家庭创建者需要先移除其他成员，或在只剩自己时删除家庭。",
++    confirmLeave: "确定要退出这个家庭空间吗？共享目标不会出现在你的页面中。",
++    confirmDeleteFamily: "目前只有你一位成员。确定要删除这个家庭空间吗？",
++    statsTitle: "家庭目标",
++    statsSubtitle: "一起看见进展，不排名，也不制造压力。",
++    statsStatusTitle: "共享目标状态",
++    statsStatusMeta: "正在进行与已经完成",
++    statsActivityTitle: "最近家庭动态",
++    statsActivityMeta: "只记录完成，不设置排行榜",
++    statsNoFamily: "加入家庭后，共享目标统计会显示在这里。",
++    statsNoGoals: "还没有家庭目标记录。",
++    completedBy: "完成者",
++  } : {
++    personalScope: "Personal Goal",
++    familyScope: "Family Goal",
++    list: "List",
++    add: "Add New",
++    signInEyebrow: "Shared space",
++    signInTitle: "Sign in to use Family Goals",
++    signInCopy: "Your personal records stay private. Only goals created here are shared with family.",
++    signIn: "Sign in",
++    createEyebrow: "Begin a shared room",
++    createTitle: "Create a family group",
++    createCopy: "Give the shared space a calm, familiar name.",
++    familyName: "Family name",
++    familyPlaceholder: "Our little garden",
++    createButton: "Create family",
++    invitesEyebrow: "Invitations",
++    invitesTitle: "Rooms waiting for you",
++    noInvites: "No invitations are waiting right now.",
++    accept: "Accept invitation",
++    roomEyebrow: "Family room",
++    members: "Members",
++    refresh: "Refresh",
++    memberCount: "{count} members",
++    leave: "Leave",
++    membersTitle: "Family members",
++    inviteEmail: "Invite by email",
++    inviteButton: "Create invitation",
++    inviteHint: "They will see it after signing in with this email.",
++    current: "Current Goals",
++    finished: "Finished Goals",
++    summary: "{open} open · {done} done",
++    empty: "No family goals yet. Add one small thing you would like to do together.",
++    finishedEmpty: "No family goals have been completed yet.",
++    addFirst: "Add family goal",
++    formTitle: "New family goal",
++    formMeta: "Shared gently",
++    goal: "Goal",
++    goalPlaceholder: "For example: take a family walk",
++    category: "Category",
++    categoryPlaceholder: "Home / Health / Together",
++    customizeCategories: "Customize categories",
++    categorySettingsTitle: "Family categories",
++    categorySettingsMeta: "Shared only inside this family.",
++    categoryInputPlaceholder: "New category",
++    categoryAdd: "Add",
++    urgency: "Urgency",
++    urgencyLow: "Low",
++    urgencyNormal: "Normal",
++    urgencyUrgent: "Urgent",
++    deadline: "Deadline",
++    addGoal: "Add family goal",
++    addNote: "Add note",
++    editNote: "Edit note",
++    noteLabel: "Completion note",
++    notePlaceholder: "Leave one simple memory...",
++    complete: "Complete and check in",
++    reopen: "Reopen",
++    delete: "Delete",
++    owner: "Owner",
++    joined: "Member",
++    loading: "Preparing the family room...",
++    schemaError: "Run the latest supabase/schema.sql in the Supabase SQL Editor first.",
++    created: "Family room created.",
++    invited: "Invitation saved. They can accept it after signing in.",
++    accepted: "You joined the family room.",
++    left: "You left the family room.",
++    ownerLeave: "The owner must remove other members first, or delete the family when alone.",
++    confirmLeave: "Leave this family room? Its shared goals will no longer appear here.",
++    confirmDeleteFamily: "You are the only member. Delete this family room?",
++    statsTitle: "Family Goals",
++    statsSubtitle: "Notice shared progress without rankings or pressure.",
++    statsStatusTitle: "Shared goal status",
++    statsStatusMeta: "Open and completed together",
++    statsActivityTitle: "Recent family activity",
++    statsActivityMeta: "Completion history, never a leaderboard",
++    statsNoFamily: "Join a family to see shared goal statistics here.",
++    statsNoGoals: "No family goal records yet.",
++    completedBy: "Completed by",
++  };
++}
++
++function resetFamilyState() {
++  familyState = {
++    loading: false,
++    activeFamily: null,
++    membership: null,
++    members: [],
++    invitations: [],
++    goals: [],
++    error: "",
++  };
++}
++
++function getFamilyCategories() {
++  const fallback = ["Home", "Health", "Together"];
++  const raw = familyState.activeFamily?.category_options;
++  const source = Array.isArray(raw) && raw.length ? raw : fallback;
++  const seen = new Set();
++  return source
++    .map((item) => String(item || "").trim())
++    .filter((item) => {
++      const key = item.toLowerCase();
++      if (!item || seen.has(key)) return false;
++      seen.add(key);
++      return true;
++    })
++    .slice(0, 12);
++}
++
++function renderFamilyCategoryControls() {
++  const text = familyText();
++  const fallback = {
++    customizeCategories: "Customize categories",
++    categorySettingsTitle: "Family categories",
++    categorySettingsMeta: "Shared only inside this family.",
++    categoryInputPlaceholder: "New category",
++    categoryAdd: "Add",
++  };
++  const categories = getFamilyCategories();
++  const select = $("#familyGoalCategory");
++  if (select) {
++    const currentValue = select.value;
++    select.innerHTML = categories
++      .map((category) => `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`)
++      .join("");
++    if (categories.includes(currentValue)) select.value = currentValue;
++  }
++  $("#familyCategoryCustomizeButton").textContent = text.customizeCategories || fallback.customizeCategories;
++  $("#familyCategorySettingsTitle").textContent = text.categorySettingsTitle || fallback.categorySettingsTitle;
++  $("#familyCategorySettingsMeta").textContent = text.categorySettingsMeta || fallback.categorySettingsMeta;
++  $("#familyCategoryInput").placeholder = text.categoryInputPlaceholder || fallback.categoryInputPlaceholder;
++  $("#familyCategoryAddButton").textContent = text.categoryAdd || fallback.categoryAdd;
++  $("#familyCategoryList").innerHTML = categories.map((category) => `
++    <button class="family-category-chip" data-family-category="${escapeHtml(category)}" type="button">
++      <span>${escapeHtml(category)}</span>
++      <b aria-hidden="true">×</b>
++    </button>
++  `).join("");
++}
++
++function renderFamilyUrgencyOptions() {
++  const text = familyText();
++  const labels = {
++    low: text.urgencyLow || "Low",
++    normal: text.urgencyNormal || "Normal",
++    urgent: text.urgencyUrgent || "Urgent",
++  };
++  $("#familyUrgencyLabel").textContent = text.urgency || "Urgency";
++  $$(".family-urgency-option").forEach((button) => {
++    const urgency = button.dataset.familyUrgency || "normal";
++    button.textContent = labels[urgency] || urgency;
++    button.classList.toggle("active", urgency === selectedFamilyGoalUrgency);
++    button.setAttribute("aria-pressed", String(urgency === selectedFamilyGoalUrgency));
++  });
++}
++
++async function saveFamilyCategories(categories) {
++  if (!supabaseClient || !currentUser || !familyState.activeFamily) return;
++  const cleaned = categories
++    .map((item) => String(item || "").trim())
++    .filter(Boolean)
++    .slice(0, 12);
++  setFamilyMessage(familyText().loading);
++  const { data, error } = await supabaseClient.rpc("update_family_categories", {
++    target_family_id: familyState.activeFamily.id,
++    categories: cleaned,
++  });
++  if (error) {
++    setFamilyMessage(error.message, true);
++    return;
++  }
++  familyState.activeFamily.category_options = Array.isArray(data) ? data : cleaned;
++  renderFamilyCategoryControls();
++  setFamilyMessage("");
++}
++
++async function addFamilyCategory(event) {
++  event.preventDefault();
++  const input = $("#familyCategoryInput");
++  const value = input?.value.trim();
++  if (!value) return;
++  const categories = getFamilyCategories();
++  if (!categories.some((category) => category.toLowerCase() === value.toLowerCase())) {
++    await saveFamilyCategories([...categories, value]);
++  }
++  if (input) input.value = "";
++}
++
++async function removeFamilyCategory(event) {
++  const button = event.target.closest("[data-family-category]");
++  if (!button) return;
++  const category = button.dataset.familyCategory;
++  const categories = getFamilyCategories().filter((item) => item !== category);
++  await saveFamilyCategories(categories);
++}
++
++function bindFamilyGoals() {
++  $$(".goal-scope-option").forEach((button) => {
++    button.addEventListener("click", async () => {
++      state.settings.goalScope = button.dataset.goalScope === "family" ? "family" : "personal";
++      saveState();
++      renderWorkGoalView();
++      if (state.settings.goalScope === "family" && currentUser) await loadFamilyData();
++    });
++  });
++
++  $("#familySignInButton")?.addEventListener("click", () => {
++    renderAccountUI();
++    $("#accountDialog")?.showModal();
++  });
++  $("#familyCreateForm")?.addEventListener("submit", createFamily);
++  $("#familyInviteForm")?.addEventListener("submit", inviteFamilyMember);
++  $("#familyMembersToggle")?.addEventListener("click", () => {
++    const panel = $("#familyMembersPanel");
++    if (panel) panel.hidden = !panel.hidden;
++  });
++  $("#familyRefreshButton")?.addEventListener("click", () => loadFamilyData());
++  $("#familyLeaveButton")?.addEventListener("click", leaveFamily);
++  $("#familyCategoryCustomizeButton")?.addEventListener("click", () => {
++    const panel = $("#familyCategorySettings");
++    if (panel) panel.hidden = !panel.hidden;
++  });
++  $("#familyCategoryAddButton")?.addEventListener("click", addFamilyCategory);
++  $("#familyCategoryInput")?.addEventListener("keydown", (event) => {
++    if (event.key === "Enter") addFamilyCategory(event);
++  });
++  $("#familyCategoryList")?.addEventListener("click", removeFamilyCategory);
++  $$(".family-urgency-option").forEach((button) => {
++    button.addEventListener("click", () => {
++      selectedFamilyGoalUrgency = button.dataset.familyUrgency || "normal";
++      renderFamilyUrgencyOptions();
++    });
++  });
++  $("#familyInviteList")?.addEventListener("click", (event) => {
++    const button = event.target.closest("[data-family-invitation-id]");
++    if (button) acceptFamilyInvitation(button.dataset.familyInvitationId);
++  });
++  $$(".family-goal-filter").forEach((button) => {
++    button.addEventListener("click", () => {
++      state.settings.familyGoalFilter = button.dataset.familyGoalFilter;
++      saveState();
++      renderFamilyGoals();
++    });
++  });
++  $("#familyGoalForm")?.addEventListener("submit", addFamilyGoal);
++  $("#familyGoalList")?.addEventListener("click", handleFamilyGoalAction);
++  $("#familyGoalList")?.addEventListener("change", updateFamilyGoalNote);
++}
++
++async function loadFamilyData({ message = "" } = {}) {
++  if (!supabaseClient || !currentUser) {
++    resetFamilyState();
++    setFamilyMessage("");
++    renderFamilyWorkspace();
++    renderWorkGoalView();
++    renderFamilyStats();
++    return;
++  }
++
++  familyState.loading = true;
++  familyState.error = "";
++  renderFamilyWorkspace();
++  const email = String(currentUser.email || "").toLowerCase();
++  const [membershipResult, invitationResult] = await Promise.all([
++    supabaseClient
++      .from("family_members")
++      .select("family_id, role, email, joined_at")
++      .eq("user_id", currentUser.id)
++      .order("joined_at", { ascending: true }),
++    supabaseClient
++      .from("family_invitations")
++      .select("id, family_id, family_name, email, created_at")
++      .eq("status", "pending")
++      .eq("email", email)
++      .order("created_at", { ascending: false }),
++  ]);
++
++  const firstError = membershipResult.error || invitationResult.error;
++  if (firstError) {
++    familyState.loading = false;
++    familyState.error = familyText().schemaError;
++    renderFamilyWorkspace();
++    renderWorkGoalView();
++    renderFamilyStats();
++    return;
++  }
++
++  familyState.invitations = invitationResult.data || [];
++  const membership = membershipResult.data?.[0] || null;
++  familyState.membership = membership;
++  if (!membership) {
++    familyState.activeFamily = null;
++    familyState.members = [];
++    familyState.goals = [];
++    familyState.loading = false;
++    renderFamilyWorkspace();
++    renderWorkGoalView();
++    renderFamilyStats();
++    setFamilyMessage(message);
++    return;
++  }
++
++  const [familyResult, membersResult, goalsResult] = await Promise.all([
++    supabaseClient
++      .from("families")
++      .select("id, name, owner_id, category_options, created_at")
++      .eq("id", membership.family_id)
++      .single(),
++    supabaseClient
++      .from("family_members")
++      .select("family_id, user_id, email, role, joined_at")
++      .eq("family_id", membership.family_id)
++      .order("joined_at", { ascending: true }),
++    supabaseClient
++      .from("family_goals")
++      .select("*")
++      .eq("family_id", membership.family_id)
++      .order("created_at", { ascending: false }),
++  ]);
++
++  const dataError = familyResult.error || membersResult.error || goalsResult.error;
++  familyState.loading = false;
++  if (dataError) {
++    familyState.error = dataError.message;
++  } else {
++    familyState.activeFamily = familyResult.data;
++    familyState.members = membersResult.data || [];
++    familyState.goals = goalsResult.data || [];
++  }
++  renderFamilyWorkspace();
++  renderWorkGoalView();
++  renderFamilyStats();
++  setFamilyMessage(message);
++}
++
++async function createFamily(event) {
++  event.preventDefault();
++  if (!supabaseClient || !currentUser) return;
++  const name = $("#familyNameInput")?.value.trim();
++  if (!name) return;
++  setFamilyMessage(familyText().loading);
++  const { error } = await supabaseClient.rpc("create_family", { family_name: name });
++  if (error) {
++    setFamilyMessage(error.message, true);
++    return;
++  }
++  $("#familyNameInput").value = "";
++  await loadFamilyData({ message: familyText().created });
++}
++
++async function acceptFamilyInvitation(invitationId) {
++  if (!supabaseClient || !currentUser || !invitationId) return;
++  setFamilyMessage(familyText().loading);
++  const { error } = await supabaseClient.rpc("accept_family_invitation", { invitation_id: invitationId });
++  if (error) {
++    setFamilyMessage(error.message, true);
++    return;
++  }
++  await loadFamilyData({ message: familyText().accepted });
++}
++
++async function inviteFamilyMember(event) {
++  event.preventDefault();
++  if (!supabaseClient || !currentUser || !familyState.activeFamily) return;
++  const email = $("#familyInviteEmail")?.value.trim().toLowerCase();
++  if (!email) return;
++  const { error } = await supabaseClient.from("family_invitations").insert({
++    family_id: familyState.activeFamily.id,
++    family_name: familyState.activeFamily.name,
++    email,
++    invited_by: currentUser.id,
++  });
++  if (error) {
++    setFamilyMessage(error.message, true);
++    return;
++  }
++  $("#familyInviteEmail").value = "";
++  setFamilyMessage(familyText().invited);
++}
++
++async function leaveFamily() {
++  if (!supabaseClient || !currentUser || !familyState.activeFamily || !familyState.membership) return;
++  const isOwner = familyState.membership.role === "owner";
++  if (isOwner && familyState.members.length > 1) {
++    setFamilyMessage(familyText().ownerLeave, true);
++    return;
++  }
++  const confirmed = window.confirm(isOwner ? familyText().confirmDeleteFamily : familyText().confirmLeave);
++  if (!confirmed) return;
++  const query = isOwner
++    ? supabaseClient.from("families").delete().eq("id", familyState.activeFamily.id)
++    : supabaseClient.from("family_members").delete()
++      .eq("family_id", familyState.activeFamily.id)
++      .eq("user_id", currentUser.id);
++  const { error } = await query;
++  if (error) {
++    setFamilyMessage(error.message, true);
++    return;
++  }
++  resetFamilyState();
++  await loadFamilyData({ message: familyText().left });
++}
++
++async function addFamilyGoal(event) {
++  event.preventDefault();
++  if (!supabaseClient || !currentUser || !familyState.activeFamily) {
++    setFamilyMessage(familyText().schemaError, true);
++    return;
++  }
++  const title = $("#familyGoalTitle")?.value.trim();
++  if (!title) {
++    $("#familyGoalTitle")?.focus();
++    return;
++  }
++  const button = $("#familyGoalAddButton");
++  if (button) button.disabled = true;
++  setFamilyMessage(familyText().loading);
++  try {
++    const { error } = await supabaseClient.from("family_goals").insert({
++      family_id: familyState.activeFamily.id,
++      title,
++      category: $("#familyGoalCategory")?.value.trim() || "",
++      deadline: $("#familyGoalDeadline")?.value || null,
++      urgency: selectedFamilyGoalUrgency,
++      created_by: currentUser.id,
++    });
++    if (error) {
++      setFamilyMessage(error.message, true);
++      return;
++    }
++  } catch (error) {
++    setFamilyMessage(error?.message || familyText().schemaError, true);
++    return;
++  } finally {
++    if (button) button.disabled = false;
++  }
++  $("#familyGoalForm").reset();
++  selectedFamilyGoalUrgency = "normal";
++  state.settings.familyGoalView = "list";
++  state.settings.familyGoalFilter = "current";
++  saveState();
++  await loadFamilyData();
++  renderWorkGoalView();
++  setFamilyMessage(familyText().saved || familyText().created);
++}
++
++async function handleFamilyGoalAction(event) {
++  const button = event.target.closest("[data-family-goal-action]");
++  if (!button) return;
++  const action = button.dataset.familyGoalAction;
++  if (action === "showAdd") {
++    state.settings.familyGoalView = "add";
++    const panel = $("#familyMembersPanel");
++    if (panel) panel.hidden = true;
++    saveState();
++    renderWorkGoalView();
++    $("#familyGoalTitle")?.focus();
++    return;
++  }
++  const card = button.closest("[data-family-goal-id]");
++  const goal = familyState.goals.find((item) => item.id === card?.dataset.familyGoalId);
++  if (!goal || !supabaseClient) return;
++  let query;
++  if (action === "complete") {
++    query = supabaseClient.from("family_goals").update({
++      status: "done",
++      note: card.querySelector(".family-goal-note")?.value.trim() || "",
++    }).eq("id", goal.id);
++  } else if (action === "reopen") {
++    query = supabaseClient.from("family_goals").update({ status: "open" }).eq("id", goal.id);
++  } else if (action === "delete") {
++    if (!window.confirm(getLanguage() === "zh" ? "确定删除这个家庭目标吗？" : "Delete this family goal?")) return;
++    query = supabaseClient.from("family_goals").delete().eq("id", goal.id);
++  }
++  if (!query) return;
++  const { error } = await query;
++  if (error) setFamilyMessage(error.message, true);
++  else await loadFamilyData();
++}
++
++async function updateFamilyGoalNote(event) {
++  if (!event.target.classList.contains("family-goal-note") || !supabaseClient) return;
++  const card = event.target.closest("[data-family-goal-id]");
++  if (!card) return;
++  const { error } = await supabaseClient
++    .from("family_goals")
++    .update({ note: event.target.value.trim() })
++    .eq("id", card.dataset.familyGoalId);
++  if (error) setFamilyMessage(error.message, true);
++  else await loadFamilyData();
++}
++
++function setFamilyMessage(message = "", isError = false) {
++  const target = $("#familyGoalStatus");
++  if (!target) return;
++  target.textContent = message;
++  target.classList.toggle("is-error", isError);
++  target.classList.toggle("is-visible", Boolean(message));
++}
++
++function renderFamilyWorkspace() {
++  if (!$("#familyGoalSpace")) return;
++  const text = familyText();
++  const signedIn = Boolean(currentUser);
++  $("#familySignedOutState").hidden = signedIn;
++  $("#familySetupState").hidden = !signedIn || Boolean(familyState.activeFamily);
++  $("#familyWorkspace").hidden = !signedIn || !familyState.activeFamily;
++
++  if (familyState.loading) setFamilyMessage(text.loading);
++  else if (familyState.error) setFamilyMessage(familyState.error, true);
++
++  renderFamilyInvitations();
++  if (!familyState.activeFamily) {
++    renderFamilyStats();
++    return;
++  }
++
++  $("#familyRoomName").textContent = familyState.activeFamily.name;
++  $("#familyRoomMeta").textContent = interpolate(text.memberCount, { count: familyState.members.length });
++  $("#familyMembersCount").textContent = interpolate(text.memberCount, { count: familyState.members.length });
++  $("#familyInviteForm").hidden = familyState.membership?.role !== "owner";
++  renderFamilyCategoryControls();
++  renderFamilyUrgencyOptions();
++  $("#familyMemberList").innerHTML = familyState.members.map((member) => `
++    <div class="family-member-row">
++      <span class="family-member-avatar">${escapeHtml((member.email || "?").slice(0, 1).toUpperCase())}</span>
++      <div><strong>${escapeHtml(member.email || "")}</strong><small>${member.role === "owner" ? text.owner : text.joined}</small></div>
++    </div>
++  `).join("");
++  renderFamilyGoals();
++}
++
++function renderFamilyInvitations() {
++  const target = $("#familyInviteList");
++  if (!target) return;
++  const text = familyText();
++  target.innerHTML = familyState.invitations.length
++    ? familyState.invitations.map((invitation) => `
++      <article class="family-invite-item">
++        <div>
++          <strong>${escapeHtml(invitation.family_name || text.familyScope)}</strong>
++          <small>${escapeHtml(formatShortDate(invitation.created_at?.slice(0, 10)))}</small>
++        </div>
++        <button class="secondary" data-family-invitation-id="${escapeHtml(invitation.id)}" type="button">${escapeHtml(text.accept)}</button>
++      </article>
++    `).join("")
++    : `<p class="family-empty-copy">${escapeHtml(text.noInvites)}</p>`;
++}
++
++function renderFamilyGoals() {
++  const target = $("#familyGoalList");
++  if (!target) return;
++  const text = familyText();
++  const filter = state.settings.familyGoalFilter === "finished" ? "finished" : "current";
++  const goals = [...familyState.goals].sort((a, b) => {
++    if (a.status !== b.status) return a.status === "open" ? -1 : 1;
++    return String(a.deadline || "9999-12-31").localeCompare(String(b.deadline || "9999-12-31"));
++  });
++  const open = goals.filter((goal) => goal.status !== "done").length;
++  const done = goals.length - open;
++  const visible = goals.filter((goal) => filter === "finished" ? goal.status === "done" : goal.status !== "done");
++  $$(".family-goal-filter").forEach((button) => {
++    button.classList.toggle("active", button.dataset.familyGoalFilter === filter);
++  });
++  $("#familyGoalSummary").textContent = interpolate(text.summary, { open, done });
++  target.innerHTML = visible.length
++    ? visible.map(renderFamilyGoalCard).join("")
++    : filter === "finished"
++      ? `<div class="empty-note work-empty-state"><p>${escapeHtml(text.finishedEmpty)}</p></div>`
++      : `<div class="empty-note work-empty-state"><p>${escapeHtml(text.empty)}</p><button class="primary" data-family-goal-action="showAdd" type="button">${escapeHtml(text.addFirst)}</button></div>`;
++}
++
++function renderFamilyGoalCard(goal) {
++  const text = familyText();
++  const isDone = goal.status === "done";
++  const urgency = ["low", "normal", "urgent"].includes(goal.urgency) ? goal.urgency : "normal";
++  const urgencyLabel = {
++    low: text.urgencyLow || "Low",
++    normal: text.urgencyNormal || "Normal",
++    urgent: text.urgencyUrgent || "Urgent",
++  }[urgency];
++  const deadline = goal.deadline
++    ? getWorkDeadlineDetails({ deadline: goal.deadline, status: goal.status })
++    : { status: text.deadline, date: "—", className: "" };
++  const creator = familyState.members.find((member) => member.user_id === goal.created_by)?.email || "";
++  return `
++    <article class="work-goal-card family-goal-card ${isDone ? "done" : ""}" data-family-goal-id="${escapeHtml(goal.id)}">
++      <div class="work-goal-main">
++        <div class="work-goal-content">
++          <p class="eyebrow">${escapeHtml(goal.category || text.familyScope)}${creator ? ` · ${escapeHtml(creator)}` : ""}</p>
++          <div class="family-goal-title-row">
++            <h3>${escapeHtml(goal.title)}</h3>
++            <span class="family-urgency-badge ${escapeHtml(urgency)}">${escapeHtml(urgencyLabel)}</span>
++          </div>
++          <details class="work-note-wrap" ${goal.note ? "open" : ""}>
++            <summary>${escapeHtml(goal.note ? text.editNote : text.addNote)}</summary>
++            <label>
++              <span>${escapeHtml(text.noteLabel)}</span>
++              <textarea class="work-goal-note family-goal-note" rows="3" placeholder="${escapeHtml(text.notePlaceholder)}">${escapeHtml(goal.note || "")}</textarea>
++            </label>
++          </details>
++          <div class="work-goal-actions">
++            ${isDone
++              ? `<span class="work-completed">${escapeHtml(t().work.completed)} · ${escapeHtml(formatShortDate(goal.completed_at?.slice(0, 10)))}</span><button class="secondary" data-family-goal-action="reopen" type="button">${escapeHtml(text.reopen)}</button>`
++              : `<button class="primary" data-family-goal-action="complete" type="button">${escapeHtml(text.complete)}</button>`}
++            <button class="work-delete-button" data-family-goal-action="delete" type="button"><span aria-hidden="true"></span>${escapeHtml(text.delete)}</button>
++          </div>
++        </div>
++        <span class="work-deadline ${deadline.className}">
++          <b>${escapeHtml(deadline.status)}</b>
++          <small>${escapeHtml(deadline.date)}</small>
++        </span>
++      </div>
++    </article>
++  `;
++}
++
+ function bindWorkDeadlinePicker() {
+   $("#workGoalDeadlineTrigger")?.addEventListener("click", () => {
+     const calendar = $("#workDeadlineCalendar");
+@@ -3933,12 +4718,50 @@ function renderWorkDeadlinePicker() {
+ 
+ function renderWorkGoalView() {
+   if (!$("#view-work")) return;
+-  const view = state.settings.workGoalView === "add" ? "add" : "list";
++  const scope = state.settings.goalScope === "family" ? "family" : "personal";
++  const viewSetting = scope === "family" ? state.settings.familyGoalView : state.settings.workGoalView;
++  const canAddFamilyGoal = Boolean(currentUser && familyState.activeFamily);
++  const view = viewSetting === "add" && (scope !== "family" || canAddFamilyGoal) ? "add" : "list";
++  $("#view-work").classList.toggle("work-mode-add", scope === "personal" && view === "add");
++  $("#view-work").classList.toggle("work-mode-family-add", scope === "family" && view === "add");
++  $$(".goal-scope-option").forEach((button) => {
++    button.classList.toggle("active", button.dataset.goalScope === scope);
++  });
+   $$(".work-view-option").forEach((button) => {
+     button.classList.toggle("active", button.dataset.workView === view);
++    button.disabled = scope === "family" && button.dataset.workView === "add" && !canAddFamilyGoal;
+   });
+-  $("#workListView").classList.toggle("active", view === "list");
+-  $("#workAddView").classList.toggle("active", view === "add");
++  const label = view === "add" ? familyText().add : familyText().list;
++  $("#workViewDropdownLabel").textContent = label;
++  $("#workViewDropdownToggle")?.setAttribute("aria-label", `${getLanguage() === "zh" ? "切换视图" : "Switch view"}: ${label}`);
++  $("#personalGoalSpace").classList.toggle("active", scope === "personal");
++  $("#familyGoalSpace").classList.toggle("active", scope === "family");
++  $("#workListView").classList.toggle("active", scope === "personal" && view === "list");
++  $("#workAddView").classList.toggle("active", scope === "personal" && view === "add");
++  $("#familyGoalListView").classList.toggle("active", scope === "family" && view === "list");
++  $("#familyGoalAddView").classList.toggle("active", scope === "family" && view === "add");
++  renderFamilyWorkspace();
++}
++
++function toggleWorkViewMenu() {
++  const menu = $("#workViewMenu");
++  const wrapper = $(".work-view-menu");
++  const toggle = $("#workViewDropdownToggle");
++  if (!menu || !toggle || !wrapper) return;
++  const willOpen = menu.hidden;
++  menu.hidden = !willOpen;
++  wrapper.classList.toggle("is-open", willOpen);
++  toggle.setAttribute("aria-expanded", String(willOpen));
++}
++
++function closeWorkViewMenu() {
++  const menu = $("#workViewMenu");
++  const wrapper = $(".work-view-menu");
++  const toggle = $("#workViewDropdownToggle");
++  if (!menu || !toggle || !wrapper) return;
++  menu.hidden = true;
++  wrapper.classList.remove("is-open");
++  toggle.setAttribute("aria-expanded", "false");
+ }
+ 
+ function getWorkGoal(goalId) {
+@@ -4188,6 +5011,7 @@ function getStatsDays() {
+     ...state.morningEntries.map((item) => item.date),
+     ...state.focusSessions.map((item) => item.date),
+     ...(state.workGoals || []).flatMap((item) => [item.createdAt?.slice(0, 10), item.completedAt?.slice(0, 10)]),
++    ...(familyState.goals || []).flatMap((item) => [item.created_at?.slice(0, 10), item.completed_at?.slice(0, 10)]),
+   ].filter(Boolean).sort();
+   if (!dates.length) return recentDays(7);
+   const first = new Date(`${dates[0]}T00:00:00`);
+@@ -4205,6 +5029,7 @@ function drawCharts() {
+   renderSkinTimeline(days);
+   renderStatsSummaries(days, focusSessions);
+   renderGoalStats(days);
++  renderFamilyStats(days);
+   renderSeedStats(days, focusSessions);
+ }
+ 
+@@ -4495,6 +5320,68 @@ function renderGoalDeadlineTimeline(openGoals, getDaysUntilDue) {
+   `;
+ }
+ 
++function renderFamilyStats(days = getStatsDays()) {
++  const summary = $("#familyStatsSummary");
++  const statusTarget = $("#familyGoalStatusChart");
++  const activityTarget = $("#familyActivityList");
++  if (!summary || !statusTarget || !activityTarget) return;
++  const text = familyText();
++  const goals = familyState.goals || [];
++  if (!currentUser || !familyState.activeFamily) {
++    summary.innerHTML = "";
++    statusTarget.innerHTML = `<div class="stats-empty">${escapeHtml(text.statsNoFamily)}</div>`;
++    activityTarget.innerHTML = `<div class="stats-empty">${escapeHtml(text.statsNoFamily)}</div>`;
++    return;
++  }
++
++  const open = goals.filter((goal) => goal.status !== "done");
++  const completed = goals.filter((goal) => goal.status === "done");
++  const completedInRange = completed.filter((goal) => {
++    if (selectedStatsRange === "all") return true;
++    return days.includes(goal.completed_at?.slice(0, 10));
++  });
++  const participation = new Set(goals.flatMap((goal) => [goal.created_by, goal.completed_by]).filter(Boolean)).size;
++  summary.innerHTML = summaryPills([
++    [open.length, getLanguage() === "zh" ? "进行中" : "Open"],
++    [completedInRange.length, getLanguage() === "zh" ? "已完成" : "Completed"],
++    [participation, getLanguage() === "zh" ? "参与成员" : "Contributors"],
++  ]);
++
++  const statuses = [
++    { label: getLanguage() === "zh" ? "进行中" : "In progress", count: open.length, color: "#91a9bd" },
++    { label: getLanguage() === "zh" ? "已完成" : "Completed", count: completedInRange.length, color: "#93ad9a" },
++  ];
++  const max = Math.max(...statuses.map((item) => item.count), 1);
++  statusTarget.innerHTML = goals.length
++    ? statuses.map((item) => `
++      <div class="goal-status-row">
++        <strong>${escapeHtml(item.label)}</strong>
++        <div class="goal-status-track"><span style="--goal-width:${(item.count / max) * 100}%;--goal-color:${item.color}"></span></div>
++        <small>${item.count}</small>
++      </div>
++    `).join("")
++    : `<div class="stats-empty">${escapeHtml(text.statsNoGoals)}</div>`;
++
++  const recent = completedInRange
++    .filter((goal) => goal.completed_at)
++    .sort((a, b) => String(b.completed_at).localeCompare(String(a.completed_at)))
++    .slice(0, 6);
++  activityTarget.innerHTML = recent.length
++    ? recent.map((goal) => {
++      const member = familyState.members.find((item) => item.user_id === goal.completed_by);
++      return `
++        <article class="family-activity-item">
++          <span class="family-activity-check" aria-hidden="true"></span>
++          <div>
++            <strong>${escapeHtml(goal.title)}</strong>
++            <small>${escapeHtml(formatShortDate(goal.completed_at.slice(0, 10)))}${member?.email ? ` · ${escapeHtml(member.email)}` : ""}</small>
++          </div>
++        </article>
++      `;
++    }).join("")
++    : `<div class="stats-empty">${escapeHtml(text.statsNoGoals)}</div>`;
++}
++
+ function renderSeedStats(days, focusSessions) {
+   const zh = getLanguage() === "zh";
+   const usedSeedIds = new Set(focusSessions.map((item) => item.habitSeed).filter(Boolean));
+diff --git a/index.html b/index.html
+index 1009972..44b8a73 100644
+--- a/index.html
++++ b/index.html
+@@ -1,4 +1,4 @@
+-<!doctype html>
++﻿<!doctype html>
+ <html lang="zh-CN">
+   <head>
+     <meta charset="utf-8" />
+@@ -6,7 +6,7 @@
+     <meta property="og:image" content="assets/images/my-care-logo.png?v=20260609-2" />
+     <title>My Care</title>
+     <link rel="icon" type="image/png" href="assets/images/my-care-logo.png?v=20260609-2" />
+-    <link rel="stylesheet" href="styles.css?v=20260619-4" />
++    <link rel="stylesheet" href="styles.css?v=20260623-12" />
+   </head>
+   <body>
+     <div class="app-shell">
+@@ -623,73 +623,206 @@
+               <h2 id="workTitle">工作目标和期限</h2>
+               <p class="muted">把现在最重要的事情放在这里，完成后打卡并留一句 note。</p>
+             </div>
+-            <div class="work-view-switch" role="group" aria-label="目标页面切换">
+-              <button class="work-view-option active" data-work-view="list" type="button">List</button>
+-              <button class="work-view-option" data-work-view="add" type="button">Add New</button>
++            <div class="work-head-controls">
++              <div class="goal-scope-switch" role="group" aria-label="Goal space">
++                <button class="goal-scope-option active" data-goal-scope="personal" type="button">Personal Goal</button>
++                <button class="goal-scope-option" data-goal-scope="family" type="button">Family Goal</button>
++              </div>
++              <div class="work-view-menu">
++                <button class="work-view-dropdown-toggle" id="workViewDropdownToggle" type="button" aria-haspopup="true" aria-expanded="false">
++                  <span class="work-view-dropdown-prefix">View</span>
++                  <b id="workViewDropdownLabel">List</b>
++                  <span class="work-view-dropdown-chevron" aria-hidden="true">⌄</span>
++                </button>
++                <div class="work-view-switch" id="workViewMenu" role="menu" aria-label="Goal view" hidden>
++                  <button class="work-view-option active" data-work-view="list" role="menuitem" type="button">List</button>
++                  <button class="work-view-option" data-work-view="add" role="menuitem" type="button">Add New</button>
++                </div>
++              </div>
+             </div>
+           </div>
+ 
+-          <div class="work-view active" id="workListView">
+-            <div class="panel work-list-panel">
+-              <div class="panel-title">
+-                <div class="work-goal-filters" role="tablist" aria-label="Goal status">
+-                  <button class="work-goal-filter active" data-goal-filter="current" role="tab" aria-selected="true" type="button">Current Goals</button>
+-                  <button class="work-goal-filter" data-goal-filter="finished" role="tab" aria-selected="false" type="button">Finished Goals</button>
++          <div class="goal-space active" id="personalGoalSpace">
++            <div class="work-view active" id="workListView">
++              <div class="panel work-list-panel">
++                <div class="panel-title">
++                  <div class="work-goal-filters" role="tablist" aria-label="Goal status">
++                    <button class="work-goal-filter active" data-goal-filter="current" role="tab" aria-selected="true" type="button">Current Goals</button>
++                    <button class="work-goal-filter" data-goal-filter="finished" role="tab" aria-selected="false" type="button">Finished Goals</button>
++                  </div>
++                  <span id="workGoalSummary">0 open · 0 done</span>
+                 </div>
+-                <span id="workGoalSummary">0 open · 0 done</span>
++                <div class="work-goal-list" id="workGoalList" aria-live="polite"></div>
++              </div>
++              <div class="work-reset-zone">
++                <span id="workResetHint">准备好重新开始时，可以清空当前旅程。</span>
++                <button class="work-reset-button" id="workResetButton" type="button">Reset</button>
+               </div>
+-              <div class="work-goal-list" id="workGoalList" aria-live="polite"></div>
+             </div>
+-            <div class="work-reset-zone">
+-              <span id="workResetHint">准备好重新开始时，可以清空当前旅程。</span>
+-              <button class="work-reset-button" id="workResetButton" type="button">Reset</button>
++
++            <div class="work-view" id="workAddView">
++              <form class="panel work-form" id="workGoalForm">
++                <div class="panel-title">
++                  <h3>新增目标</h3>
++                  <span>轻量记录</span>
++                </div>
++                <label data-work-label="title">
++                  目标
++                  <input id="workGoalTitle" type="text" maxlength="90" placeholder="例如：完成 5 份精投申请" required />
++                </label>
++                <div class="work-form-row">
++                  <div class="work-form-field" data-work-label="category">
++                    <span class="work-field-heading">
++                      <label id="workGoalCategoryLabel" for="workGoalCategory">分类</label>
++                      <button class="inline-manage-button goal-manage-button" data-settings-section="focus" type="button">＋ 自定义</button>
++                    </span>
++                    <input id="workGoalCategory" type="text" maxlength="20" list="workGoalCategoryOptions" placeholder="求职 / 技术 / 健康" />
++                    <datalist id="workGoalCategoryOptions"></datalist>
++                  </div>
++                  <div class="work-form-field work-deadline-field" data-work-label="deadline">
++                    <label id="workGoalDeadlineLabel" for="workGoalDeadlineTrigger">Deadline</label>
++                    <input id="workGoalDeadline" type="hidden" />
++                    <button class="work-date-trigger" id="workGoalDeadlineTrigger" type="button" aria-haspopup="dialog" aria-expanded="false">
++                      <span class="work-date-icon" aria-hidden="true"></span>
++                      <b id="workGoalDeadlineText">选择日期</b>
++                      <span class="work-date-chevron" aria-hidden="true"></span>
++                    </button>
++                    <div class="work-calendar" id="workDeadlineCalendar" role="dialog" aria-labelledby="workDeadlineCalendarTitle" hidden>
++                      <header class="work-calendar-head">
++                        <button id="workDeadlinePrev" type="button" aria-label="上个月">‹</button>
++                        <strong id="workDeadlineCalendarTitle"></strong>
++                        <button id="workDeadlineNext" type="button" aria-label="下个月">›</button>
++                      </header>
++                      <div class="work-calendar-weekdays" id="workDeadlineWeekdays" aria-hidden="true"></div>
++                      <div class="work-calendar-days" id="workDeadlineDays"></div>
++                      <footer class="work-calendar-foot">
++                        <button id="workDeadlineToday" type="button">今天</button>
++                        <button id="workDeadlineClear" type="button">清除</button>
++                      </footer>
++                    </div>
++                  </div>
++                </div>
++                <button class="primary full" type="submit">添加目标</button>
++              </form>
+             </div>
+           </div>
+ 
+-          <div class="work-view" id="workAddView">
+-            <form class="panel work-form" id="workGoalForm">
+-              <div class="panel-title">
+-                <h3>新增目标</h3>
+-                <span>轻量记录</span>
+-              </div>
+-              <label data-work-label="title">
+-                目标
+-                <input id="workGoalTitle" type="text" maxlength="90" placeholder="例如：完成 5 份精投申请" required />
+-              </label>
+-              <div class="work-form-row">
+-                <div class="work-form-field" data-work-label="category">
+-                  <span class="work-field-heading">
+-                    <label id="workGoalCategoryLabel" for="workGoalCategory">分类</label>
+-                    <button class="inline-manage-button goal-manage-button" data-settings-section="focus" type="button">＋ 自定义</button>
+-                  </span>
+-                  <input id="workGoalCategory" type="text" maxlength="20" list="workGoalCategoryOptions" placeholder="求职 / 技术 / 健康" />
+-                  <datalist id="workGoalCategoryOptions"></datalist>
++          <div class="goal-space" id="familyGoalSpace">
++            <div class="family-goal-status" id="familyGoalStatus" role="status"></div>
++
++            <section class="panel family-onboarding" id="familySignedOutState">
++              <span class="family-mark" aria-hidden="true"></span>
++              <p class="eyebrow" id="familySignInEyebrow">Shared space</p>
++              <h3 id="familySignInTitle">Sign in to use Family Goals</h3>
++              <p id="familySignInCopy">Your personal records stay private. Only goals created in this space are shared.</p>
++              <button class="primary" id="familySignInButton" type="button">Sign in</button>
++            </section>
++
++            <section class="family-setup-grid" id="familySetupState" hidden>
++              <article class="panel family-create-card">
++                <p class="eyebrow" id="familyCreateEyebrow">Begin a shared room</p>
++                <h3 id="familyCreateTitle">Create a family group</h3>
++                <p id="familyCreateCopy">Give the shared space a calm, familiar name.</p>
++                <form id="familyCreateForm">
++                  <label>
++                    <span id="familyNameLabel">Family name</span>
++                    <input id="familyNameInput" type="text" maxlength="60" placeholder="Our little garden" required />
++                  </label>
++                  <button class="primary" id="familyCreateButton" type="submit">Create family</button>
++                </form>
++              </article>
++              <article class="panel family-invites-card">
++                <p class="eyebrow" id="familyInvitesEyebrow">Invitations</p>
++                <h3 id="familyInvitesTitle">Rooms waiting for you</h3>
++                <div class="family-invite-list" id="familyInviteList"></div>
++              </article>
++            </section>
++
++            <section class="family-workspace" id="familyWorkspace" hidden>
++              <div class="panel family-room-bar">
++                <div>
++                  <p class="eyebrow" id="familyRoomEyebrow">Family room</p>
++                  <h3 id="familyRoomName"></h3>
++                  <p id="familyRoomMeta"></p>
++                </div>
++                <div class="family-room-actions">
++                  <button class="family-members-toggle" id="familyRefreshButton" type="button">Refresh</button>
++                  <button class="family-members-toggle" id="familyMembersToggle" type="button">Members</button>
++                  <button class="family-leave-button" id="familyLeaveButton" type="button">Leave</button>
++                </div>
++              </div>
++
++              <div class="panel family-members-panel" id="familyMembersPanel" hidden>
++                <div class="panel-title">
++                  <h3 id="familyMembersTitle">Family members</h3>
++                  <span id="familyMembersCount"></span>
+                 </div>
+-                <div class="work-form-field work-deadline-field" data-work-label="deadline">
+-                  <label id="workGoalDeadlineLabel" for="workGoalDeadlineTrigger">Deadline</label>
+-                  <input id="workGoalDeadline" type="hidden" />
+-                  <button class="work-date-trigger" id="workGoalDeadlineTrigger" type="button" aria-haspopup="dialog" aria-expanded="false">
+-                    <span class="work-date-icon" aria-hidden="true"></span>
+-                    <b id="workGoalDeadlineText">选择日期</b>
+-                    <span class="work-date-chevron" aria-hidden="true"></span>
+-                  </button>
+-                  <div class="work-calendar" id="workDeadlineCalendar" role="dialog" aria-labelledby="workDeadlineCalendarTitle" hidden>
+-                    <header class="work-calendar-head">
+-                      <button id="workDeadlinePrev" type="button" aria-label="上个月">‹</button>
+-                      <strong id="workDeadlineCalendarTitle"></strong>
+-                      <button id="workDeadlineNext" type="button" aria-label="下个月">›</button>
+-                    </header>
+-                    <div class="work-calendar-weekdays" id="workDeadlineWeekdays" aria-hidden="true"></div>
+-                    <div class="work-calendar-days" id="workDeadlineDays"></div>
+-                    <footer class="work-calendar-foot">
+-                      <button id="workDeadlineToday" type="button">今天</button>
+-                      <button id="workDeadlineClear" type="button">清除</button>
+-                    </footer>
++                <div class="family-member-list" id="familyMemberList"></div>
++                <form class="family-invite-form" id="familyInviteForm">
++                  <label>
++                    <span id="familyInviteEmailLabel">Invite by email</span>
++                    <input id="familyInviteEmail" type="email" autocomplete="email" placeholder="family@example.com" required />
++                  </label>
++                  <button class="secondary" id="familyInviteButton" type="submit">Send invitation</button>
++                </form>
++              </div>
++
++              <div class="family-view active" id="familyGoalListView">
++                <div class="panel work-list-panel family-list-panel">
++                  <div class="panel-title">
++                    <div class="work-goal-filters" role="tablist" aria-label="Family goal status">
++                      <button class="family-goal-filter active" data-family-goal-filter="current" type="button">Current Goals</button>
++                      <button class="family-goal-filter" data-family-goal-filter="finished" type="button">Finished Goals</button>
++                    </div>
++                    <span id="familyGoalSummary">0 open · 0 done</span>
+                   </div>
++                  <div class="work-goal-list" id="familyGoalList" aria-live="polite"></div>
+                 </div>
+               </div>
+-              <button class="primary full" type="submit">加入目标列表</button>
+-            </form>
++
++              <div class="family-view" id="familyGoalAddView">
++                <form class="panel work-form family-goal-form" id="familyGoalForm">
++                  <div class="panel-title">
++                    <h3 id="familyGoalFormTitle">New family goal</h3>
++                    <div class="family-urgency-field" role="group" aria-label="Family goal urgency">
++                      <span id="familyUrgencyLabel">Urgency</span>
++                      <button class="family-urgency-option" data-family-urgency="low" type="button">Low</button>
++                      <button class="family-urgency-option active" data-family-urgency="normal" type="button">Normal</button>
++                      <button class="family-urgency-option" data-family-urgency="urgent" type="button">Urgent</button>
++                    </div>
++                  </div>
++                  <label>
++                    <span id="familyGoalTitleLabel">Goal</span>
++                    <input id="familyGoalTitle" type="text" maxlength="120" placeholder="For example: plan a family walk" required />
++                  </label>
++                  <div class="work-form-row">
++                    <label>
++                      <span class="family-field-label-row">
++                        <span id="familyGoalCategoryLabel">Category</span>
++                        <button class="family-customize-button" id="familyCategoryCustomizeButton" type="button">Customize</button>
++                      </span>
++                      <select id="familyGoalCategory"></select>
++                    </label>
++                    <label>
++                      <span id="familyGoalDeadlineLabel">Deadline</span>
++                      <input id="familyGoalDeadline" class="family-date-input" type="date" />
++                    </label>
++                  </div>
++                  <div class="family-category-settings" id="familyCategorySettings" hidden>
++                    <div class="family-category-settings-head">
++                      <strong id="familyCategorySettingsTitle">Family categories</strong>
++                      <small id="familyCategorySettingsMeta">Shared only inside this family.</small>
++                    </div>
++                    <div class="family-category-list" id="familyCategoryList"></div>
++                    <div class="family-category-form" id="familyCategoryForm">
++                      <input id="familyCategoryInput" type="text" maxlength="30" placeholder="New category" />
++                      <button class="secondary" id="familyCategoryAddButton" type="button">Add</button>
++                    </div>
++                  </div>
++                  <button class="primary full" id="familyGoalAddButton" type="submit">Add family goal</button>
++                </form>
++              </div>
++            </section>
+           </div>
+         </section>
+ 
+@@ -802,6 +935,34 @@
+               </div>
+             </section>
+ 
++            <section class="stats-section stats-family-section" id="familyStatsSection">
++              <header class="stats-section-head">
++                <span class="stats-section-icon family-stats-icon" aria-hidden="true"></span>
++                <div>
++                  <p class="eyebrow">Family Goals</p>
++                  <h3 id="familyStatsTitle">Family progress</h3>
++                  <p id="familyStatsSubtitle">A shared view without rankings or pressure.</p>
++                </div>
++                <div class="stats-inline-summary" id="familyStatsSummary"></div>
++              </header>
++              <div class="stats-chart-grid">
++                <article class="stats-chart-card">
++                  <div class="stats-chart-title">
++                    <span class="mini-goal-icon" aria-hidden="true"></span>
++                    <div><h4 id="familyGoalStatusTitle">Shared goal status</h4><p id="familyGoalStatusMeta">Open and completed together</p></div>
++                  </div>
++                  <div class="goal-status-chart" id="familyGoalStatusChart"></div>
++                </article>
++                <article class="stats-chart-card">
++                  <div class="stats-chart-title">
++                    <span class="mini-timeline-icon" aria-hidden="true"></span>
++                    <div><h4 id="familyActivityTitle">Recent family activity</h4><p id="familyActivityMeta">Recent completions, not a leaderboard</p></div>
++                  </div>
++                  <div class="family-activity-list" id="familyActivityList"></div>
++                </article>
++              </div>
++            </section>
++
+             <section class="stats-section stats-seed-section">
+               <header class="stats-section-head">
+                 <span class="stats-section-icon sprout-icon" aria-hidden="true"></span>
+@@ -993,6 +1154,6 @@
+ 
+     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+     <script src="supabase-config.js?v=20260608-2"></script>
+-    <script src="app.js?v=20260619-4"></script>
++    <script src="app.js?v=20260623-8"></script>
+   </body>
+ </html>
+diff --git a/styles.css b/styles.css
+index 5283b09..1b41a1a 100644
+--- a/styles.css
++++ b/styles.css
+@@ -1,4 +1,4 @@
+-@import url("https://fonts.googleapis.com/css2?family=Great+Vibes&family=LXGW+WenKai+TC&family=Noto+Sans+SC:wght@300;400;500;600;700;800&family=Noto+Serif+SC:wght@400;500;600;700&display=swap");
++﻿@import url("https://fonts.googleapis.com/css2?family=Great+Vibes&family=LXGW+WenKai+TC&family=Noto+Sans+SC:wght@300;400;500;600;700;800&family=Noto+Serif+SC:wght@400;500;600;700&display=swap");
+ 
+ :root {
+   color-scheme: light;
+@@ -591,7 +591,7 @@ p {
+ }
+ 
+ .habit-start-card .panel-title span::before {
+-  content: "芽";
++  content: "鑺?;
+   margin-right: 8px;
+   color: rgba(127, 179, 140, 0.86);
+ }
+@@ -618,7 +618,7 @@ p {
+ }
+ 
+ .habit-custom-start::before {
+-  content: "✎";
++  content: "鉁?;
+   position: absolute;
+   left: 18px;
+   top: 50%;
+@@ -663,7 +663,7 @@ p {
+ }
+ 
+ .habit-custom-start .primary::before {
+-  content: "♧";
++  content: "鈾?;
+   margin-right: 12px;
+   font-family: var(--font-ui);
+ }
+@@ -691,7 +691,7 @@ p {
+ 
+ .habit-energy-card .panel-title::before,
+ .habit-seeds-card .panel-title::before {
+-  content: "☾";
++  content: "鈽?;
+   width: 78px;
+   height: 78px;
+   display: grid;
+@@ -739,7 +739,7 @@ p {
+ }
+ 
+ .habit-energy-options button::before {
+-  content: "♧";
++  content: "鈾?;
+   margin-right: 10px;
+   color: rgba(73, 111, 82, 0.78);
+ }
+@@ -766,7 +766,7 @@ p {
+ }
+ 
+ .habit-seeds-card .panel-title::before {
+-  content: "♧";
++  content: "鈾?;
+   color: rgba(73, 111, 82, 0.66);
+ }
+ 
+@@ -860,7 +860,7 @@ p {
+ }
+ 
+ .habit-seed-status-button::before {
+-  content: "♧";
++  content: "鈾?;
+   margin-right: 10px;
+   color: rgba(73, 111, 82, 0.78);
+ }
+@@ -1403,7 +1403,7 @@ body[data-language="zh"] .low-energy-hero h2 {
+ }
+ 
+ .low-energy-title-lockup::after {
+-  content: "❧";
++  content: "鉂?;
+   width: 132px;
+   margin-top: 18px;
+   color: rgba(92, 132, 101, 0.72);
+@@ -1435,7 +1435,7 @@ body[data-language="zh"] .low-energy-hero h2 {
+ }
+ 
+ .low-energy-keep::before {
+-  content: "芽";
++  content: "鑺?;
+   margin-right: 8px;
+   color: rgba(127, 179, 140, 0.9);
+ }
+@@ -1491,7 +1491,7 @@ body[data-language="zh"] .low-energy-hero h2 {
+ }
+ 
+ .low-energy-label::before {
+-  content: "✦";
++  content: "鉁?;
+   margin-right: 10px;
+   color: rgba(127, 179, 140, 0.9);
+ }
+@@ -1578,7 +1578,7 @@ body[data-language="zh"] .low-energy-hero h2 {
+ }
+ 
+ .low-energy-tree-panel::before {
+-  content: "♧";
++  content: "鈾?;
+   position: absolute;
+   left: 32px;
+   width: 40px;
+@@ -1637,6 +1637,20 @@ body[data-language="zh"] .low-energy-hero h2 {
+   isolation: isolate;
+ }
+ 
++#view-work.work-mode-add {
++  padding-block-start: clamp(30px, 5vh, 52px);
++}
++
++#view-work.work-mode-add::before {
++  background: rgba(18, 35, 29, 0.16);
++  border: 0;
++  border-radius: 0;
++  inset: 0;
++  width: auto;
++  height: auto;
++  z-index: -3;
++}
++
+ #view-work.active {
+   display: grid;
+ }
+@@ -1672,14 +1686,14 @@ body[data-language="zh"] .low-energy-hero h2 {
+   transform: rotate(-8deg);
+ }
+ 
+-.work-head {
++#view-work .work-head {
+   width: min(1180px, 100%);
+   margin-inline: auto;
+   display: grid;
+-  grid-template-columns: minmax(360px, 640px) auto;
+-  align-items: end;
++  grid-template-columns: minmax(360px, 640px) minmax(240px, 330px);
++  align-items: start;
+   justify-content: space-between;
+-  gap: clamp(28px, 6vw, 88px);
++  gap: clamp(24px, 5vw, 70px);
+   text-align: left;
+   margin-bottom: 0;
+   position: relative;
+@@ -1697,6 +1711,11 @@ body[data-language="zh"] .low-energy-hero h2 {
+   letter-spacing: 0;
+ }
+ 
++#view-work.work-mode-add .section-head h2 {
++  max-width: 600px;
++  font-size: clamp(2.35rem, 5vw, 4.65rem);
++}
++
+ #view-work .section-head .muted {
+   max-width: 520px;
+   margin-top: 22px;
+@@ -1713,6 +1732,13 @@ body[data-language="zh"] .low-energy-hero h2 {
+   box-shadow: none;
+ }
+ 
++#view-work.work-mode-add .section-head .muted {
++  color: rgba(20, 54, 40, 0.92);
++  font-size: clamp(1.02rem, 1.28vw, 1.2rem);
++  font-weight: 650;
++  text-shadow: 0 1px 18px rgba(255, 255, 255, 0.34);
++}
++
+ #view-work .section-head .muted::before {
+   content: "";
+   display: block;
+@@ -1732,29 +1758,72 @@ body[data-language="zh"] .low-energy-hero h2 {
+   font-size: 1.12rem;
+ }
+ 
+-.work-view-switch {
+-  display: inline-grid;
+-  grid-template-columns: repeat(2, minmax(118px, 1fr));
+-  gap: 6px;
+-  padding: 7px;
+-  margin-bottom: clamp(6px, 8vh, 82px);
+-  border: 1px solid rgba(255, 255, 255, 0.46);
++#view-work .work-head-controls {
++  grid-column: 1 / -1;
++  justify-self: center;
++  display: inline-flex;
++  align-items: center;
++  justify-content: center;
++  gap: 0;
++  width: auto;
++  max-width: min(620px, 100%);
++  margin: clamp(6px, 2vh, 18px) auto 0;
++  padding: 5px;
++  border: 1px solid rgba(255, 255, 255, 0.44);
+   border-radius: 999px;
+   background:
+-    linear-gradient(145deg, rgba(255, 255, 255, 0.76), rgba(246, 243, 235, 0.58)),
+-    rgba(255, 255, 255, 0.58);
+-  box-shadow: 0 18px 42px rgba(52, 45, 37, 0.12);
++    linear-gradient(145deg, rgba(255, 255, 255, 0.64), rgba(239, 247, 240, 0.42)),
++    rgba(255, 255, 255, 0.34);
++  box-shadow:
++    inset 0 1px 0 rgba(255, 255, 255, 0.48),
++    0 18px 38px rgba(39, 70, 55, 0.1);
+   backdrop-filter: blur(10px);
+ }
+ 
+-.work-view-option {
+-  min-height: 48px;
++#view-work.work-mode-add .work-head {
++  width: min(820px, 100%);
++  grid-template-columns: 1fr;
++  gap: 18px;
++}
++
++#view-work.work-mode-add .work-head-controls {
++  width: auto;
++  justify-self: center;
++  margin: 4px auto 0;
++}
++
++.goal-scope-switch,
++.work-view-switch {
++  display: inline-grid;
++  grid-template-columns: repeat(2, minmax(84px, auto));
++  gap: 3px;
++  padding: 0;
++  border: 0;
++  border-radius: 999px;
++  background: transparent;
++  box-shadow: none;
++  backdrop-filter: none;
++}
++
++.goal-scope-switch {
++  grid-template-columns: repeat(2, minmax(100px, auto));
++}
++
++.work-view-switch {
++  margin-left: 5px;
++  padding-left: 8px;
++  border-left: 1px solid rgba(73, 111, 82, 0.16);
++}
++
++.work-view-option,
++.goal-scope-option {
++  min-height: 34px;
+   border: 0;
+   border-radius: 999px;
+   background: transparent;
+   color: rgba(73, 111, 82, 0.74);
+-  font: 700 1.12rem/1 var(--font-ui);
+-  padding: 0 22px;
++  font: 750 0.82rem/1 var(--font-ui);
++  padding: 0 13px;
+   transition:
+     background 160ms ease,
+     box-shadow 160ms ease,
+@@ -1762,15 +1831,223 @@ body[data-language="zh"] .low-energy-hero h2 {
+     transform 160ms ease;
+ }
+ 
+-.work-view-option:hover {
++.goal-scope-option {
++  min-height: 34px;
++  font-size: 0.82rem;
++}
++
++.work-view-option:hover,
++.goal-scope-option:hover {
+   color: #183228;
+   transform: translateY(-1px);
+ }
+ 
+-.work-view-option.active {
+-  background: rgba(255, 255, 255, 0.88);
++.work-view-option.active,
++.goal-scope-option.active {
++  background: rgba(255, 255, 255, 0.74);
++  color: #183228;
++  box-shadow:
++    inset 0 1px 0 rgba(255, 255, 255, 0.58),
++    0 8px 20px rgba(24, 50, 40, 0.08);
++}
++
++.work-view-option:disabled {
++  cursor: not-allowed;
++  opacity: 0.38;
++  transform: none;
++}
++
++.goal-scope-option[data-goal-scope="family"].active {
++  color: #385f62;
++  box-shadow:
++    inset 0 0 0 1px rgba(126, 171, 174, 0.14),
++    0 10px 28px rgba(57, 95, 98, 0.1);
++}
++
++#view-work.work-mode-add .work-view-switch,
++#view-work.work-mode-family-add .work-view-switch {
++  display: inline-grid;
++  grid-template-columns: minmax(76px, auto);
++  gap: 3px;
++  padding: 0;
++  background: transparent;
++  box-shadow: none;
++  backdrop-filter: none;
++}
++
++#view-work.work-mode-add .goal-scope-switch,
++#view-work.work-mode-family-add .goal-scope-switch {
++  grid-template-columns: repeat(2, minmax(100px, auto));
++  gap: 3px;
++  padding: 0;
++  border: 0;
++  background: transparent;
++  box-shadow: none;
++  backdrop-filter: none;
++}
++
++#view-work.work-mode-add .work-view-option[data-work-view="add"],
++#view-work.work-mode-family-add .work-view-option[data-work-view="add"] {
++  display: none;
++}
++
++#view-work.work-mode-add .work-view-option[data-work-view="list"],
++#view-work.work-mode-family-add .work-view-option[data-work-view="list"] {
++  min-height: 34px;
++  padding: 0 13px;
++  border: 0;
++  background: transparent;
++  color: rgba(31, 69, 50, 0.76);
++  font-family: var(--font-ui);
++  font-size: 0.82rem;
++  font-weight: 750;
++  box-shadow: none;
++}
++
++#view-work.work-mode-add .work-view-option[data-work-view="list"]::before,
++#view-work.work-mode-family-add .work-view-option[data-work-view="list"]::before {
++  content: "<";
++  margin-right: 7px;
++  font-family: var(--font-ui);
++  font-weight: 700;
++}
++
++#view-work.work-mode-add .goal-scope-option,
++#view-work.work-mode-family-add .goal-scope-option {
++  min-height: 34px;
++  padding: 0 13px;
++  color: rgba(61, 103, 75, 0.7);
++  font-size: 0.82rem;
++  font-weight: 750;
++}
++
++#view-work.work-mode-add .goal-scope-option.active,
++#view-work.work-mode-family-add .goal-scope-option.active {
++  background: rgba(255, 255, 255, 0.72);
++  color: rgba(26, 67, 47, 0.9);
++  box-shadow: 0 8px 18px rgba(39, 70, 55, 0.08);
++}
++
++#view-work .work-head-controls {
++  gap: 8px;
++}
++
++#view-work .work-view-menu {
++  position: relative;
++  margin-left: 4px;
++  padding-left: 10px;
++  border-left: 1px solid rgba(73, 111, 82, 0.16);
++}
++
++#view-work .work-view-dropdown-toggle {
++  min-height: 34px;
++  display: inline-flex;
++  align-items: center;
++  gap: 6px;
++  padding: 0 12px;
++  border: 0;
++  border-radius: 999px;
++  background: transparent;
++  color: rgba(39, 75, 55, 0.78);
++  font-family: var(--font-ui);
++  font-size: 0.8rem;
++  font-weight: 750;
++  transition:
++    background 160ms ease,
++    box-shadow 160ms ease,
++    color 160ms ease,
++    transform 160ms ease;
++}
++
++#view-work .work-view-dropdown-toggle:hover,
++#view-work .work-view-dropdown-toggle:focus-visible,
++#view-work .work-view-menu.is-open .work-view-dropdown-toggle {
++  background: rgba(255, 255, 255, 0.68);
++  color: #183228;
++  box-shadow:
++    inset 0 1px 0 rgba(255, 255, 255, 0.54),
++    0 8px 20px rgba(24, 50, 40, 0.08);
++  transform: translateY(-1px);
++}
++
++#view-work .work-view-dropdown-prefix {
++  color: rgba(73, 111, 82, 0.52);
++  font-size: 0.72rem;
++  font-weight: 700;
++}
++
++#view-work .work-view-dropdown-toggle b {
++  font: inherit;
++  color: inherit;
++}
++
++#view-work .work-view-dropdown-chevron {
++  font-size: 0.78rem;
++  opacity: 0.72;
++}
++
++#view-work .work-view-menu .work-view-switch {
++  position: absolute;
++  right: 0;
++  top: calc(100% + 8px);
++  z-index: 12;
++  min-width: 138px;
++  display: grid;
++  grid-template-columns: 1fr;
++  gap: 4px;
++  margin: 0;
++  padding: 6px;
++  border: 1px solid rgba(255, 255, 255, 0.52);
++  border-radius: 16px;
++  background:
++    linear-gradient(145deg, rgba(255, 255, 255, 0.88), rgba(238, 246, 239, 0.72)),
++    rgba(255, 255, 255, 0.76);
++  box-shadow:
++    inset 0 1px 0 rgba(255, 255, 255, 0.72),
++    0 18px 38px rgba(39, 70, 55, 0.14);
++  backdrop-filter: blur(12px);
++}
++
++#view-work .work-view-menu .work-view-switch[hidden] {
++  display: none;
++}
++
++#view-work .work-view-menu .work-view-option,
++#view-work.work-mode-add .work-view-menu .work-view-option,
++#view-work.work-mode-family-add .work-view-menu .work-view-option {
++  min-height: 34px;
++  display: flex;
++  align-items: center;
++  justify-content: flex-start;
++  width: 100%;
++  padding: 0 12px;
++  border-radius: 11px;
++  background: transparent;
++  color: rgba(49, 84, 62, 0.78);
++  font-size: 0.8rem;
++  font-weight: 750;
++  box-shadow: none;
++}
++
++#view-work .work-view-menu .work-view-option::before,
++#view-work.work-mode-add .work-view-menu .work-view-option::before,
++#view-work.work-mode-family-add .work-view-menu .work-view-option::before {
++  content: none;
++}
++
++#view-work .work-view-menu .work-view-option:hover,
++#view-work .work-view-menu .work-view-option:focus-visible,
++#view-work .work-view-menu .work-view-option.active {
++  background: rgba(255, 255, 255, 0.76);
+   color: #183228;
+-  box-shadow: 0 10px 28px rgba(24, 50, 40, 0.09);
++}
++
++.goal-space {
++  display: none;
++}
++
++.goal-space.active {
++  display: block;
+ }
+ 
+ .work-view {
+@@ -1790,7 +2067,11 @@ body[data-language="zh"] .low-energy-hero h2 {
+ 
+ #workAddView.active {
+   display: grid;
+-  justify-items: end;
++  justify-items: center;
++}
++
++#view-work.work-mode-add #workAddView.active {
++  margin-top: -32px;
+ }
+ 
+ .work-form,
+@@ -1880,6 +2161,26 @@ body[data-language="zh"] .low-energy-hero h2 {
+   overflow: hidden;
+ }
+ 
++#workAddView .work-form {
++  width: min(820px, 100%);
++  margin-inline: auto;
++  border-color: rgba(255, 255, 255, 0.52);
++  background:
++    linear-gradient(145deg, rgba(255, 255, 255, 0.54), rgba(240, 249, 239, 0.32)),
++    rgba(255, 255, 255, 0.24);
++  box-shadow:
++    inset 0 1px 0 rgba(255, 255, 255, 0.58),
++    0 22px 54px rgba(31, 61, 42, 0.11);
++  backdrop-filter: blur(5px) saturate(1.05);
++}
++
++#workAddView .work-form input,
++#workAddView .work-form .work-deadline-trigger {
++  background: rgba(255, 255, 255, 0.58);
++  border-color: rgba(78, 125, 117, 0.13);
++  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
++}
++
+ .work-form::before,
+ .work-form::after {
+   content: "";
+@@ -2610,96 +2911,707 @@ body[data-language="zh"] .low-energy-hero h2 {
+   transform: rotate(18deg);
+ }
+ 
+-.work-reset-dialog-card .eyebrow,
+-.work-delete-dialog-card .eyebrow {
+-  color: rgba(73, 111, 82, 0.62);
++.work-reset-dialog-card .eyebrow,
++.work-delete-dialog-card .eyebrow {
++  color: rgba(73, 111, 82, 0.62);
++}
++
++.work-reset-dialog-card h2,
++.work-delete-dialog-card h2 {
++  max-width: 15ch;
++  font-family: var(--font-display);
++  font-size: clamp(1.45rem, 4vw, 1.9rem);
++  font-weight: 600;
++  line-height: 1.4;
++}
++
++.work-reset-dialog-card > p:not(.eyebrow),
++.work-delete-dialog-card > p:not(.eyebrow) {
++  color: var(--muted);
++  line-height: 1.75;
++}
++
++.work-reset-dialog-actions,
++.work-delete-dialog-actions {
++  width: 100%;
++  margin-top: 10px;
++  display: grid;
++  grid-template-columns: repeat(2, minmax(0, 1fr));
++  gap: 10px;
++}
++
++.work-reset-dialog-actions button,
++.work-delete-dialog-actions button {
++  min-height: 44px;
++  border-radius: 8px;
++  font-weight: 700;
++}
++
++.work-reset-confirm {
++  border: 1px solid rgba(131, 76, 68, 0.32);
++  background: rgba(131, 76, 68, 0.88);
++  color: #fff;
++  box-shadow: 0 10px 22px rgba(116, 72, 65, 0.14);
++}
++
++.work-reset-confirm:hover,
++.work-reset-confirm:focus-visible {
++  background: #744841;
++}
++
++.work-delete-symbol {
++  width: 44px;
++  height: 44px;
++  margin-bottom: 2px;
++  border: 1px solid rgba(145, 91, 82, 0.16);
++  border-radius: 50%;
++  background: rgba(181, 118, 104, 0.08);
++  position: relative;
++}
++
++.work-delete-symbol::before {
++  content: "";
++  position: absolute;
++  left: 14px;
++  top: 14px;
++  width: 14px;
++  height: 17px;
++  border: 1.5px solid rgba(121, 78, 70, 0.72);
++  border-top: 0;
++  border-radius: 0 0 4px 4px;
++}
++
++.work-delete-symbol::after {
++  content: "";
++  position: absolute;
++  left: 11px;
++  top: 11px;
++  width: 20px;
++  border-top: 1.5px solid rgba(121, 78, 70, 0.72);
++  box-shadow: 6px -3px 0 -2px rgba(121, 78, 70, 0.72);
++}
++
++.work-delete-confirm {
++  border: 1px solid rgba(131, 76, 68, 0.28);
++  background: rgba(131, 76, 68, 0.86);
++  color: #fff;
++  box-shadow: 0 10px 22px rgba(116, 72, 65, 0.12);
++}
++
++.work-delete-confirm:hover,
++.work-delete-confirm:focus-visible {
++  background: #744841;
++}
++
++.family-goal-status {
++  width: min(1180px, 100%);
++  max-height: 0;
++  margin: 0 auto;
++  overflow: hidden;
++  color: rgba(49, 91, 88, 0.78);
++  font-size: 0.8rem;
++  font-weight: 700;
++  text-align: right;
++  transition: max-height 180ms ease, margin 180ms ease;
++}
++
++.family-goal-status.is-visible {
++  max-height: 44px;
++  margin-bottom: 10px;
++}
++
++.family-goal-status.is-error {
++  color: #8a5750;
++}
++
++.family-onboarding,
++.family-setup-grid,
++.family-workspace {
++  width: min(1180px, 100%);
++  margin-inline: auto;
++}
++
++.family-onboarding {
++  min-height: 360px;
++  display: grid;
++  place-items: center;
++  align-content: center;
++  gap: 10px;
++  padding: 42px;
++  border-color: rgba(126, 171, 174, 0.22);
++  background:
++    linear-gradient(145deg, rgba(255, 255, 255, 0.84), rgba(233, 245, 243, 0.62)),
++    rgba(255, 255, 255, 0.7);
++  text-align: center;
++}
++
++.family-onboarding[hidden],
++.family-setup-grid[hidden],
++.family-workspace[hidden],
++.family-members-panel[hidden] {
++  display: none;
++}
++
++.family-onboarding h3,
++.family-create-card h3,
++.family-invites-card h3,
++.family-room-bar h3 {
++  color: #244b43;
++  font-family: var(--font-display);
++  font-size: clamp(1.4rem, 2.3vw, 2rem);
++}
++
++.family-onboarding > p:not(.eyebrow),
++.family-create-card > p:not(.eyebrow),
++.family-invites-card > p:not(.eyebrow),
++.family-room-bar p {
++  max-width: 52ch;
++  color: rgba(63, 91, 79, 0.68);
++  line-height: 1.7;
++}
++
++.family-mark {
++  width: 58px;
++  height: 58px;
++  border: 1px solid rgba(126, 171, 174, 0.22);
++  border-radius: 50%;
++  background: rgba(151, 193, 186, 0.1);
++  position: relative;
++}
++
++.family-mark::before,
++.family-mark::after {
++  content: "";
++  position: absolute;
++  top: 16px;
++  width: 17px;
++  height: 17px;
++  border: 1.5px solid rgba(65, 110, 103, 0.7);
++  border-radius: 50%;
++}
++
++.family-mark::before {
++  left: 12px;
++}
++
++.family-mark::after {
++  right: 12px;
++}
++
++.family-setup-grid {
++  display: grid;
++  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
++  gap: 16px;
++}
++
++.family-create-card,
++.family-invites-card,
++.family-room-bar,
++.family-members-panel {
++  border-color: rgba(126, 171, 174, 0.2);
++  background:
++    linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(235, 246, 243, 0.66)),
++    rgba(255, 255, 255, 0.72);
++  box-shadow: 0 18px 46px rgba(44, 76, 70, 0.08);
++}
++
++.family-create-card,
++.family-invites-card {
++  min-height: 320px;
++  padding: clamp(24px, 3vw, 36px);
++}
++
++.family-create-card form {
++  display: grid;
++  gap: 15px;
++  margin-top: 28px;
++}
++
++.family-create-card label,
++.family-invite-form label,
++.family-goal-form label {
++  display: grid;
++  gap: 8px;
++  color: rgba(38, 71, 53, 0.76);
++  font-size: 0.84rem;
++  font-weight: 750;
++}
++
++.family-create-card input,
++.family-invite-form input,
++.family-goal-form input {
++  width: 100%;
++  min-height: 50px;
++  border: 1px solid rgba(78, 125, 117, 0.16);
++  border-radius: 8px;
++  background: rgba(255, 255, 255, 0.74);
++  color: #183b34;
++  padding: 0 15px;
++  outline: none;
++  font: 500 0.96rem/1.4 var(--font-ui);
++}
++
++.family-goal-form input {
++  background: rgba(255, 255, 255, 0.62);
++  border-color: rgba(78, 125, 117, 0.14);
++  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58);
++}
++
++.work-form .primary.full {
++  position: relative;
++  isolation: isolate;
++  min-height: 62px;
++  margin-top: 8px;
++  overflow: hidden;
++  border: 1px solid rgba(255, 255, 255, 0.58);
++  border-radius: 999px;
++  color: #fff;
++  background:
++    linear-gradient(135deg, rgba(120, 164, 119, 0.82), rgba(42, 104, 64, 0.96) 52%, rgba(34, 86, 58, 0.98)),
++    #347148;
++  box-shadow:
++    inset 0 1px 0 rgba(255, 255, 255, 0.34),
++    inset 0 -18px 30px rgba(24, 72, 43, 0.16),
++    0 18px 36px rgba(35, 83, 49, 0.24),
++    0 0 0 7px rgba(255, 255, 255, 0.18);
++  text-shadow: 0 1px 12px rgba(13, 55, 31, 0.28);
++  transition:
++    transform 170ms ease,
++    box-shadow 170ms ease,
++    filter 170ms ease,
++    background 170ms ease;
++}
++
++.work-form .primary.full::before,
++.work-form .primary.full::after {
++  content: "";
++  position: absolute;
++  pointer-events: none;
++  z-index: -1;
++}
++
++.work-form .primary.full::before {
++  inset: 1px;
++  border-radius: inherit;
++  background:
++    linear-gradient(90deg, transparent 0 12%, rgba(255, 255, 255, 0.42) 36%, transparent 62%),
++    radial-gradient(circle at 18% 20%, rgba(255, 255, 255, 0.4), transparent 22%);
++  opacity: 0.36;
++  transform: translateX(-18%);
++  transition: transform 220ms ease, opacity 170ms ease;
++}
++
++.work-form .primary.full::after {
++  right: 26px;
++  top: 50%;
++  width: 28px;
++  height: 12px;
++  opacity: 0.72;
++  border-top: 1.5px solid rgba(255, 255, 255, 0.86);
++  border-right: 1.5px solid rgba(255, 255, 255, 0.86);
++  transform: translateY(-50%) rotate(45deg);
++  transition: transform 170ms ease, opacity 170ms ease;
++}
++
++.work-form .primary.full:hover,
++.work-form .primary.full:focus-visible {
++  filter: saturate(1.05) brightness(1.04);
++  transform: translateY(-2px);
++  box-shadow:
++    inset 0 1px 0 rgba(255, 255, 255, 0.42),
++    inset 0 -18px 30px rgba(24, 72, 43, 0.14),
++    0 22px 42px rgba(35, 83, 49, 0.28),
++    0 0 0 8px rgba(255, 255, 255, 0.22);
++}
++
++.work-form .primary.full:hover::before,
++.work-form .primary.full:focus-visible::before {
++  opacity: 0.52;
++  transform: translateX(8%);
++}
++
++.work-form .primary.full:hover::after,
++.work-form .primary.full:focus-visible::after {
++  opacity: 0.94;
++  transform: translate(5px, -50%) rotate(45deg);
++}
++
++.work-form .primary.full:active {
++  filter: brightness(0.98);
++  transform: translateY(1px) scale(0.992);
++  box-shadow:
++    inset 0 3px 12px rgba(16, 65, 37, 0.28),
++    inset 0 -10px 20px rgba(255, 255, 255, 0.08),
++    0 10px 22px rgba(35, 83, 49, 0.18),
++    0 0 0 5px rgba(255, 255, 255, 0.14);
++}
++
++.family-create-card input:focus,
++.family-invite-form input:focus,
++.family-goal-form input:focus {
++  border-color: rgba(78, 125, 117, 0.34);
++  box-shadow: 0 0 0 4px rgba(126, 171, 174, 0.11);
++}
++
++.family-invite-list {
++  display: grid;
++  gap: 10px;
++  margin-top: 24px;
++}
++
++.family-invite-item {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 14px;
++  padding: 14px;
++  border: 1px solid rgba(126, 171, 174, 0.16);
++  border-radius: 8px;
++  background: rgba(255, 255, 255, 0.55);
++}
++
++.family-invite-item div,
++.family-member-row div {
++  min-width: 0;
++  display: grid;
++  gap: 3px;
++}
++
++.family-invite-item strong,
++.family-member-row strong {
++  overflow: hidden;
++  color: #244b43;
++  font-size: 0.88rem;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++}
++
++.family-invite-item small,
++.family-member-row small,
++.family-empty-copy {
++  color: rgba(63, 91, 79, 0.6);
++  font-size: 0.72rem;
++}
++
++.family-workspace {
++  display: grid;
++  gap: 14px;
++}
++
++.family-room-bar {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 24px;
++  padding: 20px 24px;
++}
++
++.family-room-bar h3 {
++  margin-top: 3px;
++  font-size: 1.35rem;
++}
++
++.family-room-actions {
++  display: flex;
++  align-items: center;
++  gap: 9px;
++}
++
++.family-members-toggle,
++.family-leave-button {
++  min-height: 38px;
++  border: 1px solid rgba(78, 125, 117, 0.18);
++  border-radius: 999px;
++  background: rgba(255, 255, 255, 0.56);
++  color: #39665f;
++  padding: 0 15px;
++  font-size: 0.78rem;
++  font-weight: 750;
++}
++
++.family-leave-button {
++  border-color: rgba(145, 91, 82, 0.14);
++  color: rgba(121, 78, 70, 0.68);
++}
++
++.family-members-panel {
++  padding: 20px 24px;
++}
++
++.family-member-list {
++  display: grid;
++  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
++  gap: 9px;
++  margin: 15px 0;
++}
++
++.family-member-row {
++  min-width: 0;
++  display: grid;
++  grid-template-columns: 36px minmax(0, 1fr);
++  align-items: center;
++  gap: 10px;
++  padding: 10px;
++  border-radius: 8px;
++  background: rgba(255, 255, 255, 0.5);
++}
++
++.family-member-avatar {
++  width: 34px;
++  height: 34px;
++  display: grid;
++  place-items: center;
++  border-radius: 50%;
++  background: rgba(126, 171, 174, 0.16);
++  color: #39665f;
++  font: 750 0.82rem/1 var(--font-display);
++}
++
++.family-invite-form {
++  display: grid;
++  grid-template-columns: minmax(0, 1fr) auto;
++  align-items: end;
++  gap: 10px;
++  padding-top: 15px;
++  border-top: 1px solid rgba(78, 125, 117, 0.1);
++}
++
++.family-invite-form button {
++  min-height: 50px;
++}
++
++.family-view {
++  display: none;
++}
++
++.family-view.active {
++  display: block;
++}
++
++.family-goal-form {
++  width: min(780px, 100%);
++  margin-left: auto;
++  padding: clamp(26px, 3vw, 38px);
++  border-color: rgba(255, 255, 255, 0.54);
++  background:
++    linear-gradient(145deg, rgba(255, 255, 255, 0.58), rgba(235, 245, 235, 0.34)),
++    rgba(255, 255, 255, 0.28);
++  box-shadow:
++    inset 0 1px 0 rgba(255, 255, 255, 0.62),
++    0 22px 54px rgba(31, 61, 42, 0.12);
++  backdrop-filter: blur(5px) saturate(1.05);
++}
++
++.family-goal-form select {
++  width: 100%;
++  border: 1px solid rgba(73, 112, 88, 0.2);
++  border-radius: 8px;
++  background:
++    linear-gradient(135deg, rgba(255, 255, 255, 0.74), rgba(244, 249, 244, 0.5));
++  color: #224231;
++  font: inherit;
++  padding: 15px 42px 15px 18px;
++  min-height: 58px;
++  outline: none;
++  box-shadow:
++    inset 0 1px 0 rgba(255, 255, 255, 0.66),
++    0 12px 28px rgba(54, 91, 68, 0.08);
++}
++
++.family-goal-form select:focus {
++  border-color: rgba(79, 129, 93, 0.5);
++  box-shadow:
++    0 0 0 4px rgba(126, 166, 120, 0.14),
++    0 16px 34px rgba(54, 91, 68, 0.1);
++}
++
++.family-customize-button,
++.family-urgency-option,
++.family-category-chip {
++  border: 1px solid rgba(81, 124, 91, 0.22);
++  background: rgba(255, 255, 255, 0.48);
++  color: #3c694a;
++  box-shadow: 0 12px 26px rgba(54, 91, 68, 0.08);
++}
++
++.family-customize-button {
++  min-height: 30px;
++  border-radius: 999px;
++  padding: 0 12px;
++  font-size: 0.78rem;
++  font-weight: 700;
++}
++
++.family-customize-button:hover,
++.family-customize-button:focus-visible,
++.family-urgency-option:hover,
++.family-urgency-option:focus-visible {
++  border-color: rgba(73, 119, 84, 0.42);
++  background: rgba(247, 252, 246, 0.92);
++  transform: translateY(-1px);
++}
++
++.family-urgency-field {
++  display: flex;
++  align-items: center;
++  justify-content: flex-end;
++  gap: 7px;
++  flex-wrap: wrap;
++  color: #577260;
++  font-size: 0.82rem;
++}
++
++.family-urgency-field > span {
++  margin-right: 4px;
++  font-weight: 700;
++}
++
++.family-urgency-option {
++  min-height: 34px;
++  border-radius: 999px;
++  padding: 0 12px;
++  font-weight: 700;
++}
++
++.family-urgency-option.active {
++  background: linear-gradient(135deg, rgba(82, 126, 89, 0.94), rgba(112, 151, 105, 0.9));
++  border-color: rgba(255, 255, 255, 0.7);
++  color: #fff;
++}
++
++.family-category-settings {
++  display: grid;
++  gap: 14px;
++  padding: 18px;
++  border: 1px solid rgba(255, 255, 255, 0.72);
++  border-radius: 8px;
++  background:
++    linear-gradient(135deg, rgba(255, 255, 255, 0.76), rgba(240, 248, 239, 0.58));
++  box-shadow: 0 16px 34px rgba(51, 85, 62, 0.08);
++}
++
++.family-category-settings[hidden] {
++  display: none;
++}
++
++.family-field-label-row {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 12px;
++}
++
++.family-category-settings-head {
++  display: flex;
++  justify-content: space-between;
++  gap: 12px;
++  flex-wrap: wrap;
++  color: #244533;
+ }
+ 
+-.work-reset-dialog-card h2,
+-.work-delete-dialog-card h2 {
+-  max-width: 15ch;
+-  font-family: var(--font-display);
+-  font-size: clamp(1.45rem, 4vw, 1.9rem);
+-  font-weight: 600;
+-  line-height: 1.4;
++.family-category-settings-head small {
++  color: #6c806f;
+ }
+ 
+-.work-reset-dialog-card > p:not(.eyebrow),
+-.work-delete-dialog-card > p:not(.eyebrow) {
+-  color: var(--muted);
+-  line-height: 1.75;
++.family-category-list {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 10px;
+ }
+ 
+-.work-reset-dialog-actions,
+-.work-delete-dialog-actions {
+-  width: 100%;
+-  margin-top: 10px;
++.family-category-chip {
++  display: inline-flex;
++  align-items: center;
++  gap: 8px;
++  min-height: 36px;
++  border-radius: 999px;
++  padding: 0 12px 0 14px;
++}
++
++.family-category-chip b {
++  font-size: 1rem;
++  line-height: 1;
++  color: #789279;
++}
++
++.family-category-form {
+   display: grid;
+-  grid-template-columns: repeat(2, minmax(0, 1fr));
++  grid-template-columns: 1fr auto;
+   gap: 10px;
+ }
+ 
+-.work-reset-dialog-actions button,
+-.work-delete-dialog-actions button {
+-  min-height: 44px;
++.family-category-form input {
++  min-height: 46px;
++  border: 1px solid rgba(73, 112, 88, 0.18);
+   border-radius: 8px;
+-  font-weight: 700;
++  background: rgba(255, 255, 255, 0.76);
++  padding: 0 16px;
++  font: inherit;
++  color: #294737;
++  outline: none;
+ }
+ 
+-.work-reset-confirm {
+-  border: 1px solid rgba(131, 76, 68, 0.32);
+-  background: rgba(131, 76, 68, 0.88);
+-  color: #fff;
+-  box-shadow: 0 10px 22px rgba(116, 72, 65, 0.14);
++.family-goal-title-row {
++  display: flex;
++  align-items: center;
++  gap: 12px;
++  flex-wrap: wrap;
+ }
+ 
+-.work-reset-confirm:hover,
+-.work-reset-confirm:focus-visible {
+-  background: #744841;
++.family-goal-title-row h3 {
++  margin: 0;
+ }
+ 
+-.work-delete-symbol {
+-  width: 44px;
+-  height: 44px;
+-  margin-bottom: 2px;
+-  border: 1px solid rgba(145, 91, 82, 0.16);
+-  border-radius: 50%;
+-  background: rgba(181, 118, 104, 0.08);
+-  position: relative;
++.family-urgency-badge {
++  border-radius: 999px;
++  padding: 5px 10px;
++  font-size: 0.74rem;
++  font-weight: 800;
++  letter-spacing: 0.04em;
++  color: #557064;
++  background: rgba(244, 249, 244, 0.86);
++  border: 1px solid rgba(87, 122, 94, 0.18);
+ }
+ 
+-.work-delete-symbol::before {
+-  content: "";
+-  position: absolute;
+-  left: 14px;
+-  top: 14px;
+-  width: 14px;
+-  height: 17px;
+-  border: 1.5px solid rgba(121, 78, 70, 0.72);
+-  border-top: 0;
+-  border-radius: 0 0 4px 4px;
++.family-urgency-badge.low {
++  color: #5f7b83;
++  background: rgba(231, 244, 246, 0.86);
+ }
+ 
+-.work-delete-symbol::after {
+-  content: "";
+-  position: absolute;
+-  left: 11px;
+-  top: 11px;
+-  width: 20px;
+-  border-top: 1.5px solid rgba(121, 78, 70, 0.72);
+-  box-shadow: 6px -3px 0 -2px rgba(121, 78, 70, 0.72);
++.family-urgency-badge.urgent {
++  color: #8a5a50;
++  background: rgba(250, 239, 231, 0.88);
++  border-color: rgba(172, 112, 90, 0.2);
+ }
+ 
+-.work-delete-confirm {
+-  border: 1px solid rgba(131, 76, 68, 0.28);
+-  background: rgba(131, 76, 68, 0.86);
+-  color: #fff;
+-  box-shadow: 0 10px 22px rgba(116, 72, 65, 0.12);
++.family-list-panel::before {
++  background:
++    radial-gradient(circle at 36% 50%, transparent 0 22%, rgba(65, 110, 103, 0.7) 24% 28%, transparent 30%),
++    radial-gradient(circle at 66% 50%, transparent 0 22%, rgba(65, 110, 103, 0.7) 24% 28%, transparent 30%),
++    rgba(126, 171, 174, 0.12);
+ }
+ 
+-.work-delete-confirm:hover,
+-.work-delete-confirm:focus-visible {
+-  background: #744841;
++.family-goal-filter {
++  border: 0;
++  border-bottom: 2px solid transparent;
++  background: transparent;
++  color: rgba(57, 102, 95, 0.58);
++  padding: 5px 2px 7px;
++  font: 700 1.05rem/1.2 var(--font-ui);
++}
++
++.family-goal-filter.active,
++.family-goal-filter:hover {
++  border-bottom-color: rgba(57, 102, 95, 0.58);
++  color: #244b43;
++}
++
++.family-goal-card::before {
++  background: linear-gradient(180deg, rgba(126, 171, 174, 0.82), rgba(174, 163, 196, 0.5));
++}
++
++.family-date-input {
++  color-scheme: light;
+ }
+ 
+ @media (max-width: 620px) {
+@@ -2717,6 +3629,16 @@ body[data-language="zh"] .low-energy-hero h2 {
+   .work-form.calendar-open .work-form-row {
+     margin-bottom: 350px;
+   }
++
++  .family-setup-grid,
++  .family-invite-form {
++    grid-template-columns: 1fr;
++  }
++
++  .family-room-bar {
++    align-items: flex-start;
++    flex-direction: column;
++  }
+ }
+ 
+ .today-panel,
+@@ -2874,6 +3796,13 @@ body[data-language="zh"] .low-energy-hero h2 {
+   flex-direction: column;
+ }
+ 
++#view-morning.active {
++  min-height: 100vh;
++  padding: clamp(18px, 4vw, 48px);
++  display: flex;
++  flex-direction: column;
++}
++
+ .night-mode #view-night {
+   min-height: 100vh;
+   padding: clamp(26px, 5vw, 72px) clamp(18px, 4vw, 52px);
+@@ -2908,6 +3837,11 @@ body[data-language="zh"] .low-energy-hero h2 {
+   top: clamp(86px, 11vh, 128px);
+ }
+ 
++#view-morning.active .immersive-home {
++  left: clamp(22px, 4.5vw, 58px);
++  top: clamp(86px, 11vh, 128px);
++}
++
+ .night-mode #view-night .immersive-home {
+   left: max(clamp(18px, 4vw, 52px), calc((100vw - 1120px) / 2));
+   top: clamp(112px, 13vh, 156px);
+@@ -2931,6 +3865,16 @@ body[data-language="zh"] .low-energy-hero h2 {
+   text-shadow: 0 2px 18px rgba(10, 24, 18, 0.42);
+ }
+ 
++#view-morning.active .section-head {
++  width: min(780px, 100%);
++  margin: clamp(24px, 5vh, 54px) auto 0;
++  align-items: center;
++  justify-content: center;
++  text-align: center;
++  color: #f7fff7;
++  text-shadow: 0 2px 18px rgba(10, 24, 18, 0.42);
++}
++
+ .morning-mode #view-morning .section-head h2 {
+   max-width: 620px;
+   margin: 8px auto 0;
+@@ -2945,6 +3889,20 @@ body[data-language="zh"] .low-energy-hero h2 {
+     0 3px 16px rgba(10, 24, 18, 0.48);
+ }
+ 
++#view-morning.active .section-head h2 {
++  max-width: 620px;
++  margin: 8px auto 0;
++  font-size: clamp(1.7rem, 3.4vw, 3.25rem);
++  line-height: 1.16;
++  font-weight: 500;
++  text-shadow:
++    0 1px 1px rgba(255, 255, 255, 0.72),
++    0 0 10px rgba(255, 255, 255, 0.88),
++    0 0 24px rgba(226, 246, 228, 0.72),
++    0 0 46px rgba(127, 179, 140, 0.52),
++    0 3px 16px rgba(10, 24, 18, 0.48);
++}
++
+ .morning-subtitle {
+   margin-top: 18px;
+   color: rgba(250, 255, 250, 0.94);
+@@ -2966,6 +3924,12 @@ body[data-language="zh"] .low-energy-hero h2 {
+   top: clamp(18px, 4vw, 48px);
+ }
+ 
++#view-morning.active .section-head .icon-button {
++  position: absolute;
++  right: clamp(18px, 4vw, 48px);
++  top: clamp(18px, 4vw, 48px);
++}
++
+ .morning-mode #view-morning .audio-toggle,
+ .night-mode #view-night .audio-toggle {
+   width: 58px;
+@@ -3076,6 +4040,12 @@ body[data-language="zh"] .low-energy-hero h2 {
+   align-items: start;
+ }
+ 
++#view-morning.active .ritual-layout {
++  flex: 1;
++  display: grid;
++  align-items: start;
++}
++
+ .night-mode #view-night .night-layout {
+   flex: 1;
+   grid-template-columns: minmax(0, 1.08fr) minmax(320px, 390px);
+@@ -3105,6 +4075,22 @@ body[data-language="zh"] .low-energy-hero h2 {
+   padding-top: clamp(58px, 12vh, 120px);
+ }
+ 
++#view-morning.active .ritual-stage {
++  min-height: 0;
++  height: 100%;
++  border: 0;
++  box-shadow: none;
++  background: transparent;
++  backdrop-filter: none;
++  color: #f7fff7;
++  text-shadow: 0 2px 20px rgba(10, 24, 18, 0.52);
++  align-items: center;
++  text-align: center;
++  justify-content: flex-start;
++  padding-inline: clamp(18px, 7vw, 96px);
++  padding-top: clamp(58px, 12vh, 120px);
++}
++
+ .morning-stage-meta {
+   width: min(760px, 90vw);
+   display: flex;
+@@ -3166,16 +4152,33 @@ body[data-language="zh"] .low-energy-hero h2 {
+   font-weight: 400;
+ }
+ 
++#view-morning.active .ritual-stage h3 {
++  max-width: min(760px, 90vw);
++  font-size: clamp(1.55rem, 3.2vw, 2.8rem);
++  line-height: 1.38;
++  font-weight: 400;
++}
++
+ .morning-mode #view-morning .ritual-stage p:not(.stage-label) {
+   margin-left: auto;
+   margin-right: auto;
+ }
+ 
++#view-morning.active .ritual-stage p:not(.stage-label) {
++  margin-left: auto;
++  margin-right: auto;
++}
++
+ .morning-mode #view-morning .action-row {
+   justify-content: center;
+   margin-top: 42px;
+ }
+ 
++#view-morning.active .action-row {
++  justify-content: center;
++  margin-top: 42px;
++}
++
+ .night-mode #view-night .night-stage h3 {
+   max-width: min(690px, 100%);
+   font-size: clamp(1.85rem, 3.35vw, 3.2rem);
+@@ -4991,19 +5994,19 @@ body.block-mode[data-block-theme="dark"] .app-shell::before {
+   background: #9fc8bd;
+ }
+ 
+-.mood-dot[data-mood="开心"] {
++.mood-dot[data-mood="寮€蹇?] {
+   background: #d8bd68;
+ }
+ 
+-.mood-dot[data-mood="疲惫"] {
++.mood-dot[data-mood="鐤叉儷"] {
+   background: #98a5a0;
+ }
+ 
+-.mood-dot[data-mood="焦虑"] {
++.mood-dot[data-mood="鐒﹁檻"] {
+   background: #c99a8d;
+ }
+ 
+-.mood-dot[data-mood="期待"] {
++.mood-dot[data-mood="鏈熷緟"] {
+   background: #8bb8bf;
+ }
+ 
+@@ -6985,6 +7988,14 @@ output {
+   --stats-tint: rgba(249, 244, 235, 0.48);
+ }
+ 
++.stats-family-section {
++  --stats-accent: #86aaa7;
++  --stats-accent-soft: rgba(134, 170, 167, 0.105);
++  --stats-accent-border: rgba(134, 170, 167, 0.2);
++  --stats-ink: #42645f;
++  --stats-tint: rgba(233, 244, 242, 0.48);
++}
++
+ .stats-seed-section {
+   --stats-accent: #a99cba;
+   --stats-accent-soft: rgba(169, 156, 186, 0.105);
+@@ -7059,7 +8070,7 @@ output {
+ }
+ 
+ .sprout-icon::before {
+-  content: "⌁";
++  content: "鈱?;
+   transform: rotate(-40deg);
+   font-size: 1.35rem;
+ }
+@@ -7083,6 +8094,25 @@ output {
+   transform: translate(1px, -1px) rotate(-45deg);
+ }
+ 
++.family-stats-icon::before,
++.family-stats-icon::after {
++  content: "";
++  position: absolute;
++  top: 13px;
++  width: 12px;
++  height: 12px;
++  border: 1.3px solid currentColor;
++  border-radius: 50%;
++}
++
++.family-stats-icon::before {
++  left: 8px;
++}
++
++.family-stats-icon::after {
++  right: 8px;
++}
++
+ .stats-inline-summary {
+   display: flex;
+   justify-content: flex-end;
+@@ -7184,7 +8214,7 @@ output {
+ }
+ 
+ .mini-timeline-icon::after {
+-  content: "···";
++  content: "路路路";
+   position: absolute;
+   inset: -8px 0 auto;
+   font-size: 1.1rem;
+@@ -7335,6 +8365,68 @@ output {
+   min-height: 250px;
+ }
+ 
++.family-activity-list {
++  min-height: 250px;
++  display: grid;
++  align-content: center;
++  gap: 8px;
++  padding: 8px 2px;
++}
++
++.family-activity-item {
++  display: grid;
++  grid-template-columns: 28px minmax(0, 1fr);
++  align-items: center;
++  gap: 10px;
++  padding: 10px 11px;
++  border-radius: 8px;
++  background: var(--stats-accent-soft);
++}
++
++.family-activity-check {
++  width: 22px;
++  height: 22px;
++  border: 1px solid var(--stats-accent-border);
++  border-radius: 50%;
++  background: rgba(255, 255, 255, 0.5);
++  position: relative;
++}
++
++.family-activity-check::after {
++  content: "";
++  position: absolute;
++  left: 6px;
++  top: 5px;
++  width: 7px;
++  height: 4px;
++  border-left: 1.5px solid var(--stats-accent);
++  border-bottom: 1.5px solid var(--stats-accent);
++  transform: rotate(-45deg);
++}
++
++.family-activity-item div {
++  min-width: 0;
++  display: grid;
++  gap: 3px;
++}
++
++.family-activity-item strong,
++.family-activity-item small {
++  overflow: hidden;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++}
++
++.family-activity-item strong {
++  color: var(--stats-ink);
++  font-size: 0.78rem;
++}
++
++.family-activity-item small {
++  color: rgba(98, 117, 106, 0.62);
++  font-size: 0.68rem;
++}
++
+ .goal-status-chart,
+ .goal-category-chart {
+   display: grid;
+@@ -8394,16 +9486,26 @@ body.block-mode[data-block-theme="iceland"] .today-panel {
+     align-items: center;
+   }
+ 
+-  .work-view-switch {
++  .work-head-controls,
++  .work-view-switch,
++  .goal-scope-switch {
+     box-sizing: border-box;
+     justify-self: stretch;
+     min-width: 0;
+     width: 100%;
+-    grid-template-columns: repeat(2, 1fr);
++  }
++
++  .work-head-controls {
+     margin-bottom: 0;
+   }
+ 
+-  .work-view-option {
++  .work-view-switch,
++  .goal-scope-switch {
++    grid-template-columns: repeat(2, 1fr);
++  }
++
++  .work-view-option,
++  .goal-scope-option {
+     min-width: 0;
+     padding-inline: 12px;
+   }
+diff --git a/supabase/schema.sql b/supabase/schema.sql
+index b268175..128b00f 100644
+--- a/supabase/schema.sql
++++ b/supabase/schema.sql
+@@ -105,3 +105,333 @@ drop trigger if exists touch_app_state_before_update on public.app_states;
+ create trigger touch_app_state_before_update
+ before update on public.app_states
+ for each row execute function public.touch_app_state();
++
++-- Family sharing
++-- Personal app state remains private in app_states. Shared family data lives
++-- in relational tables so one member cannot overwrite another member's state.
++
++create table if not exists public.families (
++  id uuid primary key default gen_random_uuid(),
++  name text not null check (char_length(name) between 1 and 60),
++  owner_id uuid not null references auth.users(id) on delete cascade,
++  category_options jsonb not null default '["Home","Health","Together"]'::jsonb,
++  created_at timestamptz not null default now()
++);
++
++alter table public.families
++add column if not exists category_options jsonb not null default '["Home","Health","Together"]'::jsonb;
++
++create table if not exists public.family_members (
++  family_id uuid not null references public.families(id) on delete cascade,
++  user_id uuid not null references auth.users(id) on delete cascade,
++  email text not null default '',
++  role text not null default 'member' check (role in ('owner', 'member')),
++  joined_at timestamptz not null default now(),
++  primary key (family_id, user_id)
++);
++
++create table if not exists public.family_invitations (
++  id uuid primary key default gen_random_uuid(),
++  family_id uuid not null references public.families(id) on delete cascade,
++  family_name text not null default '',
++  email text not null,
++  invited_by uuid not null references auth.users(id) on delete cascade,
++  status text not null default 'pending' check (status in ('pending', 'accepted', 'cancelled')),
++  created_at timestamptz not null default now(),
++  accepted_at timestamptz
++);
++
++alter table public.family_invitations
++add column if not exists family_name text not null default '';
++
++create unique index if not exists family_pending_invitation_idx
++on public.family_invitations (family_id, lower(email))
++where status = 'pending';
++
++create table if not exists public.family_goals (
++  id uuid primary key default gen_random_uuid(),
++  family_id uuid not null references public.families(id) on delete cascade,
++  title text not null check (char_length(title) between 1 and 120),
++  category text not null default '',
++  deadline date,
++  urgency text not null default 'normal' check (urgency in ('low', 'normal', 'urgent')),
++  status text not null default 'open' check (status in ('open', 'done')),
++  note text not null default '',
++  created_by uuid not null references auth.users(id) on delete cascade,
++  completed_by uuid references auth.users(id) on delete set null,
++  created_at timestamptz not null default now(),
++  completed_at timestamptz,
++  updated_at timestamptz not null default now()
++);
++
++alter table public.family_goals
++add column if not exists urgency text not null default 'normal'
++check (urgency in ('low', 'normal', 'urgent'));
++
++create index if not exists family_goals_family_deadline_idx
++on public.family_goals (family_id, status, deadline);
++
++alter table public.families enable row level security;
++alter table public.family_members enable row level security;
++alter table public.family_invitations enable row level security;
++alter table public.family_goals enable row level security;
++
++grant select, update, delete on public.families to authenticated;
++grant select, delete on public.family_members to authenticated;
++grant select, insert, update on public.family_invitations to authenticated;
++grant select, insert, update, delete on public.family_goals to authenticated;
++
++create or replace function public.is_family_member(target_family_id uuid)
++returns boolean
++language sql
++stable
++security definer
++set search_path = public
++as $$
++  select exists (
++    select 1
++    from public.family_members
++    where family_id = target_family_id
++      and user_id = auth.uid()
++  );
++$$;
++
++create or replace function public.is_family_owner(target_family_id uuid)
++returns boolean
++language sql
++stable
++security definer
++set search_path = public
++as $$
++  select exists (
++    select 1
++    from public.family_members
++    where family_id = target_family_id
++      and user_id = auth.uid()
++      and role = 'owner'
++  );
++$$;
++
++revoke all on function public.is_family_member(uuid) from public;
++revoke all on function public.is_family_owner(uuid) from public;
++grant execute on function public.is_family_member(uuid) to authenticated;
++grant execute on function public.is_family_owner(uuid) to authenticated;
++
++create or replace function public.update_family_categories(
++  target_family_id uuid,
++  categories jsonb
++)
++returns jsonb
++language plpgsql
++security definer
++set search_path = public
++as $$
++declare
++  cleaned jsonb;
++begin
++  if auth.uid() is null then
++    raise exception 'Authentication required';
++  end if;
++
++  if not public.is_family_member(target_family_id) then
++    raise exception 'Family access required';
++  end if;
++
++  select coalesce(jsonb_agg(value), '[]'::jsonb)
++  into cleaned
++  from (
++    select distinct trim(value #>> '{}') as value
++    from jsonb_array_elements(categories)
++    where char_length(trim(value #>> '{}')) between 1 and 30
++    limit 12
++  ) normalized;
++
++  if jsonb_array_length(cleaned) = 0 then
++    cleaned := '["Home","Health","Together"]'::jsonb;
++  end if;
++
++  update public.families
++  set category_options = cleaned
++  where id = target_family_id;
++
++  return cleaned;
++end;
++$$;
++
++revoke all on function public.update_family_categories(uuid, jsonb) from public;
++grant execute on function public.update_family_categories(uuid, jsonb) to authenticated;
++
++drop policy if exists "Members can read their families" on public.families;
++create policy "Members can read their families"
++on public.families for select
++using (public.is_family_member(id));
++
++drop policy if exists "Owners can update their families" on public.families;
++create policy "Owners can update their families"
++on public.families for update
++using (public.is_family_owner(id))
++with check (public.is_family_owner(id));
++
++drop policy if exists "Owners can delete their families" on public.families;
++create policy "Owners can delete their families"
++on public.families for delete
++using (public.is_family_owner(id));
++
++drop policy if exists "Members can read family members" on public.family_members;
++create policy "Members can read family members"
++on public.family_members for select
++using (public.is_family_member(family_id));
++
++drop policy if exists "Owners or self can remove family members" on public.family_members;
++create policy "Owners or self can remove family members"
++on public.family_members for delete
++using (public.is_family_owner(family_id) or user_id = auth.uid());
++
++drop policy if exists "Members can read invitations" on public.family_invitations;
++create policy "Members can read invitations"
++on public.family_invitations for select
++using (
++  public.is_family_member(family_id)
++  or lower(email) = lower(coalesce(auth.jwt() ->> 'email', ''))
++);
++
++drop policy if exists "Owners can create invitations" on public.family_invitations;
++create policy "Owners can create invitations"
++on public.family_invitations for insert
++with check (
++  public.is_family_owner(family_id)
++  and invited_by = auth.uid()
++);
++
++drop policy if exists "Owners can update invitations" on public.family_invitations;
++create policy "Owners can update invitations"
++on public.family_invitations for update
++using (public.is_family_owner(family_id))
++with check (public.is_family_owner(family_id));
++
++drop policy if exists "Members can read family goals" on public.family_goals;
++create policy "Members can read family goals"
++on public.family_goals for select
++using (public.is_family_member(family_id));
++
++drop policy if exists "Members can create family goals" on public.family_goals;
++create policy "Members can create family goals"
++on public.family_goals for insert
++with check (
++  public.is_family_member(family_id)
++  and created_by = auth.uid()
++);
++
++drop policy if exists "Members can update family goals" on public.family_goals;
++create policy "Members can update family goals"
++on public.family_goals for update
++using (public.is_family_member(family_id))
++with check (public.is_family_member(family_id));
++
++drop policy if exists "Creators or owners can delete family goals" on public.family_goals;
++create policy "Creators or owners can delete family goals"
++on public.family_goals for delete
++using (
++  created_by = auth.uid()
++  or public.is_family_owner(family_id)
++);
++
++create or replace function public.create_family(family_name text)
++returns uuid
++language plpgsql
++security definer
++set search_path = public
++as $$
++declare
++  new_family_id uuid;
++  member_email text;
++begin
++  if auth.uid() is null then
++    raise exception 'Authentication required';
++  end if;
++
++  if char_length(trim(family_name)) < 1 or char_length(trim(family_name)) > 60 then
++    raise exception 'Family name must be between 1 and 60 characters';
++  end if;
++
++  member_email := lower(coalesce(auth.jwt() ->> 'email', ''));
++
++  insert into public.families (name, owner_id)
++  values (trim(family_name), auth.uid())
++  returning id into new_family_id;
++
++  insert into public.family_members (family_id, user_id, email, role)
++  values (new_family_id, auth.uid(), member_email, 'owner');
++
++  return new_family_id;
++end;
++$$;
++
++create or replace function public.accept_family_invitation(invitation_id uuid)
++returns uuid
++language plpgsql
++security definer
++set search_path = public
++as $$
++declare
++  invitation public.family_invitations%rowtype;
++  member_email text;
++begin
++  if auth.uid() is null then
++    raise exception 'Authentication required';
++  end if;
++
++  member_email := lower(coalesce(auth.jwt() ->> 'email', ''));
++
++  select *
++  into invitation
++  from public.family_invitations
++  where id = invitation_id
++    and status = 'pending'
++    and lower(email) = member_email
++  for update;
++
++  if invitation.id is null then
++    raise exception 'Invitation not found';
++  end if;
++
++  insert into public.family_members (family_id, user_id, email, role)
++  values (invitation.family_id, auth.uid(), member_email, 'member')
++  on conflict (family_id, user_id) do nothing;
++
++  update public.family_invitations
++  set status = 'accepted',
++      accepted_at = now()
++  where id = invitation.id;
++
++  return invitation.family_id;
++end;
++$$;
++
++create or replace function public.touch_family_goal()
++returns trigger
++language plpgsql
++set search_path = public
++as $$
++begin
++  new.updated_at = now();
++  if new.status = 'done' and old.status <> 'done' then
++    new.completed_at = now();
++    new.completed_by = auth.uid();
++  elsif new.status <> 'done' then
++    new.completed_at = null;
++    new.completed_by = null;
++  end if;
++  return new;
++end;
++$$;
++
++drop trigger if exists touch_family_goal_before_update on public.family_goals;
++create trigger touch_family_goal_before_update
++before update on public.family_goals
++for each row execute function public.touch_family_goal();
++
++revoke all on function public.create_family(text) from public;
++revoke all on function public.accept_family_invitation(uuid) from public;
++grant execute on function public.create_family(text) to authenticated;
++grant execute on function public.accept_family_invitation(uuid) to authenticated;

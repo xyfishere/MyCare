@@ -105,3 +105,506 @@ drop trigger if exists touch_app_state_before_update on public.app_states;
 create trigger touch_app_state_before_update
 before update on public.app_states
 for each row execute function public.touch_app_state();
+
+-- Family sharing foundation
+-- Family records are separate from each user's private app_states JSON.
+
+create extension if not exists pgcrypto;
+
+create table if not exists public.families (
+  id uuid primary key default gen_random_uuid(),
+  name text not null check (char_length(trim(name)) between 1 and 80),
+  created_by uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.families enable row level security;
+
+create table if not exists public.family_members (
+  family_id uuid not null references public.families(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  email text,
+  role text not null default 'member' check (role in ('owner', 'member')),
+  joined_at timestamptz not null default now(),
+  primary key (family_id, user_id)
+);
+
+alter table public.family_members enable row level security;
+
+create table if not exists public.family_invitations (
+  id uuid primary key default gen_random_uuid(),
+  family_id uuid not null references public.families(id) on delete cascade,
+  email text not null,
+  token text not null unique default encode(gen_random_bytes(24), 'hex'),
+  status text not null default 'pending' check (status in ('pending', 'accepted', 'revoked', 'expired')),
+  invited_by uuid not null references auth.users(id) on delete cascade,
+  accepted_by uuid references auth.users(id) on delete set null,
+  accepted_at timestamptz,
+  expires_at timestamptz not null default (now() + interval '14 days'),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists family_invitations_family_idx
+on public.family_invitations (family_id, created_at desc);
+
+create index if not exists family_invitations_email_idx
+on public.family_invitations (lower(email), status);
+
+alter table public.family_invitations enable row level security;
+
+create table if not exists public.family_goal_categories (
+  id uuid primary key default gen_random_uuid(),
+  family_id uuid not null references public.families(id) on delete cascade,
+  name text not null check (char_length(trim(name)) between 1 and 40),
+  color text not null default '#9eb39f' check (color ~ '^#[0-9A-Fa-f]{6}$'),
+  active boolean not null default true,
+  created_by uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists family_goal_categories_family_idx
+on public.family_goal_categories (family_id, active, name);
+
+alter table public.family_goal_categories enable row level security;
+
+create table if not exists public.family_goals (
+  id uuid primary key default gen_random_uuid(),
+  family_id uuid not null references public.families(id) on delete cascade,
+  title text not null check (char_length(trim(title)) between 1 and 160),
+  category_id uuid references public.family_goal_categories(id) on delete set null,
+  category_label text,
+  urgency text not null default 'normal' check (urgency in ('low', 'normal', 'high')),
+  deadline date not null,
+  status text not null default 'open' check (status in ('open', 'done')),
+  note text,
+  completion_note text,
+  created_by uuid not null references auth.users(id) on delete cascade,
+  completed_by uuid references auth.users(id) on delete set null,
+  completed_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check ((status = 'done' and completed_at is not null) or (status = 'open'))
+);
+
+create index if not exists family_goals_family_deadline_idx
+on public.family_goals (family_id, status, deadline);
+
+create index if not exists family_goals_category_idx
+on public.family_goals (category_id);
+
+alter table public.family_goals enable row level security;
+
+-- Repair older family tables created before the full Family Sharing schema.
+-- `create table if not exists` does not add missing columns to existing tables.
+alter table public.families
+  add column if not exists created_by uuid references auth.users(id) on delete cascade,
+  add column if not exists created_at timestamptz not null default now(),
+  add column if not exists updated_at timestamptz not null default now();
+
+alter table public.family_members
+  add column if not exists email text;
+
+alter table public.family_invitations
+  add column if not exists token text default encode(gen_random_bytes(24), 'hex'),
+  add column if not exists accepted_by uuid references auth.users(id) on delete set null,
+  add column if not exists accepted_at timestamptz,
+  add column if not exists expires_at timestamptz not null default (now() + interval '14 days'),
+  add column if not exists updated_at timestamptz not null default now();
+
+update public.family_invitations
+set token = encode(gen_random_bytes(24), 'hex')
+where token is null;
+
+create unique index if not exists family_invitations_token_key
+on public.family_invitations (token);
+
+alter table public.family_goal_categories
+  add column if not exists color text not null default '#9eb39f',
+  add column if not exists active boolean not null default true,
+  add column if not exists created_by uuid references auth.users(id) on delete cascade,
+  add column if not exists created_at timestamptz not null default now(),
+  add column if not exists updated_at timestamptz not null default now();
+
+alter table public.family_goals
+  add column if not exists category_id uuid references public.family_goal_categories(id) on delete set null,
+  add column if not exists category_label text,
+  add column if not exists urgency text not null default 'normal',
+  add column if not exists note text,
+  add column if not exists completion_note text,
+  add column if not exists created_by uuid references auth.users(id) on delete cascade,
+  add column if not exists completed_by uuid references auth.users(id) on delete set null,
+  add column if not exists completed_at timestamptz,
+  add column if not exists created_at timestamptz not null default now(),
+  add column if not exists updated_at timestamptz not null default now();
+
+do $$
+begin
+  alter table public.family_goals drop constraint if exists family_goals_urgency_check;
+  alter table public.family_goals
+    add constraint family_goals_urgency_check
+    check (urgency in ('low', 'normal', 'high'));
+end $$;
+
+update public.families family
+set created_by = member.user_id
+from public.family_members member
+where family.id = member.family_id
+  and member.role = 'owner'
+  and family.created_by is null;
+
+update public.families family
+set created_by = member.user_id
+from public.family_members member
+where family.id = member.family_id
+  and family.created_by is null;
+
+do $$
+begin
+  if not exists (select 1 from public.families where created_by is null) then
+    alter table public.families alter column created_by set not null;
+  end if;
+end;
+$$;
+
+create or replace function public.is_family_member(target_family_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.family_members
+    where family_id = target_family_id
+      and user_id = auth.uid()
+  );
+$$;
+
+create or replace function public.is_family_owner(target_family_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.family_members
+    where family_id = target_family_id
+      and user_id = auth.uid()
+      and role = 'owner'
+  );
+$$;
+
+create or replace function public.is_family_creator(target_family_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.families
+    where id = target_family_id
+      and created_by = auth.uid()
+  );
+$$;
+
+create or replace function public.has_pending_family_invitation(target_family_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.family_invitations
+    where family_id = target_family_id
+      and lower(email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+      and status = 'pending'
+      and expires_at > now()
+  );
+$$;
+
+create or replace function public.touch_updated_at()
+returns trigger
+language plpgsql
+security invoker
+set search_path = public
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+create or replace function public.validate_family_goal_category()
+returns trigger
+language plpgsql
+security invoker
+set search_path = public
+as $$
+begin
+  if new.category_id is not null and not exists (
+    select 1
+    from public.family_goal_categories
+    where id = new.category_id
+      and family_id = new.family_id
+  ) then
+    raise exception 'family goal category must belong to the same family';
+  end if;
+
+  return new;
+end;
+$$;
+
+create or replace function public.create_family_goal_category(
+  p_family_id uuid,
+  p_name text,
+  p_color text default '#9eb39f'
+)
+returns public.family_goal_categories
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  created_category public.family_goal_categories;
+begin
+  if auth.uid() is null then
+    raise exception 'Sign in is required';
+  end if;
+
+  if not public.is_family_member(p_family_id) then
+    raise exception 'You must be a family member to edit family categories';
+  end if;
+
+  insert into public.family_goal_categories (family_id, name, color, created_by)
+  values (
+    p_family_id,
+    trim(p_name),
+    case when p_color ~ '^#[0-9A-Fa-f]{6}$' then p_color else '#9eb39f' end,
+    auth.uid()
+  )
+  returning * into created_category;
+
+  return created_category;
+end;
+$$;
+
+create or replace function public.update_family_goal_category(
+  p_category_id uuid,
+  p_name text default null,
+  p_color text default null,
+  p_active boolean default null
+)
+returns public.family_goal_categories
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_family_id uuid;
+  updated_category public.family_goal_categories;
+begin
+  if auth.uid() is null then
+    raise exception 'Sign in is required';
+  end if;
+
+  select family_id
+  into target_family_id
+  from public.family_goal_categories
+  where id = p_category_id;
+
+  if target_family_id is null then
+    raise exception 'Family category not found';
+  end if;
+
+  if not public.is_family_member(target_family_id) then
+    raise exception 'You must be a family member to edit family categories';
+  end if;
+
+  update public.family_goal_categories
+  set
+    name = coalesce(nullif(trim(p_name), ''), name),
+    color = case
+      when p_color ~ '^#[0-9A-Fa-f]{6}$' then p_color
+      else color
+    end,
+    active = coalesce(p_active, active)
+  where id = p_category_id
+  returning * into updated_category;
+
+  return updated_category;
+end;
+$$;
+
+grant execute on function public.create_family_goal_category(uuid, text, text) to authenticated;
+grant execute on function public.update_family_goal_category(uuid, text, text, boolean) to authenticated;
+
+create or replace function public.create_family_goal_category(
+  p_color text,
+  p_family_id uuid,
+  p_name text
+)
+returns public.family_goal_categories
+language sql
+security definer
+set search_path = public
+as $$
+  select public.create_family_goal_category(p_family_id, p_name, p_color);
+$$;
+
+grant execute on function public.create_family_goal_category(text, uuid, text) to authenticated;
+
+drop trigger if exists touch_families_before_update on public.families;
+create trigger touch_families_before_update
+before update on public.families
+for each row execute function public.touch_updated_at();
+
+drop trigger if exists touch_family_invitations_before_update on public.family_invitations;
+create trigger touch_family_invitations_before_update
+before update on public.family_invitations
+for each row execute function public.touch_updated_at();
+
+drop trigger if exists touch_family_goal_categories_before_update on public.family_goal_categories;
+create trigger touch_family_goal_categories_before_update
+before update on public.family_goal_categories
+for each row execute function public.touch_updated_at();
+
+drop trigger if exists touch_family_goals_before_update on public.family_goals;
+create trigger touch_family_goals_before_update
+before update on public.family_goals
+for each row execute function public.touch_updated_at();
+
+drop trigger if exists validate_family_goal_category_before_write on public.family_goals;
+create trigger validate_family_goal_category_before_write
+before insert or update on public.family_goals
+for each row execute function public.validate_family_goal_category();
+
+drop policy if exists "Family members can read families" on public.families;
+create policy "Family members can read families"
+on public.families for select
+using (public.is_family_member(id));
+
+drop policy if exists "Users can create families" on public.families;
+create policy "Users can create families"
+on public.families for insert
+with check (auth.uid() = created_by);
+
+drop policy if exists "Family owners can update families" on public.families;
+create policy "Family owners can update families"
+on public.families for update
+using (public.is_family_owner(id))
+with check (public.is_family_owner(id));
+
+drop policy if exists "Family owners can delete families" on public.families;
+create policy "Family owners can delete families"
+on public.families for delete
+using (public.is_family_owner(id));
+
+drop policy if exists "Family members can read memberships" on public.family_members;
+create policy "Family members can read memberships"
+on public.family_members for select
+using (public.is_family_member(family_id));
+
+drop policy if exists "Owners can add family members" on public.family_members;
+create policy "Owners can add family members"
+on public.family_members for insert
+with check (
+  public.is_family_owner(family_id)
+  or (
+    auth.uid() = user_id
+    and role = 'owner'
+    and public.is_family_creator(family_id)
+  )
+  or (
+    auth.uid() = user_id
+    and role = 'member'
+    and public.has_pending_family_invitation(family_id)
+  )
+);
+
+drop policy if exists "Owners can update family members" on public.family_members;
+create policy "Owners can update family members"
+on public.family_members for update
+using (public.is_family_owner(family_id))
+with check (public.is_family_owner(family_id));
+
+drop policy if exists "Owners and self can leave family" on public.family_members;
+create policy "Owners and self can leave family"
+on public.family_members for delete
+using (public.is_family_owner(family_id) or auth.uid() = user_id);
+
+drop policy if exists "Family members and invitees can read invitations" on public.family_invitations;
+create policy "Family members and invitees can read invitations"
+on public.family_invitations for select
+using (
+  public.is_family_member(family_id)
+  or lower(email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+);
+
+drop policy if exists "Family members can create invitations" on public.family_invitations;
+create policy "Family members can create invitations"
+on public.family_invitations for insert
+with check (public.is_family_member(family_id) and auth.uid() = invited_by);
+
+drop policy if exists "Family members and invitees can update invitations" on public.family_invitations;
+create policy "Family members and invitees can update invitations"
+on public.family_invitations for update
+using (
+  public.is_family_member(family_id)
+  or lower(email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+)
+with check (
+  public.is_family_member(family_id)
+  or lower(email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+);
+
+drop policy if exists "Family members can read goal categories" on public.family_goal_categories;
+create policy "Family members can read goal categories"
+on public.family_goal_categories for select
+using (public.is_family_member(family_id));
+
+drop policy if exists "Family members can create goal categories" on public.family_goal_categories;
+create policy "Family members can create goal categories"
+on public.family_goal_categories for insert
+with check (public.is_family_member(family_id) and (created_by is null or auth.uid() = created_by));
+
+drop policy if exists "Family members can update goal categories" on public.family_goal_categories;
+create policy "Family members can update goal categories"
+on public.family_goal_categories for update
+using (public.is_family_member(family_id))
+with check (public.is_family_member(family_id) and (created_by is null or created_by = auth.uid() or public.is_family_owner(family_id)));
+
+drop policy if exists "Family members can delete goal categories" on public.family_goal_categories;
+create policy "Family members can delete goal categories"
+on public.family_goal_categories for delete
+using (public.is_family_member(family_id));
+
+drop policy if exists "Family members can read family goals" on public.family_goals;
+create policy "Family members can read family goals"
+on public.family_goals for select
+using (public.is_family_member(family_id));
+
+drop policy if exists "Family members can create family goals" on public.family_goals;
+create policy "Family members can create family goals"
+on public.family_goals for insert
+with check (public.is_family_member(family_id) and auth.uid() = created_by);
+
+drop policy if exists "Family members can update family goals" on public.family_goals;
+create policy "Family members can update family goals"
+on public.family_goals for update
+using (public.is_family_member(family_id))
+with check (public.is_family_member(family_id));
+
+drop policy if exists "Family members can delete family goals" on public.family_goals;
+create policy "Family members can delete family goals"
+on public.family_goals for delete
+using (public.is_family_member(family_id));

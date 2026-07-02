@@ -73,8 +73,10 @@ const defaults = {
     personalBlockTheme: "iceland",
     personalBlockTab: "write",
     personalNoteFilter: "all",
+    goalScope: "personal",
     workGoalView: "list",
     workGoalFilter: "current",
+    statsScope: "personal",
     language: "zh",
     focusCategories: defaultFocusCategories,
     habitSeedTypes: defaultHabitSeeds,
@@ -210,6 +212,21 @@ let cloudSnapshot = null;
 let cloudSyncTimer = null;
 let cloudSyncInProgress = false;
 let applyingCloudState = false;
+let familyState = {
+  loading: false,
+  families: [],
+  activeFamilyId: "",
+  members: [],
+  invitations: [],
+  categories: [],
+  goals: [],
+  message: "",
+  error: "",
+  goalMessage: "",
+  categoryMessage: "",
+  categoryError: "",
+};
+let familyGoalCategoryMode = "preset";
 let focusTimer = {
   mode: "focus",
   running: false,
@@ -302,6 +319,8 @@ const copy = {
       eyebrow: "Work Goals",
       title: "工作目标和期限",
       subtitle: "把现在最重要的事情放在这里，完成后打卡并留一句 note。",
+      personalGoalLabel: "个人目标",
+      familyGoalLabel: "家庭目标",
       listLabel: "清单",
       addNewLabel: "新增",
       formTitle: "新增目标",
@@ -347,6 +366,53 @@ const copy = {
       deleteCopy: "删除后，这个 goal 和它的 note 将无法恢复。",
       deleteCancel: "取消",
       deleteConfirm: "删除 goal",
+      familyEyebrow: "Family Room",
+      familyTitle: "家庭共享",
+      familyCopy: "为共享目标准备一个安静的家庭空间。个人记录仍然默认私密。",
+      familySignedOut: "登录后可以创建或加入家庭。",
+      familyNoFamily: "还没有家庭空间。可以先创建一个，或输入邀请 token 加入。",
+      familyLoading: "正在读取家庭空间...",
+      familyReady: "家庭空间已准备好。",
+      familyError: "家庭空间暂时无法加载。",
+      familyRefresh: "刷新",
+      familyNameLabel: "家庭名称",
+      familyNamePlaceholder: "例如：小白猫的家",
+      familyCreate: "创建家庭",
+      familyTokenLabel: "邀请 token",
+      familyTokenPlaceholder: "粘贴邀请 token",
+      familyAccept: "接受邀请",
+      familyCurrent: "当前家庭",
+      familyMembers: "{count} 位成员",
+      familyLeave: "离开",
+      familyInviteLabel: "通过邮箱邀请",
+      familyInvitePlaceholder: "family@example.com",
+      familyInvite: "创建邀请",
+      familyInviteCreated: "邀请已创建。把 token 发给对方即可加入。",
+      familyInviteEmpty: "还没有待处理邀请。",
+      familyOwner: "Owner",
+      familyMember: "Member",
+      familyTokenPrefix: "Token",
+      familyGoalsEyebrow: "Shared Goals",
+      familyGoalsTitle: "家庭目标",
+      familyGoalSummary: "{open} open · {done} completed",
+      familyGoalTitleLabel: "目标",
+      familyGoalTitlePlaceholder: "例如：一起散步 20 分钟",
+      familyGoalCategoryLabel: "家庭分类",
+      familyGoalCategoryPlaceholder: "家务 / 健康 / 一起完成",
+      familyGoalUrgencyLabel: "紧急程度",
+      familyGoalDeadlineLabel: "Deadline",
+      familyGoalAdd: "添加家庭目标",
+      familyGoalEmpty: "还没有家庭目标。先添加一个轻量共享目标就好。",
+      familyGoalAdded: "家庭目标已添加。",
+      familyGoalCompleted: "家庭目标已完成。",
+      familyGoalDeleted: "家庭目标已删除。",
+      familyCompletionNote: "完成 note",
+      familyCompletionPlaceholder: "可以简单写一句完成情况。",
+      familyUrgency: {
+        low: "低",
+        normal: "普通",
+        high: "紧急",
+      },
     },
     personalization: {
       title: "个性化设置",
@@ -541,6 +607,12 @@ const copy = {
     stats: {
       eyebrow: "Patterns",
       title: "从记录里看见自己的节奏",
+      personalStatsLabel: "个人统计",
+      familyStatsLabel: "家庭统计",
+      familyStatsEyebrow: "Family Stats",
+      familyStatsTitle: "家庭统计",
+      familyStatsSubtitle: "家庭目标、共享习惯和授权后的健康数据会放在这里。",
+      familyStatsEmpty: "家庭统计会在家庭目标稳定后接入。",
       export: "导出数据",
       hungerTitle: "近 7 天饥饿值",
       hungerSub: "晨间记录",
@@ -617,6 +689,8 @@ const copy = {
       eyebrow: "Work Goals",
       title: "Work Goals and Deadlines",
       subtitle: "Keep the most important work in one calm place. Check it off and leave a note when it is done.",
+      personalGoalLabel: "Personal Goal",
+      familyGoalLabel: "Family Goal",
       listLabel: "List",
       addNewLabel: "Add New",
       formTitle: "New goal",
@@ -662,6 +736,53 @@ const copy = {
       deleteCopy: "This goal and its note cannot be restored after deletion.",
       deleteCancel: "Cancel",
       deleteConfirm: "Delete goal",
+      familyEyebrow: "Family Room",
+      familyTitle: "Family sharing",
+      familyCopy: "Prepare a calm shared space for family goals. Personal records stay private by default.",
+      familySignedOut: "Sign in to create or join a family.",
+      familyNoFamily: "No family space yet. Create one, or paste an invitation token to join.",
+      familyLoading: "Loading family space...",
+      familyReady: "Family space is ready.",
+      familyError: "Family space could not load.",
+      familyRefresh: "Refresh",
+      familyNameLabel: "Family name",
+      familyNamePlaceholder: "For example: Little White Cat Home",
+      familyCreate: "Create family",
+      familyTokenLabel: "Invitation token",
+      familyTokenPlaceholder: "Paste invitation token",
+      familyAccept: "Accept invitation",
+      familyCurrent: "Current family",
+      familyMembers: "{count} members",
+      familyLeave: "Leave",
+      familyInviteLabel: "Invite by email",
+      familyInvitePlaceholder: "family@example.com",
+      familyInvite: "Create invitation",
+      familyInviteCreated: "Invitation created. Share the token with them to join.",
+      familyInviteEmpty: "No pending invitations yet.",
+      familyOwner: "Owner",
+      familyMember: "Member",
+      familyTokenPrefix: "Token",
+      familyGoalsEyebrow: "Shared Goals",
+      familyGoalsTitle: "Family goals",
+      familyGoalSummary: "{open} open · {done} completed",
+      familyGoalTitleLabel: "Goal",
+      familyGoalTitlePlaceholder: "For example: take a 20-minute walk together",
+      familyGoalCategoryLabel: "Family category",
+      familyGoalCategoryPlaceholder: "Home / Health / Together",
+      familyGoalUrgencyLabel: "Urgency",
+      familyGoalDeadlineLabel: "Deadline",
+      familyGoalAdd: "Add family goal",
+      familyGoalEmpty: "No family goals yet. Add one light shared goal first.",
+      familyGoalAdded: "Family goal added.",
+      familyGoalCompleted: "Family goal completed.",
+      familyGoalDeleted: "Family goal deleted.",
+      familyCompletionNote: "Completion note",
+      familyCompletionPlaceholder: "Add a short note about how it went.",
+      familyUrgency: {
+        low: "Low",
+        normal: "Normal",
+        high: "High",
+      },
     },
     personalization: {
       title: "Personalization",
@@ -670,13 +791,22 @@ const copy = {
       seedTab: "Habit Seeds",
       quotesTab: "Self-care Quotes",
       calendarTab: "Calendar",
+      familyCategoryTab: "Family Categories",
       custom: "+ Customize",
+      familySettings: "Family category settings",
       customizeQuotes: "+ Customize quotes",
       customizeCalendar: "Customize calendar",
       add: "Add",
+      addFamilyCategory: "Add family category",
       addQuote: "Add quote",
       focusPlaceholder: "New category",
       seedPlaceholder: "New Habit Seed",
+      familyCategoryPlaceholder: "New family category",
+      familyCategorySignedOut: "Sign in first, then you can customize family goal categories.",
+      familyCategoryNoFamily: "Join or create a family before customizing family categories.",
+      familyCategoryReady: "These categories only apply to the current family room.",
+      familyCategoryAdded: "Family category added.",
+      familyCategorySaved: "Family category saved.",
       quoteLabel: "Quote",
       quotePlaceholder: "Write something you would like to read in the morning",
       active: "Active",
@@ -856,6 +986,12 @@ const copy = {
     stats: {
       eyebrow: "Patterns",
       title: "See Your Rhythm Through Records",
+      personalStatsLabel: "Personal Stats",
+      familyStatsLabel: "Family Stats",
+      familyStatsEyebrow: "Family Stats",
+      familyStatsTitle: "Family Stats",
+      familyStatsSubtitle: "Family goals, shared habits, and approved health data will live here.",
+      familyStatsEmpty: "Family stats will connect after family goals are stable.",
       export: "Export data",
       hungerTitle: "Hunger Level: Last 7 Days",
       hungerSub: "Morning records",
@@ -1035,6 +1171,7 @@ const morningCheckInSteps = [
   },
 ];
 
+let canonicalMorningQuotes = [...defaultMorningQuotes];
 let morningQuotePool = [...defaultMorningQuotes];
 let morningSteps = [...pickMorningQuotes(), ...morningCheckInSteps];
 
@@ -1042,15 +1179,10 @@ const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 
 function loadState() {
-  const saved = localStorage.getItem(STORE_KEY);
-  if (!saved) return cloneDefaults();
+  const parsed = window.MyCare.storage.readJson(STORE_KEY);
+  if (!parsed) return cloneDefaults();
   try {
-    const parsed = JSON.parse(saved);
-    const loaded = {
-      ...cloneDefaults(),
-      ...parsed,
-      settings: { ...cloneDefaults().settings, ...(parsed.settings || {}) },
-    };
+    const loaded = window.MyCare.storage.mergeState(defaults, parsed);
     loaded.settings.nightMusicPlaylists = migrateNightMusicPlaylists(parsed.settings?.nightMusicPlaylists);
     normalizePersonalizationSettings(loaded.settings);
     if (!loaded.settings.nightMusicPlaylists[loaded.settings.nightMusicTheme]) {
@@ -1065,7 +1197,7 @@ function loadState() {
         loaded[key] = [];
       });
       loaded.settings.recordDataResetVersion = RECORD_DATA_RESET_VERSION;
-      localStorage.setItem(STORE_KEY, JSON.stringify(loaded));
+      persistState(loaded);
     }
     return loaded;
   } catch {
@@ -1136,14 +1268,18 @@ function normalizeQuoteDefinitions(saved) {
 }
 
 function cloneDefaults() {
-  return JSON.parse(JSON.stringify(defaults));
+  return window.MyCare.storage.clone(defaults);
+}
+
+function persistState(payload = state) {
+  window.MyCare.storage.writeJson(STORE_KEY, payload);
 }
 
 function saveState({ skipCloud = false, preserveTimestamp = false } = {}) {
   if (!preserveTimestamp) {
     state.settings.lastLocalChangeAt = new Date().toISOString();
   }
-  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  persistState();
   refreshDashboard();
   if (!skipCloud && !applyingCloudState) queueCloudSync();
 }
@@ -1165,6 +1301,7 @@ function init() {
   bindHabitGarden();
   bindLowEnergyMode();
   bindWorkGoals();
+  bindFamilyRoom();
   bindStats();
   bindTimerAccuracy();
   bindAccount();
@@ -1197,6 +1334,7 @@ function bindAccount() {
 
 function bindPersonalization() {
   $("#globalSettingsToggle")?.addEventListener("click", () => openPersonalization("focus"));
+  $("#familySettingsToggle")?.addEventListener("click", () => openPersonalization("family-category"));
   $("#morningQuoteCustomize")?.addEventListener("click", () => openPersonalization("quotes"));
   $("#personalizationLanguageToggle")?.addEventListener("click", toggleLanguage);
   $$("[data-settings-section]").forEach((button) => {
@@ -1207,10 +1345,16 @@ function bindPersonalization() {
   });
   $("#addFocusCategory")?.addEventListener("click", () => addPersonalizationItem("focus"));
   $("#addHabitSeed")?.addEventListener("click", () => addPersonalizationItem("seed"));
+  $("#addFamilyCategory")?.addEventListener("click", addFamilyCategory);
   $("#addSelfCareQuote")?.addEventListener("click", addSelfCareQuote);
   $("#personalizationDialog")?.addEventListener("input", handlePersonalizationEdit);
   $("#personalizationDialog")?.addEventListener("change", handlePersonalizationEdit);
   $("#personalizationDialog")?.addEventListener("click", handleColorPicker);
+  $("#familyCategorySettingsState")?.addEventListener("click", (event) => {
+    if (!event.target.closest("#familyCategorySignIn")) return;
+    $("#personalizationDialog")?.close();
+    $("#accountDialog")?.showModal();
+  });
   $("#personalizationDialog")?.addEventListener("close", closeColorPalettes);
   $(".personalization-card")?.addEventListener("scroll", closeColorPalettes, { passive: true });
   window.addEventListener("resize", closeColorPalettes);
@@ -1220,11 +1364,12 @@ function openPersonalization(section = "focus") {
   selectPersonalizationTab(section);
   renderPersonalizationSettings();
   $("#personalizationDialog")?.showModal();
+  if (section === "family-category") refreshFamilyCategorySettings();
 }
 
 function selectPersonalizationTab(section) {
   closeColorPalettes();
-  const selected = ["focus", "seed", "quotes", "calendar"].includes(section) ? section : "focus";
+  const selected = ["focus", "seed", "quotes", "calendar", "family-category"].includes(section) ? section : "focus";
   $$(".personalization-tab").forEach((button) => {
     const active = button.dataset.personalizationTab === selected;
     button.classList.toggle("active", active);
@@ -1233,19 +1378,15 @@ function selectPersonalizationTab(section) {
   $$(".personalization-section").forEach((panel) => {
     panel.classList.toggle("active", panel.dataset.personalizationSection === selected);
   });
-  if ($("#personalizationNote")) {
-    $("#personalizationNote").textContent = selected === "quotes"
-      ? t().personalization.quoteNote
-      : selected === "calendar"
-        ? t().personalization.calendarNote
-        : t().personalization.note;
-  }
+  updatePersonalizationNote(selected);
 }
 
 function renderPersonalizationLanguage() {
   const text = t().personalization;
   $("#globalSettingsToggle")?.setAttribute("aria-label", text.settings);
   $("#globalSettingsToggle")?.setAttribute("title", text.settings);
+  $("#familySettingsToggle")?.setAttribute("aria-label", personalizationText("familySettings", "家庭分类设置", "Family category settings"));
+  $("#familySettingsToggle")?.setAttribute("title", personalizationText("familySettings", "家庭分类设置", "Family category settings"));
   $(".personalization-close")?.setAttribute("aria-label", getLanguage() === "zh" ? "关闭" : "Close");
   $(".personalization-tabs")?.setAttribute("aria-label", text.settings);
   $("#personalizationTitle").textContent = text.title;
@@ -1254,14 +1395,17 @@ function renderPersonalizationLanguage() {
   $(".personalization-tab[data-personalization-tab='seed']").textContent = text.seedTab;
   $(".personalization-tab[data-personalization-tab='quotes']").textContent = text.quotesTab;
   $(".personalization-tab[data-personalization-tab='calendar']").textContent = text.calendarTab;
+  $(".personalization-tab[data-personalization-tab='family-category']").textContent = personalizationText("familyCategoryTab", "家庭分类", "Family Categories");
   $("#morningQuoteCustomize").textContent = text.customizeQuotes;
   $("#morningCalendarCustomize b").textContent = text.customizeCalendar;
   $("#newFocusCategoryName").placeholder = text.focusPlaceholder;
   $("#newHabitSeedName").placeholder = text.seedPlaceholder;
+  $("#newFamilyCategoryName").placeholder = personalizationText("familyCategoryPlaceholder", "新的家庭分类", "New family category");
   $("#newQuoteLabel").textContent = text.quoteLabel;
   $("#newSelfCareQuote").placeholder = text.quotePlaceholder;
   $("#addFocusCategory").textContent = text.add;
   $("#addHabitSeed").textContent = text.add;
+  $("#addFamilyCategory").textContent = personalizationText("addFamilyCategory", "添加家庭分类", "Add family category");
   $("#addSelfCareQuote").textContent = text.addQuote;
   $("#calendarSettingsEyebrow").textContent = text.calendarEyebrow;
   $("#calendarSettingsTitle").textContent = text.calendarTitle;
@@ -1278,14 +1422,33 @@ function renderPersonalizationLanguage() {
 function renderPersonalizationSettings() {
   renderDefinitionSettings($("#focusCategorySettingsList"), getFocusCategories(), "focus");
   renderDefinitionSettings($("#habitSeedSettingsList"), getHabitSeedTypes(), "seed");
+  renderFamilyCategorySettings();
   renderColorPalettes();
   renderSelfCareQuoteSettings();
   const selectedSection = $(".personalization-section.active")?.dataset.personalizationSection;
-  $("#personalizationNote").textContent = selectedSection === "quotes"
-    ? t().personalization.quoteNote
-    : selectedSection === "calendar"
-      ? t().personalization.calendarNote
-      : t().personalization.note;
+  updatePersonalizationNote(selectedSection);
+}
+
+function updatePersonalizationNote(section) {
+  const target = $("#personalizationNote");
+  if (!target) return;
+  if (section === "quotes") {
+    target.textContent = t().personalization.quoteNote;
+    return;
+  }
+  if (section === "calendar") {
+    target.textContent = t().personalization.calendarNote;
+    return;
+  }
+  if (section === "family-category") {
+    target.textContent = personalizationText(
+      "familyCategoryReady",
+      "这些分类只会用于当前家庭的共享目标。",
+      "These categories only apply to the current family room.",
+    );
+    return;
+  }
+  target.textContent = t().personalization.note;
 }
 
 function renderDefinitionSettings(container, items, type) {
@@ -1392,6 +1555,24 @@ function handleColorPicker(event) {
 
   const row = picker.closest("[data-definition-id]");
   if (!row) return;
+  if (row.dataset.definitionType === "family-category") {
+    const category = familyState.categories.find((entry) => entry.id === row.dataset.definitionId);
+    if (!category) return;
+    category.color = color;
+    renderFamilyGoalControls();
+    window.MyCare.family.updateFamilyGoalCategory(supabaseClient, category.id, { color })
+      .then((updated) => {
+        familyState.categories = familyState.categories.map((item) => item.id === updated.id ? updated : item);
+        familyState.categoryMessage = personalizationText("familyCategorySaved", "家庭分类已保存。", "Family category saved.");
+        renderPersonalizationSettings();
+        renderFamilyGoalControls();
+      })
+      .catch((error) => {
+        familyState.categoryError = error?.message || "Family category could not be saved.";
+        renderPersonalizationSettings();
+      });
+    return;
+  }
   const list = row.dataset.definitionType === "focus" ? getFocusCategories() : getHabitSeedTypes();
   const item = list.find((entry) => entry.id === row.dataset.definitionId);
   if (!item) return;
@@ -1469,6 +1650,56 @@ function addPersonalizationItem(type) {
   renderHabitGarden();
 }
 
+async function refreshFamilyCategorySettings() {
+  if (!supabaseClient || !currentUser) {
+    renderPersonalizationSettings();
+    return;
+  }
+  if (!getActiveFamily()) {
+    await loadFamilyRoom({ keepMessage: true });
+    renderPersonalizationSettings();
+  } else {
+    const family = getActiveFamily();
+    familyState.categories = await loadFamilyGoalCategoriesSafely(family.id);
+    renderPersonalizationSettings();
+    renderFamilyGoalControls();
+  }
+}
+
+async function addFamilyCategory() {
+  const family = getActiveFamily();
+  if (!supabaseClient || !currentUser || !family) {
+    renderFamilyCategorySettings();
+    return;
+  }
+  const input = $("#newFamilyCategoryName");
+  const colorInput = $("#newFamilyCategoryColor");
+  const name = input?.value.trim();
+  if (!name) {
+    input?.focus();
+    return;
+  }
+  try {
+    familyState.categoryError = "";
+    const created = await window.MyCare.family.createFamilyGoalCategory(supabaseClient, currentUser, {
+      familyId: family.id,
+      name,
+      color: colorInput?.value || "#8baa97",
+    });
+    familyState.categories = [
+      ...familyState.categories.filter((category) => category.id !== created.id),
+      created,
+    ].sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    input.value = "";
+    familyState.categoryMessage = personalizationText("familyCategoryAdded", "家庭分类已添加。", "Family category added.");
+    renderPersonalizationSettings();
+    renderFamilyGoalControls();
+  } catch (error) {
+    familyState.categoryError = error?.message || "Family category could not be saved.";
+    renderPersonalizationSettings();
+  }
+}
+
 function createDefinitionId(name, list) {
   const base = name.toLowerCase()
     .normalize("NFKD")
@@ -1483,7 +1714,41 @@ function createDefinitionId(name, list) {
   return id;
 }
 
-function handlePersonalizationEdit(event) {
+async function handleFamilyCategoryEdit(event, row) {
+  const category = familyState.categories.find((entry) => entry.id === row.dataset.definitionId);
+  if (!category) return;
+  const updates = {};
+  if (event.target.classList.contains("personalization-name")) {
+    const name = event.target.value.trim();
+    if (!name) return;
+    category.name = name;
+    if (event.type !== "change") return;
+    updates.name = name;
+  }
+  if (event.target.classList.contains("personalization-color")) {
+    category.color = event.target.value;
+    updates.color = event.target.value;
+  }
+  if (event.target.classList.contains("personalization-active")) {
+    category.active = event.target.checked;
+    updates.active = event.target.checked;
+  }
+  if (!Object.keys(updates).length) return;
+  renderFamilyGoalControls();
+  try {
+    familyState.categoryError = "";
+    const updated = await window.MyCare.family.updateFamilyGoalCategory(supabaseClient, category.id, updates);
+    familyState.categories = familyState.categories.map((item) => item.id === updated.id ? updated : item);
+    familyState.categoryMessage = personalizationText("familyCategorySaved", "家庭分类已保存。", "Family category saved.");
+    renderPersonalizationSettings();
+    renderFamilyGoalControls();
+  } catch (error) {
+    familyState.categoryError = error?.message || "Family category could not be saved.";
+    renderPersonalizationSettings();
+  }
+}
+
+async function handlePersonalizationEdit(event) {
   const quoteRow = event.target.closest("[data-quote-id]");
   if (quoteRow) {
     if (event.type !== "change") return;
@@ -1513,6 +1778,10 @@ function handlePersonalizationEdit(event) {
   }
   const row = event.target.closest("[data-definition-id]");
   if (!row) return;
+  if (row.dataset.definitionType === "family-category") {
+    await handleFamilyCategoryEdit(event, row);
+    return;
+  }
   const list = row.dataset.definitionType === "focus" ? getFocusCategories() : getHabitSeedTypes();
   const item = list.find((entry) => entry.id === row.dataset.definitionId);
   if (!item) return;
@@ -1566,6 +1835,7 @@ async function initSupabase() {
   if (currentUser) {
     await reconcileCloudState();
     await loadCloudHistory();
+    await loadFamilyRoom();
   }
 
   supabaseClient.auth.onAuthStateChange((event, session) => {
@@ -1575,7 +1845,11 @@ async function initSupabase() {
       window.setTimeout(async () => {
         await reconcileCloudState();
         await loadCloudHistory();
+        await loadFamilyRoom();
       }, 0);
+    } else if (!currentUser) {
+      resetFamilyState();
+      renderFamilyRoom();
     }
   });
 }
@@ -1615,8 +1889,10 @@ async function signOut() {
   currentUser = null;
   cloudRevision = 0;
   cloudSnapshot = null;
+  resetFamilyState();
   setAccountMessage(getLanguage() === "zh" ? "已退出。数据仍保存在此设备。" : "Signed out. Your data remains on this device.");
   renderAccountUI();
+  renderFamilyRoom();
 }
 
 function queueCloudSync() {
@@ -1751,7 +2027,7 @@ async function syncToCloud({ announce = false, force = false } = {}) {
   cloudRevision = Number(data.revision || cloudRevision);
   cloudSnapshot = null;
   state.settings.lastCloudSyncAt = data.updated_at;
-  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  persistState();
   setAccountMessage(getLanguage() === "zh" ? "已安全同步到云端。" : "Safely synced to the cloud.");
   renderAccountUI("synced");
   loadCloudHistory();
@@ -1781,11 +2057,14 @@ function applyCloudState(snapshot) {
   };
   state.settings.nightMusicPlaylists = migrateNightMusicPlaylists(payload.settings?.nightMusicPlaylists);
   normalizePersonalizationSettings(state.settings);
+  syncBuiltInSelfCareQuotes(canonicalMorningQuotes);
+  morningQuotePool = getActiveSelfCareQuotes();
+  resetMorningSteps();
   state.settings.lastCloudSyncAt = snapshot.updated_at || new Date().toISOString();
   state.settings.lastLocalChangeAt = state.settings.lastCloudSyncAt;
   cloudRevision = Number(snapshot.revision || cloudRevision);
   cloudSnapshot = null;
-  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  persistState();
   applyingCloudState = false;
   renderLanguage();
   refreshDashboard();
@@ -1942,7 +2221,7 @@ async function restoreCloudHistory(historyId) {
   downloadStateBackup(state, "before-restore");
   applyCloudState({ payload: data.payload, revision: data.revision, updated_at: data.saved_at });
   state.settings.lastLocalChangeAt = new Date().toISOString();
-  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  persistState();
   await syncToCloud({ announce: true, force: true });
 }
 
@@ -1969,10 +2248,12 @@ async function loadMorningQuotes() {
     const quotes = await response.json();
     const normalized = normalizeMorningQuotes(quotes);
     if (!normalized.length) throw new Error("quotes file is empty");
+    canonicalMorningQuotes = normalized;
     syncBuiltInSelfCareQuotes(normalized);
     morningQuotePool = getActiveSelfCareQuotes();
     resetMorningSteps();
   } catch {
+    canonicalMorningQuotes = [...defaultMorningQuotes];
     syncBuiltInSelfCareQuotes(defaultMorningQuotes);
     morningQuotePool = getActiveSelfCareQuotes();
     resetMorningSteps();
@@ -1990,20 +2271,40 @@ function syncBuiltInSelfCareQuotes(quotes) {
     const id = `quote-${index + 1}`;
     const saved = currentBuiltIns.get(id);
     const savedText = String(saved?.text || "").trim();
+    const savedZh = String(saved?.zh || "").trim();
+    const savedEn = String(saved?.en || "").trim();
     const hasCustomSingleText = savedText
       && savedText !== quote.prompt
       && savedText !== quote.promptEn;
+    const keepSingleZh = hasCustomSingleText && shouldKeepSavedQuote(savedText, quote.prompt, quote.promptEn, "zh");
+    const keepSingleEn = hasCustomSingleText && shouldKeepSavedQuote(savedText, quote.promptEn, quote.prompt, "en");
     return {
       id,
       text: "",
-      zh: saved?.zh || (hasCustomSingleText ? savedText : quote.prompt),
-      en: saved?.en || (hasCustomSingleText ? savedText : quote.promptEn),
+      zh: shouldKeepSavedQuote(savedZh, quote.prompt, quote.promptEn, "zh")
+        ? savedZh
+        : (keepSingleZh ? savedText : quote.prompt),
+      en: shouldKeepSavedQuote(savedEn, quote.promptEn, quote.prompt, "en")
+        ? savedEn
+        : (keepSingleEn ? savedText : quote.promptEn),
       active: saved?.active !== false,
       builtIn: true,
     };
   });
   state.settings.selfCareQuotes = [...builtInQuotes, ...customQuotes];
-  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  persistState();
+}
+
+function shouldKeepSavedQuote(value, canonical, alternate, language = "") {
+  return window.MyCare.language.shouldKeepSavedQuote(value, canonical, alternate, language);
+}
+
+function looksLikeMojibake(value = "") {
+  return window.MyCare.language.looksLikeMojibake(value);
+}
+
+function isQuoteLanguageCompatible(value = "", language = "") {
+  return window.MyCare.language.isQuoteLanguageCompatible(value, language);
 }
 
 function getActiveSelfCareQuotes() {
@@ -2067,7 +2368,7 @@ function pickMorningQuotes() {
   }
   return selected.map((quote, index) => ({
     ...quote,
-    label: `今日短句 ${index + 1}`,
+    label: getLanguage() === "zh" ? `今日短句 ${index + 1}` : `Quote ${index + 1}`,
   }));
 }
 
@@ -2108,6 +2409,10 @@ function t() {
   return copy[getLanguage()];
 }
 
+function personalizationText(key, zhFallback, enFallback = zhFallback) {
+  return t().personalization?.[key] || (getLanguage() === "zh" ? zhFallback : enFallback);
+}
+
 function interpolate(template, values) {
   return Object.entries(values).reduce((result, [key, value]) => result.replaceAll(`{${key}}`, value), template);
 }
@@ -2119,7 +2424,9 @@ function displayFocusCategory(category) {
 }
 
 function getDefinitionLabel(definition) {
-  return getLanguage() === "zh" ? definition.labelZh : definition.labelEn;
+  return getLanguage() === "zh"
+    ? (definition.labelZh || definition.name || definition.labelEn || "")
+    : (definition.labelEn || definition.name || definition.labelZh || "");
 }
 
 function getFocusCategories({ includeInactive = true } = {}) {
@@ -2425,6 +2732,8 @@ function renderWorkLanguage() {
   $("#view-work .section-head .eyebrow").textContent = text.eyebrow;
   $("#workTitle").textContent = text.title;
   $("#view-work .section-head .muted").textContent = text.subtitle;
+  $(".goal-scope-option[data-goal-scope='personal']").textContent = text.personalGoalLabel;
+  $(".goal-scope-option[data-goal-scope='family']").textContent = text.familyGoalLabel;
   $(".work-view-option[data-work-view='list']").textContent = text.listLabel;
   $(".work-view-option[data-work-view='add']").textContent = text.addNewLabel;
   $("#workGoalForm .panel-title h3").textContent = text.formTitle;
@@ -2449,6 +2758,8 @@ function renderWorkLanguage() {
   $("#workDeleteCopy").textContent = text.deleteCopy;
   $("#workDeleteCancel").textContent = text.deleteCancel;
   $("#workDeleteConfirm").textContent = text.deleteConfirm;
+  renderFamilyRoomLanguage();
+  renderGoalScope();
   renderWorkDeadlinePicker();
   renderWorkGoalView();
   renderWorkGoals();
@@ -2460,6 +2771,12 @@ function renderStatsLanguage() {
   $("#view-stats .section-head .eyebrow").textContent = text.eyebrow;
   $("#statsTitle").textContent = zh ? "看见自己的节奏" : "See Your Rhythm";
   $("#statsSubtitle").textContent = zh ? "只看趋势，不评价每一天。" : "Notice the patterns without judging each day.";
+  $(".stats-scope-option[data-stats-scope='personal']").textContent = text.personalStatsLabel;
+  $(".stats-scope-option[data-stats-scope='family']").textContent = text.familyStatsLabel;
+  $("#familyStatsEyebrow").textContent = text.familyStatsEyebrow;
+  $("#familyStatsTitle").textContent = text.familyStatsTitle;
+  $("#familyStatsSubtitle").textContent = text.familyStatsSubtitle;
+  $("#familyStatsEmpty").textContent = text.familyStatsEmpty;
   $("#exportData").setAttribute("aria-label", text.export);
   $("#exportData").setAttribute("title", text.export);
   const labels = {
@@ -2490,6 +2807,14 @@ function renderStatsLanguage() {
     seedTimelineTitle: zh ? "最近照顾时间线" : "Recent care timeline",
     seedTimelineMeta: zh ? "记录出现的位置，而不是连续天数" : "Presence over streaks",
   };
+  Object.assign(labels, {
+    familyGoalStatusTitle: zh ? "家庭目标状态" : "Family goal status",
+    familyGoalStatusMeta: zh ? "共享目标的进行与完成情况" : "Open and completed shared goals",
+    familyGoalCategoryTitle: zh ? "家庭分类" : "Family categories",
+    familyGoalCategoryMeta: zh ? "按家庭分类查看共享目标" : "Shared goals by category",
+    familyGoalUrgencyTitle: zh ? "紧急程度" : "Urgency",
+    familyGoalUrgencyMeta: zh ? "低、普通、紧急的分布" : "Low, normal, and high urgency",
+  });
   Object.entries(labels).forEach(([id, label]) => {
     const target = $(`#${id}`);
     if (target) target.textContent = label;
@@ -2498,6 +2823,7 @@ function renderStatsLanguage() {
     const range = button.dataset.statsRange;
     button.textContent = range === "all" ? (zh ? "全部" : "All") : `${range} ${zh ? "天" : "days"}`;
   });
+  renderStatsScope();
   if ($("#view-stats").classList.contains("active")) drawCharts();
 }
 
@@ -2515,6 +2841,44 @@ function renderTodayPanelLabels() {
   });
 }
 
+function renderGoalScope() {
+  const scope = state.settings.goalScope === "family" ? "family" : "personal";
+  $$(".goal-scope-option").forEach((button) => {
+    const isActive = button.dataset.goalScope === scope;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-selected", String(isActive));
+  });
+  $$("[data-goal-scope-panel]").forEach((panel) => {
+    panel.classList.toggle("active", panel.dataset.goalScopePanel === scope);
+  });
+  if (scope === "family") {
+    renderFamilyRoom();
+    if ($("#view-work")?.classList.contains("active")) loadFamilyRoom();
+  }
+}
+
+function renderStatsScope() {
+  const scope = state.settings.statsScope === "family" ? "family" : "personal";
+  $$(".stats-scope-option").forEach((button) => {
+    const isActive = button.dataset.statsScope === scope;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-selected", String(isActive));
+  });
+  $$("[data-stats-scope-panel]").forEach((panel) => {
+    panel.classList.toggle("active", panel.dataset.statsScopePanel === scope);
+  });
+  if (scope === "family") refreshFamilyStatsData();
+}
+
+async function refreshFamilyStatsData() {
+  if (!supabaseClient || !currentUser) {
+    renderFamilyStats(getStatsDays());
+    return;
+  }
+  await loadFamilyRoom({ keepMessage: true });
+  renderFamilyStats(getStatsDays());
+}
+
 function showView(viewName) {
   $$(".nav-tab").forEach((item) => item.classList.toggle("active", item.dataset.view === viewName));
   const isSelfCareView = viewName === "morning" || viewName === "night";
@@ -2530,9 +2894,15 @@ function showView(viewName) {
   if (viewName !== "morning") stopMorningBackgroundTrack();
   if (viewName === "block") renderPersonalBlock();
   if (viewName === "habits") renderHabitGarden();
-  if (viewName === "work") renderWorkGoals();
+  if (viewName === "work") {
+    renderGoalScope();
+    renderWorkGoals();
+  }
   if (viewName !== "block") $("#backgroundCredit").textContent = currentBackgroundCredit;
-  if (viewName === "stats") drawCharts();
+  if (viewName === "stats") {
+    renderStatsScope();
+    drawCharts();
+  }
 }
 
 function setImmersiveMode(viewName) {
@@ -2743,12 +3113,13 @@ function renderMorningPrompt() {
 
 function getLocalizedMorningStep(step) {
   if (!step?.field) {
+    const zh = getLanguage() === "zh";
     return {
       ...step,
-      label: getLanguage() === "zh"
+      label: zh
         ? (morningIndex === 0 ? "先读一句" : "再读一句")
         : (morningIndex === 0 ? "Read one line" : "Read another line"),
-      prompt: step.prompt,
+      prompt: zh ? (step.prompt || step.promptEn) : (step.promptEn || step.prompt),
       hint: "",
     };
   }
@@ -3705,9 +4076,493 @@ function getLegacyHabitSeedKey(entry) {
   return "health";
 }
 
+function resetFamilyState() {
+  familyState = {
+    loading: false,
+    families: [],
+    activeFamilyId: "",
+    members: [],
+    invitations: [],
+    categories: [],
+    goals: [],
+    message: "",
+    error: "",
+    goalMessage: "",
+    categoryMessage: "",
+    categoryError: "",
+  };
+}
+
+function getActiveFamily() {
+  return familyState.families.find((family) => family.id === familyState.activeFamilyId) || familyState.families[0] || null;
+}
+
+function bindFamilyRoom() {
+  if (!$("#familyRoomPanel")) return;
+  $("#refreshFamilyRoom")?.addEventListener("click", () => loadFamilyRoom({ announce: true }));
+  $("#createFamilyForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!supabaseClient || !currentUser) {
+      familyState.error = t().work.familySignedOut;
+      renderFamilyRoom();
+      return;
+    }
+    const name = $("#familyNameInput").value.trim();
+    if (!name) {
+      $("#familyNameInput").focus();
+      return;
+    }
+    await runFamilyAction(async () => {
+      const result = await window.MyCare.family.createFamily(supabaseClient, currentUser, name);
+      familyState.activeFamilyId = result.family.id;
+      $("#familyNameInput").value = "";
+      familyState.message = t().work.familyReady;
+      await loadFamilyRoom({ keepMessage: true });
+    });
+  });
+  $("#acceptInvitationForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!supabaseClient || !currentUser) {
+      familyState.error = t().work.familySignedOut;
+      renderFamilyRoom();
+      return;
+    }
+    const token = $("#familyInvitationToken").value.trim();
+    if (!token) {
+      $("#familyInvitationToken").focus();
+      return;
+    }
+    await runFamilyAction(async () => {
+      const result = await window.MyCare.family.acceptInvitation(supabaseClient, currentUser, token);
+      familyState.activeFamilyId = result.membership.familyId;
+      $("#familyInvitationToken").value = "";
+      familyState.message = t().work.familyReady;
+      await loadFamilyRoom({ keepMessage: true });
+    });
+  });
+  $("#familyInviteForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const family = getActiveFamily();
+    if (!family) return;
+    const email = $("#familyInviteEmail").value.trim();
+    if (!email) {
+      $("#familyInviteEmail").focus();
+      return;
+    }
+    await runFamilyAction(async () => {
+      const invitation = await window.MyCare.family.createInvitation(supabaseClient, currentUser, {
+        familyId: family.id,
+        email,
+      });
+      $("#familyInviteEmail").value = "";
+      familyState.message = `${t().work.familyInviteCreated} ${t().work.familyTokenPrefix}: ${invitation.token}`;
+      await loadFamilyRoom({ keepMessage: true });
+    });
+  });
+  $("#leaveFamilyButton")?.addEventListener("click", async () => {
+    const family = getActiveFamily();
+    if (!family) return;
+    await runFamilyAction(async () => {
+      await window.MyCare.family.leaveFamily(supabaseClient, currentUser, family.id);
+      familyState.activeFamilyId = "";
+      familyState.message = "";
+      await loadFamilyRoom();
+    });
+  });
+  $("#familyGoalCategoryPicker")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-family-goal-category]");
+    if (!button) return;
+    const value = button.dataset.familyGoalCategory;
+    if (value === "__custom") {
+      familyGoalCategoryMode = "custom";
+      $("#familyGoalCategoryInput").value = "";
+      renderFamilyGoalCategoryPicker();
+      requestAnimationFrame(() => $("#familyGoalCategoryCustomInput")?.focus());
+      return;
+    } else {
+      familyGoalCategoryMode = "preset";
+      $("#familyGoalCategoryInput").value = value;
+      $("#familyGoalCategoryCustomInput").value = "";
+    }
+    renderFamilyGoalCategoryPicker();
+  });
+  $("#familyGoalCategoryCustomInput")?.addEventListener("input", (event) => {
+    familyGoalCategoryMode = "custom";
+    $("#familyGoalCategoryInput").value = event.target.value.trim();
+    renderFamilyGoalCategoryPicker();
+  });
+  $("#familyGoalUrgencyPicker")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-family-goal-urgency]");
+    if (!button) return;
+    $("#familyGoalUrgencyInput").value = button.dataset.familyGoalUrgency || "normal";
+    renderFamilyGoalUrgencyPicker();
+  });
+  $("#familyGoalForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const family = getActiveFamily();
+    if (!family || !supabaseClient || !currentUser) return;
+    const title = $("#familyGoalTitleInput").value.trim();
+    const deadline = $("#familyGoalDeadlineInput").value;
+    if (!title) {
+      $("#familyGoalTitleInput").focus();
+      return;
+    }
+    if (!deadline) {
+      $("#familyGoalDeadlineInput").focus();
+      return;
+    }
+    await runFamilyAction(async () => {
+      const categoryLabel = getFamilyGoalCategoryValue();
+      const created = await window.MyCare.family.createFamilyGoal(supabaseClient, currentUser, {
+        familyId: family.id,
+        title,
+        deadline,
+        urgency: String($("#familyGoalUrgencyInput").value || "normal").trim().toLowerCase(),
+        categoryLabel,
+      });
+      familyState.goals = window.MyCare.goals.sortGoals([
+        created,
+        ...familyState.goals.filter((goal) => goal.id !== created.id),
+      ]);
+      $("#familyGoalTitleInput").value = "";
+      $("#familyGoalCategoryInput").value = "";
+      $("#familyGoalCategoryCustomInput").value = "";
+      familyGoalCategoryMode = "preset";
+      $("#familyGoalUrgencyInput").value = "normal";
+      $("#familyGoalDeadlineInput").value = "";
+      familyState.goalMessage = t().work.familyGoalAdded;
+      renderFamilyRoom();
+      await loadFamilyRoom({ keepMessage: true });
+      if (!familyState.goals.some((goal) => goal.id === created.id)) {
+        familyState.goals = window.MyCare.goals.sortGoals([created, ...familyState.goals]);
+        familyState.goalMessage = t().work.familyGoalAdded;
+        renderFamilyRoom();
+      }
+    });
+  });
+  $("#familyGoalList")?.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-family-goal-action]");
+    if (!button) return;
+    const card = button.closest("[data-family-goal-id]");
+    const goal = familyState.goals.find((item) => item.id === card?.dataset.familyGoalId);
+    if (!goal) return;
+    await runFamilyAction(async () => {
+      if (button.dataset.familyGoalAction === "complete") {
+        const note = card.querySelector(".family-goal-note")?.value.trim() || "";
+        const updated = await window.MyCare.family.completeFamilyGoal(supabaseClient, currentUser, goal.id, note);
+        familyState.goals = window.MyCare.goals.sortGoals(familyState.goals.map((item) => item.id === goal.id ? updated : item));
+        familyState.goalMessage = t().work.familyGoalCompleted;
+        renderFamilyRoom();
+        await loadFamilyRoom({ keepMessage: true });
+        if (!familyState.goals.some((item) => item.id === goal.id && item.status === "done")) {
+          familyState.goals = window.MyCare.goals.sortGoals(familyState.goals.map((item) => item.id === goal.id ? updated : item));
+          familyState.goalMessage = t().work.familyGoalCompleted;
+          renderFamilyRoom();
+        }
+        return;
+      }
+      if (button.dataset.familyGoalAction === "reopen") {
+        const updated = await window.MyCare.family.reopenFamilyGoal(supabaseClient, goal.id);
+        familyState.goals = window.MyCare.goals.sortGoals(familyState.goals.map((item) => item.id === goal.id ? updated : item));
+        familyState.goalMessage = "";
+        renderFamilyRoom();
+        await loadFamilyRoom({ keepMessage: true });
+        if (!familyState.goals.some((item) => item.id === goal.id && item.status === "open")) {
+          familyState.goals = window.MyCare.goals.sortGoals(familyState.goals.map((item) => item.id === goal.id ? updated : item));
+          renderFamilyRoom();
+        }
+        return;
+      }
+      if (button.dataset.familyGoalAction === "delete") {
+        await window.MyCare.family.deleteFamilyGoal(supabaseClient, goal.id);
+        familyState.goals = familyState.goals.filter((item) => item.id !== goal.id);
+        familyState.goalMessage = t().work.familyGoalDeleted;
+        renderFamilyRoom();
+        await loadFamilyRoom({ keepMessage: true });
+        if (familyState.goals.some((item) => item.id === goal.id)) {
+          familyState.goals = familyState.goals.filter((item) => item.id !== goal.id);
+          familyState.goalMessage = t().work.familyGoalDeleted;
+          renderFamilyRoom();
+        }
+        return;
+      }
+    });
+  });
+}
+
+async function runFamilyAction(action) {
+  familyState.loading = true;
+  familyState.error = "";
+  renderFamilyRoom();
+  try {
+    await action();
+  } catch (error) {
+    console.error("Family action failed", error);
+    familyState.error = error?.message || t().work.familyError;
+    familyState.loading = false;
+    renderFamilyRoom();
+  }
+}
+
+async function loadFamilyRoom(options = {}) {
+  if (!$("#familyRoomPanel")) return;
+  if (!supabaseClient || !currentUser) {
+    resetFamilyState();
+    renderFamilyRoom();
+    return;
+  }
+  familyState.loading = true;
+  familyState.error = "";
+  if (!options.keepMessage) familyState.message = options.announce ? t().work.familyLoading : familyState.message;
+  renderFamilyRoom();
+  try {
+    const families = await window.MyCare.family.listFamilies(supabaseClient);
+    familyState.families = families;
+    if (!families.some((family) => family.id === familyState.activeFamilyId)) {
+      familyState.activeFamilyId = families[0]?.id || "";
+    }
+    const active = getActiveFamily();
+    familyState.members = active ? await window.MyCare.family.getFamilyMembers(supabaseClient, active.id) : [];
+    familyState.invitations = active ? await window.MyCare.family.listInvitations(supabaseClient, active.id) : [];
+    familyState.categories = active ? await loadFamilyGoalCategoriesSafely(active.id) : [];
+    familyState.goals = active ? await window.MyCare.family.listFamilyGoals(supabaseClient, active.id) : [];
+    familyState.loading = false;
+    if (!familyState.message && families.length) familyState.message = t().work.familyReady;
+    renderFamilyRoom();
+  } catch (error) {
+    familyState.loading = false;
+    familyState.error = error?.message || t().work.familyError;
+    renderFamilyRoom();
+  }
+}
+
+async function loadFamilyGoalCategoriesSafely(familyId) {
+  try {
+    return await window.MyCare.family.listFamilyGoalCategories(supabaseClient, familyId);
+  } catch {
+    return [];
+  }
+}
+
+async function resolveFamilyGoalCategory(familyId, label) {
+  const name = String(label || "").trim();
+  if (!name) return null;
+  const existing = familyState.categories.find((category) => category.name.toLowerCase() === name.toLowerCase());
+  if (existing) return existing;
+  const created = await window.MyCare.family.createFamilyGoalCategory(supabaseClient, currentUser, {
+    familyId,
+    name,
+    color: "#9eb39f",
+  });
+  familyState.categories = [...familyState.categories, created];
+  return created;
+}
+
+function renderFamilyRoomLanguage() {
+  if (!$("#familyRoomPanel")) return;
+  const text = t().work;
+  $("#familyRoomEyebrow").textContent = text.familyEyebrow;
+  $("#familyRoomTitle").textContent = text.familyTitle;
+  $("#familyRoomCopy").textContent = text.familyCopy;
+  $("#refreshFamilyRoom").textContent = text.familyRefresh;
+  $("#familyNameLabel").textContent = text.familyNameLabel;
+  $("#familyNameInput").placeholder = text.familyNamePlaceholder;
+  $("#createFamilyButton").textContent = text.familyCreate;
+  $("#familyTokenLabel").textContent = text.familyTokenLabel;
+  $("#familyInvitationToken").placeholder = text.familyTokenPlaceholder;
+  $("#acceptInvitationButton").textContent = text.familyAccept;
+  $("#familyActiveEyebrow").textContent = text.familyCurrent;
+  $("#leaveFamilyButton").textContent = text.familyLeave;
+  $("#familyInviteLabel").textContent = text.familyInviteLabel;
+  $("#familyInviteEmail").placeholder = text.familyInvitePlaceholder;
+  $("#familyInviteButton").textContent = text.familyInvite;
+  $("#familyGoalsEyebrow").textContent = text.familyGoalsEyebrow;
+  $("#familyGoalsTitle").textContent = text.familyGoalsTitle;
+  $("#familyGoalTitleLabel").textContent = text.familyGoalTitleLabel;
+  $("#familyGoalTitleInput").placeholder = text.familyGoalTitlePlaceholder;
+  $("#familyGoalCategoryLabel").textContent = text.familyGoalCategoryLabel;
+  $("#familyGoalCategoryCustomInput").placeholder = text.familyGoalCategoryPlaceholder;
+  $("#familyGoalUrgencyLabel").textContent = text.familyGoalUrgencyLabel;
+  $("#familyGoalDeadlineLabel").textContent = text.familyGoalDeadlineLabel;
+  $("#familyGoalSubmit").textContent = text.familyGoalAdd;
+  renderFamilyRoom();
+}
+
+function renderFamilyRoom() {
+  if (!$("#familyRoomPanel")) return;
+  const text = t().work;
+  const signedIn = Boolean(supabaseClient && currentUser);
+  const active = getActiveFamily();
+  const message = familyState.loading
+    ? text.familyLoading
+    : familyState.error || familyState.message || (signedIn ? text.familyNoFamily : text.familySignedOut);
+  $("#familyRoomMessage").textContent = message;
+  $("#familyRoomMessage").classList.toggle("is-error", Boolean(familyState.error));
+  $("#createFamilyForm").classList.toggle("is-disabled", !signedIn || familyState.loading);
+  $("#acceptInvitationForm").classList.toggle("is-disabled", !signedIn || familyState.loading);
+  $("#createFamilyButton").disabled = !signedIn || familyState.loading;
+  $("#acceptInvitationButton").disabled = !signedIn || familyState.loading;
+  $("#refreshFamilyRoom").disabled = !signedIn || familyState.loading;
+  $("#familyActiveCard").hidden = !active;
+  if (!active) return;
+
+  $("#familyActiveName").textContent = active.name;
+  $("#familyActiveMeta").textContent = interpolate(text.familyMembers, { count: familyState.members.length });
+  $("#leaveFamilyButton").disabled = familyState.loading;
+  $("#familyInviteButton").disabled = familyState.loading;
+  $("#familyMemberList").innerHTML = familyState.members.length
+    ? familyState.members.map((member) => `
+      <div class="family-member-pill">
+        <span>${escapeHtml(getFamilyMemberDisplayName(member))}</span>
+        <small>${escapeHtml(member.role === "owner" ? text.familyOwner : text.familyMember)}</small>
+      </div>
+    `).join("")
+    : `<p class="family-empty">${escapeHtml(text.familyNoFamily)}</p>`;
+  const pending = familyState.invitations.filter((invite) => invite.status === "pending");
+  $("#familyInvitationList").innerHTML = pending.length
+    ? pending.slice(0, 4).map((invite) => `
+      <div class="family-invite-pill">
+        <span>${escapeHtml(invite.email)}</span>
+        <small>${escapeHtml(text.familyTokenPrefix)}: ${escapeHtml(invite.token)}</small>
+      </div>
+    `).join("")
+    : `<p class="family-empty">${escapeHtml(text.familyInviteEmpty)}</p>`;
+  renderFamilyGoalControls();
+  renderFamilyGoals();
+}
+
+function getFamilyMemberDisplayName(member = {}) {
+  return member.email || (member.userId ? `${member.userId.slice(0, 8)}...` : "?");
+}
+
+function getFamilyGoalCategoryValue() {
+  return ($("#familyGoalCategoryCustomInput")?.value || $("#familyGoalCategoryInput")?.value || "").trim();
+}
+
+function getActiveFamilyGoalCategories() {
+  return familyState.categories
+    .filter((category) => category.active !== false)
+    .slice(0, 5);
+}
+
+function renderFamilyGoalCategoryPicker() {
+  const picker = $("#familyGoalCategoryPicker");
+  if (!picker) return;
+  let selected = ($("#familyGoalCategoryInput")?.value || "").trim();
+  const customValue = ($("#familyGoalCategoryCustomInput")?.value || "").trim();
+  const categories = getActiveFamilyGoalCategories();
+  const customActive = familyGoalCategoryMode === "custom" || !categories.length;
+  if (!selected && categories.length && !customActive) {
+    selected = categories[0].name;
+    $("#familyGoalCategoryInput").value = selected;
+  }
+  const resolvedCustomLabel = getLanguage() === "zh" ? "自定义" : "Custom";
+  const customLabel = getLanguage() === "zh" ? "自定义" : "Custom";
+  picker.innerHTML = categories.map((category) => {
+    const active = !customActive && selected === category.name;
+    const color = category.color || "#8baa97";
+    return `
+      <button class="family-category-choice ${active ? "active" : ""}" data-family-goal-category="${escapeHtml(category.name)}" type="button" aria-pressed="${active ? "true" : "false"}" style="--family-choice-color:${escapeHtml(color)}">
+        <i></i>
+        <span>${escapeHtml(category.name)}</span>
+      </button>
+    `;
+  }).join("") + `
+    <button class="family-category-choice custom ${customActive ? "active" : ""}" data-family-goal-category="__custom" type="button" aria-pressed="${customActive ? "true" : "false"}">
+      <i></i>
+      <span>${escapeHtml(resolvedCustomLabel)}</span>
+    </button>
+  `;
+  $("#familyGoalCategoryCustomInput")?.classList.toggle("is-active", customActive);
+}
+
+function renderFamilyGoalUrgencyPicker() {
+  const picker = $("#familyGoalUrgencyPicker");
+  if (!picker) return;
+  const text = t().work;
+  const selected = ($("#familyGoalUrgencyInput")?.value || "normal").trim().toLowerCase();
+  picker.innerHTML = ["low", "normal", "high"].map((key) => `
+    <button class="family-urgency-choice ${selected === key ? "active" : ""}" data-family-goal-urgency="${key}" data-urgency="${key}" type="button" aria-pressed="${selected === key ? "true" : "false"}">
+      <span>${escapeHtml(text.familyUrgency[key] || key)}</span>
+    </button>
+  `).join("");
+}
+
+function renderFamilyGoalControls() {
+  const text = t().work;
+  const open = familyState.goals.filter((goal) => goal.status !== "done").length;
+  const done = familyState.goals.length - open;
+  $("#familyGoalSummary").textContent = interpolate(text.familyGoalSummary, { open, done });
+  renderFamilyGoalCategoryPicker();
+  renderFamilyGoalUrgencyPicker();
+  $("#familyGoalForm").classList.toggle("is-disabled", familyState.loading);
+  $("#familyGoalSubmit").disabled = familyState.loading;
+}
+
+function renderFamilyGoals() {
+  const target = $("#familyGoalList");
+  if (!target) return;
+  const goals = window.MyCare.goals.sortGoals(familyState.goals);
+  const error = familyState.error ? `<p class="family-goal-message is-error">${escapeHtml(familyState.error)}</p>` : "";
+  const message = familyState.goalMessage ? `<p class="family-goal-message">${escapeHtml(familyState.goalMessage)}</p>` : "";
+  target.innerHTML = error + message + (goals.length
+    ? goals.map(renderFamilyGoalCard).join("")
+    : `<div class="empty-note family-goal-empty">${escapeHtml(t().work.familyGoalEmpty)}</div>`);
+}
+
+function renderFamilyGoalCard(goal) {
+  const text = t().work;
+  const isDone = goal.status === "done";
+  const deadline = getWorkDeadlineDetails({
+    ...goal,
+    note: goal.completionNote || goal.note || "",
+  });
+  const urgencyLabel = text.familyUrgency[goal.urgency] || goal.urgency || text.familyUrgency.normal;
+  const category = goal.category || text.familyGoalCategoryLabel;
+  return `
+    <article class="work-goal-card family-goal-card ${isDone ? "done" : ""}" data-family-goal-id="${escapeHtml(goal.id)}" data-urgency="${escapeHtml(goal.urgency || "normal")}">
+      <div class="work-goal-main">
+        <div class="work-goal-content">
+          <p class="eyebrow">${escapeHtml(category)} · ${escapeHtml(urgencyLabel)}</p>
+          <h3>${escapeHtml(goal.title)}</h3>
+          ${isDone ? `<span class="family-status-pill completed">${escapeHtml(text.completed)}</span>` : ""}
+          <details class="work-note-wrap" ${goal.completionNote ? "open" : ""}>
+            <summary>${escapeHtml(goal.completionNote ? text.editNote : text.addNote)}</summary>
+            <label>
+              <span>${escapeHtml(text.familyCompletionNote)}</span>
+              <textarea class="family-goal-note" rows="3" placeholder="${escapeHtml(text.familyCompletionPlaceholder)}">${escapeHtml(goal.completionNote || "")}</textarea>
+            </label>
+          </details>
+          <div class="work-goal-actions">
+            ${isDone
+              ? `<span class="work-completed">${escapeHtml(text.completed)} · ${escapeHtml(formatShortDate(goal.completedAt?.slice(0, 10)))}</span><button class="secondary" data-family-goal-action="reopen" type="button">${escapeHtml(text.reopen)}</button>`
+              : `<button class="primary" data-family-goal-action="complete" type="button">${escapeHtml(text.complete)}</button>`}
+            <button class="work-delete-button" data-family-goal-action="delete" type="button" aria-label="${escapeHtml(text.delete)}">
+              <span aria-hidden="true"></span>
+              ${escapeHtml(text.delete)}
+            </button>
+          </div>
+        </div>
+        <span class="work-deadline ${deadline.className}">
+          <b>${escapeHtml(deadline.status)}</b>
+          <small>${escapeHtml(deadline.date)}</small>
+        </span>
+      </div>
+    </article>
+  `;
+}
+
 function bindWorkGoals() {
   if (!$("#workGoalForm")) return;
   bindWorkDeadlinePicker();
+  $$(".goal-scope-option").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.settings.goalScope = button.dataset.goalScope === "family" ? "family" : "personal";
+      if (state.settings.goalScope === "family") closeWorkDeadlinePicker();
+      saveState();
+      renderGoalScope();
+    });
+  });
   $("#workResetButton")?.addEventListener("click", () => {
     $("#workResetDialog")?.showModal();
   });
@@ -3949,15 +4804,10 @@ function renderWorkGoals() {
   if (!$("#workGoalList")) return;
   state.workGoals = state.workGoals || [];
   const filter = state.settings.workGoalFilter === "finished" ? "finished" : "current";
-  const goals = [...state.workGoals].sort((a, b) => {
-    if (a.status !== b.status) return a.status === "open" ? -1 : 1;
-    return String(a.deadline || "").localeCompare(String(b.deadline || ""));
-  });
+  const goals = window.MyCare.goals.sortGoals(state.workGoals);
   const open = goals.filter((goal) => goal.status !== "done").length;
   const done = goals.length - open;
-  const visibleGoals = goals.filter((goal) => filter === "finished"
-    ? goal.status === "done"
-    : goal.status !== "done");
+  const visibleGoals = window.MyCare.goals.getVisibleGoals(goals, filter);
   $$(".work-goal-filter").forEach((button) => {
     const isActive = button.dataset.goalFilter === filter;
     button.classList.toggle("active", isActive);
@@ -4009,6 +4859,7 @@ function renderWorkGoalCard(goal) {
 function getWorkDeadlineDetails(goal) {
   const dueDate = formatLongDate(goal.deadline);
   const dueLabel = interpolate(t().work.dueOn, { date: dueDate });
+  const deadline = window.MyCare.goals.getDeadlineState(goal, todayKey());
   if (goal.status === "done") {
     return {
       status: t().work.completed,
@@ -4016,23 +4867,15 @@ function getWorkDeadlineDetails(goal) {
       className: "done",
     };
   }
-  const today = new Date(`${todayKey()}T00:00:00`);
-  const deadline = new Date(`${goal.deadline}T00:00:00`);
-  const days = Math.round((deadline - today) / 86400000);
-  const className = getWorkDeadlineClass(goal);
+  const days = deadline.days;
+  const className = deadline.className;
   if (days < 0) return { status: interpolate(t().work.overdue, { days: Math.abs(days) }), date: dueLabel, className };
   if (days === 0) return { status: t().work.dueToday, date: dueLabel, className };
   return { status: interpolate(t().work.daysLeft, { days }), date: dueLabel, className };
 }
 
 function getWorkDeadlineClass(goal) {
-  if (goal.status === "done") return "done";
-  const today = new Date(`${todayKey()}T00:00:00`);
-  const deadline = new Date(`${goal.deadline}T00:00:00`);
-  const days = Math.round((deadline - today) / 86400000);
-  if (days < 0) return "overdue";
-  if (days <= 7) return "soon";
-  return "";
+  return window.MyCare.goals.getDeadlineClass(goal, todayKey());
 }
 
 function formatLongDate(dateText) {
@@ -4057,6 +4900,14 @@ function escapeHtml(value) {
 function bindStats() {
   $("#healthImport")?.addEventListener("change", handleImport);
   $("#exportData").addEventListener("click", exportData);
+  $$(".stats-scope-option").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.settings.statsScope = button.dataset.statsScope === "family" ? "family" : "personal";
+      saveState();
+      renderStatsScope();
+      drawCharts();
+    });
+  });
   $$(".stats-range").forEach((button) => {
     button.addEventListener("click", () => {
       selectedStatsRange = button.dataset.statsRange || "7";
@@ -4188,6 +5039,7 @@ function getStatsDays() {
     ...state.morningEntries.map((item) => item.date),
     ...state.focusSessions.map((item) => item.date),
     ...(state.workGoals || []).flatMap((item) => [item.createdAt?.slice(0, 10), item.completedAt?.slice(0, 10)]),
+    ...(familyState.goals || []).flatMap((item) => [item.createdAt?.slice(0, 10), item.completedAt?.slice(0, 10)]),
   ].filter(Boolean).sort();
   if (!dates.length) return recentDays(7);
   const first = new Date(`${dates[0]}T00:00:00`);
@@ -4205,6 +5057,7 @@ function drawCharts() {
   renderSkinTimeline(days);
   renderStatsSummaries(days, focusSessions);
   renderGoalStats(days);
+  renderFamilyStats(days);
   renderSeedStats(days, focusSessions);
 }
 
@@ -4343,6 +5196,10 @@ function formatChartDate(dateText) {
   return dateText?.slice(5).replace("-", "/") || "";
 }
 
+function formatSkinStateLabel(value) {
+  return window.MyCare.language.formatSkinStateLabel(value, getLanguage());
+}
+
 function drawCanvasEmpty(ctx, width, height, message) {
   ctx.fillStyle = "rgba(98, 117, 106, 0.62)";
   ctx.font = "16px Noto Sans SC";
@@ -4363,9 +5220,66 @@ function renderSkinTimeline(days) {
     <div class="skin-timeline-row">
       <time>${escapeHtml(formatShortDate(item.date))}</time>
       <span class="skin-dot" style="--skin-color:${colors[index % colors.length]}"></span>
-      <strong>${escapeHtml(item.skinState)}</strong>
+      <strong>${escapeHtml(formatSkinStateLabel(item.skinState))}</strong>
     </div>
   `).join("");
+}
+
+function toFamilyCategoryDefinition(category) {
+  return {
+    ...category,
+    labelZh: category.name,
+    labelEn: category.name,
+    color: category.color || "#8baa97",
+    active: category.active !== false,
+  };
+}
+
+function renderFamilyCategorySettings() {
+  const stateTarget = $("#familyCategorySettingsState");
+  const listTarget = $("#familyCategorySettingsList");
+  const addRow = $("#familyCategoryAddRow");
+  if (!stateTarget || !listTarget || !addRow) return;
+  const signedIn = Boolean(supabaseClient && currentUser);
+  const family = getActiveFamily();
+  const canEdit = signedIn && Boolean(family);
+  addRow.hidden = !canEdit;
+  listTarget.hidden = !canEdit;
+  if (!signedIn) {
+    stateTarget.classList.remove("is-error");
+    const message = personalizationText(
+      "familyCategorySignedOut",
+      "请先登录，之后就可以为家庭目标设置分类。",
+      "Sign in first, then you can customize family goal categories.",
+    );
+    const label = getLanguage() === "zh" ? "登录" : "Sign in";
+    stateTarget.innerHTML = `<span>${escapeHtml(message)}</span><button class="family-category-login-button" id="familyCategorySignIn" type="button">${escapeHtml(label)}</button>`;
+    listTarget.innerHTML = "";
+    return;
+  }
+  if (!family) {
+    stateTarget.classList.remove("is-error");
+    stateTarget.textContent = personalizationText(
+      "familyCategoryNoFamily",
+      "你还没有加入家庭。先创建或加入一个家庭，再来自定义家庭分类。",
+      "Join or create a family before customizing family categories.",
+    );
+    listTarget.innerHTML = "";
+    return;
+  }
+  stateTarget.textContent = familyState.categoryError
+    || familyState.categoryMessage
+    || personalizationText(
+      "familyCategoryReady",
+      "这些分类只会用于当前家庭的共享目标。",
+      "These categories only apply to the current family room.",
+    );
+  stateTarget.classList.toggle("is-error", Boolean(familyState.categoryError));
+  renderDefinitionSettings(
+    listTarget,
+    familyState.categories.map(toFamilyCategoryDefinition),
+    "family-category",
+  );
 }
 
 function renderStatsSummaries(days, focusSessions) {
@@ -4397,20 +5311,22 @@ function summaryPills(items) {
 function renderGoalStats(days) {
   const zh = getLanguage() === "zh";
   const goals = state.workGoals || [];
-  const today = new Date(`${todayKey()}T00:00:00`);
-  const completedInRange = goals.filter((goal) => goal.status === "done" && days.includes(goal.completedAt?.slice(0, 10)));
-  const openGoals = goals.filter((goal) => goal.status !== "done");
-  const relevantGoals = selectedStatsRange === "all"
-    ? goals
-    : [...openGoals, ...completedInRange.filter((goal) => !openGoals.includes(goal))];
-  const getDaysUntilDue = (goal) => Math.round((new Date(`${goal.deadline}T00:00:00`) - today) / 86400000);
-  const overdue = openGoals.filter((goal) => goal.deadline && getDaysUntilDue(goal) < 0);
-  const dueSoon = openGoals.filter((goal) => goal.deadline && getDaysUntilDue(goal) >= 0 && getDaysUntilDue(goal) <= 7);
-  const inProgress = openGoals.filter((goal) => !overdue.includes(goal) && !dueSoon.includes(goal));
-  const leadDays = completedInRange
-    .filter((goal) => goal.deadline && goal.completedAt)
-    .map((goal) => Math.round((new Date(`${goal.deadline}T00:00:00`) - new Date(goal.completedAt)) / 86400000));
-  const averageLead = leadDays.length ? Math.round(leadDays.reduce((sum, value) => sum + value, 0) / leadDays.length) : null;
+  const goalStats = window.MyCare.goals.buildGoalStats(goals, {
+    days,
+    range: selectedStatsRange,
+    todayDateText: todayKey(),
+    uncategorizedLabel: zh ? "未分类" : "Uncategorized",
+  });
+  const {
+    averageLead,
+    categoryTotals,
+    completedInRange,
+    dueSoon,
+    futureGoals,
+    inProgress,
+    openGoals,
+    overdue,
+  } = goalStats;
 
   $("#goalsStatsSummary").innerHTML = summaryPills([
     [openGoals.length, zh ? "进行中" : "Open"],
@@ -4440,13 +5356,6 @@ function renderGoalStats(days) {
     `).join("")
     : `<div class="stats-empty">${zh ? "还没有目标记录" : "No goals yet"}</div>`;
 
-  const categoryTotals = relevantGoals.reduce((acc, goal) => {
-    const category = goal.category?.trim() || (zh ? "未分类" : "Uncategorized");
-    acc[category] = acc[category] || { total: 0, completed: 0 };
-    acc[category].total += 1;
-    if (goal.status === "done") acc[category].completed += 1;
-    return acc;
-  }, {});
   const categories = Object.entries(categoryTotals).sort((a, b) => b[1].total - a[1].total).slice(0, 6);
   const maxCategory = Math.max(...categories.map(([, value]) => value.total), 1);
   $("#goalCategoryChart").innerHTML = categories.length
@@ -4461,30 +5370,25 @@ function renderGoalStats(days) {
     `).join("")
     : `<div class="stats-empty">${zh ? "还没有目标类别记录" : "No goal categories yet"}</div>`;
 
-  renderGoalDeadlineTimeline(openGoals, getDaysUntilDue);
+  renderGoalDeadlineTimeline(futureGoals);
 }
 
-function renderGoalDeadlineTimeline(openGoals, getDaysUntilDue) {
+function renderGoalDeadlineTimeline(futureGoals) {
   const zh = getLanguage() === "zh";
-  const futureGoals = openGoals
-    .filter((goal) => goal.deadline && getDaysUntilDue(goal) >= 0)
-    .sort((a, b) => String(a.deadline).localeCompare(String(b.deadline)));
   const rangeDays = selectedStatsRange === "all"
-    ? Math.max(30, ...futureGoals.map((goal) => getDaysUntilDue(goal)))
+    ? Math.max(30, ...futureGoals.map((item) => item.days))
     : Number(selectedStatsRange) || 7;
-  const visibleGoals = futureGoals.filter((goal) => getDaysUntilDue(goal) <= rangeDays);
+  const visibleGoals = futureGoals.filter((item) => item.days <= rangeDays);
   if (!visibleGoals.length) {
     $("#goalDeadlineTimeline").innerHTML = `<div class="stats-empty">${zh ? "这个时间范围内没有临近的 Deadline" : "No upcoming deadlines in this range"}</div>`;
     return;
   }
-  const points = visibleGoals.map((goal) => {
-    const days = getDaysUntilDue(goal);
+  const points = visibleGoals.map(({ goal, days }) => {
     const position = rangeDays ? (days / rangeDays) * 100 : 0;
     const color = days <= 3 ? "#c4a3a8" : days <= 7 ? "#c7ad82" : "#94aabd";
     return `<i class="goal-deadline-point" style="--goal-position:${position}%;--goal-color:${color}" title="${escapeHtml(goal.title)} · ${escapeHtml(formatShortDate(goal.deadline))}"></i>`;
   }).join("");
-  const list = visibleGoals.slice(0, 6).map((goal) => {
-    const days = getDaysUntilDue(goal);
+  const list = visibleGoals.slice(0, 6).map(({ goal, days }) => {
     const dueText = days === 0 ? (zh ? "今天到期" : "Due today") : `${days} ${zh ? "天后" : "days left"}`;
     return `<div class="goal-deadline-item"><b>${escapeHtml(goal.title)}</b><span>${escapeHtml(dueText)} · ${escapeHtml(formatShortDate(goal.deadline))}</span></div>`;
   }).join("");
@@ -4493,6 +5397,132 @@ function renderGoalDeadlineTimeline(openGoals, getDaysUntilDue) {
     <div class="goal-deadline-labels"><span>${zh ? "今天" : "Today"}</span><span>${rangeDays} ${zh ? "天" : "days"}</span></div>
     <div class="goal-deadline-list">${list}</div>
   `;
+}
+
+function renderFamilyStats(days) {
+  const grid = $("#familyStatsGrid");
+  const empty = $("#familyStatsEmpty");
+  const summary = $("#familyStatsSummary");
+  if (!grid || !empty || !summary) return;
+  const zh = getLanguage() === "zh";
+  const signedIn = Boolean(supabaseClient && currentUser);
+  const family = getActiveFamily();
+
+  if (!signedIn) {
+    grid.hidden = true;
+    summary.innerHTML = "";
+    empty.hidden = false;
+    empty.textContent = zh ? "登录后可以查看家庭统计。" : "Sign in to see family stats.";
+    return;
+  }
+  if (!family) {
+    grid.hidden = true;
+    summary.innerHTML = "";
+    empty.hidden = false;
+    empty.textContent = zh ? "先创建或加入一个家庭，再查看家庭统计。" : "Create or join a family to see family stats.";
+    return;
+  }
+  if (familyState.loading && !familyState.goals.length) {
+    grid.hidden = true;
+    summary.innerHTML = "";
+    empty.hidden = false;
+    empty.textContent = zh ? "正在读取家庭统计..." : "Loading family stats...";
+    return;
+  }
+
+  const goals = familyState.goals || [];
+  if (!goals.length) {
+    grid.hidden = true;
+    summary.innerHTML = summaryPills([
+      [0, zh ? "家庭目标" : "Family goals"],
+      [0, zh ? "已完成" : "Completed"],
+    ]);
+    empty.hidden = false;
+    empty.textContent = zh ? "还没有家庭目标。添加一个共享目标后，这里会自动生成统计。" : "No family goals yet. Add a shared goal and stats will appear here.";
+    return;
+  }
+
+  grid.hidden = false;
+  empty.hidden = true;
+  const goalStats = window.MyCare.family.buildFamilyGoalStats(goals, {
+    days,
+    range: selectedStatsRange,
+    todayDateText: todayKey(),
+    uncategorizedLabel: zh ? "未分类" : "Uncategorized",
+  });
+  const {
+    categoryTotals,
+    completedInRange,
+    dueSoon,
+    inProgress,
+    openGoals,
+    overdue,
+    relevantGoals,
+  } = goalStats;
+  const completionRate = relevantGoals.length
+    ? Math.round((relevantGoals.filter((goal) => goal.status === "done").length / relevantGoals.length) * 100)
+    : 0;
+
+  summary.innerHTML = summaryPills([
+    [openGoals.length, zh ? "进行中" : "Open"],
+    [completedInRange.length, zh ? "已完成" : "Completed"],
+    [`${completionRate}%`, zh ? "完成比例" : "Done rate"],
+    [dueSoon.length, zh ? "临近期限" : "Due soon"],
+  ]);
+
+  const statuses = [
+    { label: zh ? "已完成" : "Completed", count: completedInRange.length, color: "#9eb39f" },
+    { label: zh ? "进行中" : "In progress", count: inProgress.length, color: "#94aabd" },
+    { label: zh ? "临近期限" : "Due soon", count: dueSoon.length, color: "#c7ad82" },
+    { label: zh ? "已逾期" : "Overdue", count: overdue.length, color: "#c4a3a8" },
+  ];
+  const maxStatus = Math.max(...statuses.map((item) => item.count), 1);
+  $("#familyGoalStatusChart").innerHTML = statuses.some((item) => item.count)
+    ? statuses.map((item) => `
+      <div class="goal-status-row">
+        <strong>${escapeHtml(item.label)}</strong>
+        <div class="goal-status-track"><span style="--goal-width:${(item.count / maxStatus) * 100}%;--goal-color:${item.color}"></span></div>
+        <small>${item.count}</small>
+      </div>
+    `).join("")
+    : `<div class="stats-empty">${zh ? "这个时间范围内还没有完成记录。" : "No completed records in this range yet."}</div>`;
+
+  const categoryColorMap = new Map(familyState.categories.map((category) => [category.name, category.color || "#8baa97"]));
+  const categories = Object.entries(categoryTotals).sort((a, b) => b[1].total - a[1].total).slice(0, 6);
+  const maxCategory = Math.max(...categories.map(([, value]) => value.total), 1);
+  $("#familyGoalCategoryChart").innerHTML = categories.length
+    ? categories.map(([label, value], index) => {
+      const color = categoryColorMap.get(label) || ["#8baa97", "#94aabd", "#b5a6c9", "#c7ad82", "#c4a3a8", "#a8b9a1"][index % 6];
+      return `
+        <div class="goal-category-row family-category-stat-row">
+          <strong>${escapeHtml(label)}</strong>
+          <div class="goal-category-track" style="--family-category-color:${escapeHtml(color)}">
+            <span style="--goal-width:${(value.total / maxCategory) * 100}%;--goal-complete-width:${(value.completed / Math.max(value.total, 1)) * 100}%"></span>
+          </div>
+          <small>${value.total} ${zh ? "个目标" : "goals"} · ${value.completed} ${zh ? "完成" : "done"}</small>
+        </div>
+      `;
+    }).join("")
+    : `<div class="stats-empty">${zh ? "还没有家庭分类记录。" : "No family category records yet."}</div>`;
+
+  const urgencyCounts = relevantGoals.reduce((acc, goal) => {
+    const urgency = ["low", "normal", "high"].includes(goal.urgency) ? goal.urgency : "normal";
+    acc[urgency] = (acc[urgency] || 0) + 1;
+    return acc;
+  }, { low: 0, normal: 0, high: 0 });
+  const urgencyItems = ["high", "normal", "low"].map((key) => ({
+    key,
+    count: urgencyCounts[key] || 0,
+    label: t().work.familyUrgency?.[key] || key,
+  }));
+  const maxUrgency = Math.max(...urgencyItems.map((item) => item.count), 1);
+  $("#familyGoalUrgencyChart").innerHTML = urgencyItems.map((item) => `
+    <div class="family-urgency-row" data-urgency="${escapeHtml(item.key)}">
+      <span>${escapeHtml(item.label)}</span>
+      <div><i style="--urgency-width:${(item.count / maxUrgency) * 100}%"></i></div>
+      <strong>${item.count}</strong>
+    </div>
+  `).join("");
 }
 
 function renderSeedStats(days, focusSessions) {

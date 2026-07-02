@@ -6,7 +6,7 @@
     <meta property="og:image" content="assets/images/my-care-logo.png?v=20260609-2" />
     <title>My Care</title>
     <link rel="icon" type="image/png" href="assets/images/my-care-logo.png?v=20260609-2" />
-    <link rel="stylesheet" href="styles.css?v=20260619-4" />
+    <link rel="stylesheet" href="styles.css?v=20260702-family-form-2" />
   </head>
   <body>
     <div class="app-shell">
@@ -17,6 +17,9 @@
         <span data-lang-label="en">EN</span>
       </button>
       <button class="global-settings-toggle" id="globalSettingsToggle" type="button" aria-label="打开个性化设置" title="个性化设置">
+        <span aria-hidden="true"></span>
+      </button>
+      <button class="global-settings-toggle family-settings-toggle" id="familySettingsToggle" type="button" aria-label="Family categories" title="Family categories">
         <span aria-hidden="true"></span>
       </button>
       <aside class="sidebar" aria-label="主导航">
@@ -623,73 +626,163 @@
               <h2 id="workTitle">工作目标和期限</h2>
               <p class="muted">把现在最重要的事情放在这里，完成后打卡并留一句 note。</p>
             </div>
-            <div class="work-view-switch" role="group" aria-label="目标页面切换">
-              <button class="work-view-option active" data-work-view="list" type="button">List</button>
-              <button class="work-view-option" data-work-view="add" type="button">Add New</button>
+            <div class="goal-scope-switch" role="tablist" aria-label="目标类型切换">
+              <button class="goal-scope-option active" data-goal-scope="personal" role="tab" aria-selected="true" type="button">Personal Goal</button>
+              <button class="goal-scope-option" data-goal-scope="family" role="tab" aria-selected="false" type="button">Family Goal</button>
             </div>
           </div>
 
-          <div class="work-view active" id="workListView">
-            <div class="panel work-list-panel">
-              <div class="panel-title">
-                <div class="work-goal-filters" role="tablist" aria-label="Goal status">
-                  <button class="work-goal-filter active" data-goal-filter="current" role="tab" aria-selected="true" type="button">Current Goals</button>
-                  <button class="work-goal-filter" data-goal-filter="finished" role="tab" aria-selected="false" type="button">Finished Goals</button>
-                </div>
-                <span id="workGoalSummary">0 open · 0 done</span>
+          <div class="goal-scope active" id="personalGoalsScope" data-goal-scope-panel="personal">
+            <div class="goal-subtoolbar">
+              <div class="work-view-switch" role="group" aria-label="个人目标页面切换">
+                <button class="work-view-option active" data-work-view="list" type="button">List</button>
+                <button class="work-view-option" data-work-view="add" type="button">Add New</button>
               </div>
-              <div class="work-goal-list" id="workGoalList" aria-live="polite"></div>
             </div>
-            <div class="work-reset-zone">
-              <span id="workResetHint">准备好重新开始时，可以清空当前旅程。</span>
-              <button class="work-reset-button" id="workResetButton" type="button">Reset</button>
-            </div>
-          </div>
 
-          <div class="work-view" id="workAddView">
-            <form class="panel work-form" id="workGoalForm">
-              <div class="panel-title">
-                <h3>新增目标</h3>
-                <span>轻量记录</span>
-              </div>
-              <label data-work-label="title">
-                目标
-                <input id="workGoalTitle" type="text" maxlength="90" placeholder="例如：完成 5 份精投申请" required />
-              </label>
-              <div class="work-form-row">
-                <div class="work-form-field" data-work-label="category">
-                  <span class="work-field-heading">
-                    <label id="workGoalCategoryLabel" for="workGoalCategory">分类</label>
-                    <button class="inline-manage-button goal-manage-button" data-settings-section="focus" type="button">＋ 自定义</button>
-                  </span>
-                  <input id="workGoalCategory" type="text" maxlength="20" list="workGoalCategoryOptions" placeholder="求职 / 技术 / 健康" />
-                  <datalist id="workGoalCategoryOptions"></datalist>
+            <div class="work-view active" id="workListView">
+              <div class="panel work-list-panel">
+                <div class="panel-title">
+                  <div class="work-goal-filters" role="tablist" aria-label="Goal status">
+                    <button class="work-goal-filter active" data-goal-filter="current" role="tab" aria-selected="true" type="button">Current Goals</button>
+                    <button class="work-goal-filter" data-goal-filter="finished" role="tab" aria-selected="false" type="button">Finished Goals</button>
+                  </div>
+                  <span id="workGoalSummary">0 open · 0 done</span>
                 </div>
-                <div class="work-form-field work-deadline-field" data-work-label="deadline">
-                  <label id="workGoalDeadlineLabel" for="workGoalDeadlineTrigger">Deadline</label>
-                  <input id="workGoalDeadline" type="hidden" />
-                  <button class="work-date-trigger" id="workGoalDeadlineTrigger" type="button" aria-haspopup="dialog" aria-expanded="false">
-                    <span class="work-date-icon" aria-hidden="true"></span>
-                    <b id="workGoalDeadlineText">选择日期</b>
-                    <span class="work-date-chevron" aria-hidden="true"></span>
-                  </button>
-                  <div class="work-calendar" id="workDeadlineCalendar" role="dialog" aria-labelledby="workDeadlineCalendarTitle" hidden>
-                    <header class="work-calendar-head">
-                      <button id="workDeadlinePrev" type="button" aria-label="上个月">‹</button>
-                      <strong id="workDeadlineCalendarTitle"></strong>
-                      <button id="workDeadlineNext" type="button" aria-label="下个月">›</button>
-                    </header>
-                    <div class="work-calendar-weekdays" id="workDeadlineWeekdays" aria-hidden="true"></div>
-                    <div class="work-calendar-days" id="workDeadlineDays"></div>
-                    <footer class="work-calendar-foot">
-                      <button id="workDeadlineToday" type="button">今天</button>
-                      <button id="workDeadlineClear" type="button">清除</button>
-                    </footer>
+                <div class="work-goal-list" id="workGoalList" aria-live="polite"></div>
+              </div>
+              <div class="work-reset-zone">
+                <span id="workResetHint">准备好重新开始时，可以清空当前旅程。</span>
+                <button class="work-reset-button" id="workResetButton" type="button">Reset</button>
+              </div>
+            </div>
+
+            <div class="work-view" id="workAddView">
+              <form class="panel work-form" id="workGoalForm">
+                <div class="panel-title">
+                  <h3>新增目标</h3>
+                  <span>轻量记录</span>
+                </div>
+                <label data-work-label="title">
+                  目标
+                  <input id="workGoalTitle" type="text" maxlength="90" placeholder="例如：完成 5 份精投申请" required />
+                </label>
+                <div class="work-form-row">
+                  <div class="work-form-field" data-work-label="category">
+                    <span class="work-field-heading">
+                      <label id="workGoalCategoryLabel" for="workGoalCategory">分类</label>
+                      <button class="inline-manage-button goal-manage-button" data-settings-section="focus" type="button">＋ 自定义</button>
+                    </span>
+                    <input id="workGoalCategory" type="text" maxlength="20" list="workGoalCategoryOptions" placeholder="求职 / 技术 / 健康" />
+                    <datalist id="workGoalCategoryOptions"></datalist>
+                  </div>
+                  <div class="work-form-field work-deadline-field" data-work-label="deadline">
+                    <label id="workGoalDeadlineLabel" for="workGoalDeadlineTrigger">Deadline</label>
+                    <input id="workGoalDeadline" type="hidden" />
+                    <button class="work-date-trigger" id="workGoalDeadlineTrigger" type="button" aria-haspopup="dialog" aria-expanded="false">
+                      <span class="work-date-icon" aria-hidden="true"></span>
+                      <b id="workGoalDeadlineText">选择日期</b>
+                      <span class="work-date-chevron" aria-hidden="true"></span>
+                    </button>
+                    <div class="work-calendar" id="workDeadlineCalendar" role="dialog" aria-labelledby="workDeadlineCalendarTitle" hidden>
+                      <header class="work-calendar-head">
+                        <button id="workDeadlinePrev" type="button" aria-label="上个月">‹</button>
+                        <strong id="workDeadlineCalendarTitle"></strong>
+                        <button id="workDeadlineNext" type="button" aria-label="下个月">›</button>
+                      </header>
+                      <div class="work-calendar-weekdays" id="workDeadlineWeekdays" aria-hidden="true"></div>
+                      <div class="work-calendar-days" id="workDeadlineDays"></div>
+                      <footer class="work-calendar-foot">
+                        <button id="workDeadlineToday" type="button">今天</button>
+                        <button id="workDeadlineClear" type="button">清除</button>
+                      </footer>
+                    </div>
                   </div>
                 </div>
+                <button class="primary full" type="submit">加入目标列表</button>
+              </form>
+            </div>
+          </div>
+
+          <div class="goal-scope" id="familyGoalsScope" data-goal-scope-panel="family">
+            <section class="panel family-room-panel" id="familyRoomPanel" aria-labelledby="familyRoomTitle">
+              <div class="family-room-head">
+                <div>
+                  <p class="eyebrow" id="familyRoomEyebrow">Family Room</p>
+                  <h3 id="familyRoomTitle">家庭共享</h3>
+                  <p id="familyRoomCopy">登录后，可以创建一个轻量家庭空间。</p>
+                </div>
+                <button class="family-refresh-button" id="refreshFamilyRoom" type="button">Refresh</button>
               </div>
-              <button class="primary full" type="submit">加入目标列表</button>
-            </form>
+              <p class="family-room-message" id="familyRoomMessage" role="status"></p>
+              <div class="family-room-grid">
+                <form class="family-mini-card" id="createFamilyForm">
+                  <label>
+                    <span id="familyNameLabel">家庭名称</span>
+                    <input id="familyNameInput" type="text" maxlength="80" placeholder="例如：小白猫的家" />
+                  </label>
+                  <button class="secondary" id="createFamilyButton" type="submit">Create family</button>
+                </form>
+                <form class="family-mini-card" id="acceptInvitationForm">
+                  <label>
+                    <span id="familyTokenLabel">邀请 token</span>
+                    <input id="familyInvitationToken" type="text" autocomplete="off" placeholder="Paste invitation token" />
+                  </label>
+                  <button class="secondary" id="acceptInvitationButton" type="submit">Accept invitation</button>
+                </form>
+              </div>
+              <div class="family-active-card" id="familyActiveCard" hidden>
+                <div class="family-active-head">
+                  <div>
+                    <p class="eyebrow" id="familyActiveEyebrow">Current family</p>
+                    <h4 id="familyActiveName"></h4>
+                    <p id="familyActiveMeta"></p>
+                  </div>
+                  <button class="family-leave-button" id="leaveFamilyButton" type="button">Leave</button>
+                </div>
+                <div class="family-member-list" id="familyMemberList"></div>
+              <form class="family-invite-row" id="familyInviteForm">
+                <label>
+                  <span id="familyInviteLabel">Invite by email</span>
+                  <input id="familyInviteEmail" type="email" autocomplete="email" placeholder="family@example.com" />
+                </label>
+                <button class="primary" id="familyInviteButton" type="submit">Create invitation</button>
+              </form>
+              <div class="family-invitation-list" id="familyInvitationList"></div>
+              <section class="family-goals-panel" aria-labelledby="familyGoalsTitle">
+                <div class="family-goals-head">
+                  <div>
+                    <p class="eyebrow" id="familyGoalsEyebrow">Shared goals</p>
+                    <h4 id="familyGoalsTitle">Family goals</h4>
+                  </div>
+                  <span id="familyGoalSummary">0 open · 0 completed</span>
+                </div>
+                <form class="family-goal-form" id="familyGoalForm">
+                  <label class="family-goal-title-field">
+                    <span id="familyGoalTitleLabel">Goal</span>
+                    <input id="familyGoalTitleInput" type="text" maxlength="90" placeholder="For example: take a family walk" />
+                  </label>
+                  <label>
+                    <span id="familyGoalCategoryLabel">Category</span>
+                    <input id="familyGoalCategoryInput" type="hidden" />
+                    <div class="family-category-picker" id="familyGoalCategoryPicker" aria-label="Family goal category"></div>
+                    <input class="family-category-custom-input" id="familyGoalCategoryCustomInput" type="text" maxlength="24" placeholder="Home / Health / Together" />
+                  </label>
+                  <label>
+                    <span id="familyGoalUrgencyLabel">Urgency</span>
+                    <input id="familyGoalUrgencyInput" type="hidden" value="normal" />
+                    <div class="family-urgency-picker" id="familyGoalUrgencyPicker" aria-label="Family goal urgency"></div>
+                  </label>
+                  <label>
+                    <span id="familyGoalDeadlineLabel">Deadline</span>
+                    <input id="familyGoalDeadlineInput" type="date" />
+                  </label>
+                  <button class="primary family-goal-submit" id="familyGoalSubmit" type="submit">Add family goal</button>
+                </form>
+                <div class="family-goal-list" id="familyGoalList" aria-live="polite"></div>
+              </section>
+            </div>
+          </section>
           </div>
         </section>
 
@@ -701,6 +794,10 @@
               <p class="stats-subtitle" id="statsSubtitle">只看趋势，不评价每一天。</p>
             </div>
             <div class="stats-head-actions">
+              <div class="stats-scope-switch" role="tablist" aria-label="统计类型切换">
+                <button class="stats-scope-option active" data-stats-scope="personal" role="tab" aria-selected="true" type="button">Personal Stats</button>
+                <button class="stats-scope-option" data-stats-scope="family" role="tab" aria-selected="false" type="button">Family Stats</button>
+              </div>
               <div class="stats-range-switch" role="group" aria-label="统计时间范围">
                 <button class="stats-range active" data-stats-range="7" type="button">7 天</button>
                 <button class="stats-range" data-stats-range="30" type="button">30 天</button>
@@ -710,7 +807,8 @@
             </div>
           </div>
 
-          <div class="stats-sections">
+          <div class="stats-scope active" id="personalStatsScope" data-stats-scope-panel="personal">
+            <div class="stats-sections">
             <section class="stats-section stats-health-section">
               <header class="stats-section-head">
                 <span class="stats-section-icon" aria-hidden="true">♡</span>
@@ -829,6 +927,45 @@
                 </article>
               </div>
             </section>
+            </div>
+          </div>
+
+          <div class="stats-scope" id="familyStatsScope" data-stats-scope-panel="family">
+            <section class="stats-section stats-family-section">
+              <header class="stats-section-head">
+                <span class="stats-section-icon goals-icon" aria-hidden="true"></span>
+                <div>
+                  <p class="eyebrow" id="familyStatsEyebrow">Family Stats</p>
+                  <h3 id="familyStatsTitle">家庭统计</h3>
+                  <p id="familyStatsSubtitle">家庭目标和共享习惯的数据会放在这里。</p>
+                </div>
+                <div class="stats-inline-summary" id="familyStatsSummary"></div>
+              </header>
+              <div class="stats-chart-grid family-stats-grid" id="familyStatsGrid">
+                <article class="stats-chart-card">
+                  <div class="stats-chart-title">
+                    <span class="mini-goal-icon" aria-hidden="true"></span>
+                    <div><h4 id="familyGoalStatusTitle">Family goal status</h4><p id="familyGoalStatusMeta">Open and completed shared goals</p></div>
+                  </div>
+                  <div class="goal-status-chart family-goal-status-chart" id="familyGoalStatusChart"></div>
+                </article>
+                <article class="stats-chart-card">
+                  <div class="stats-chart-title">
+                    <span class="mini-bars-icon" aria-hidden="true"></span>
+                    <div><h4 id="familyGoalCategoryTitle">Family categories</h4><p id="familyGoalCategoryMeta">Shared goals by category</p></div>
+                  </div>
+                  <div class="goal-category-chart family-goal-category-chart" id="familyGoalCategoryChart"></div>
+                </article>
+                <article class="stats-chart-card family-urgency-card">
+                  <div class="stats-chart-title">
+                    <span class="mini-spark-icon" aria-hidden="true">!</span>
+                    <div><h4 id="familyGoalUrgencyTitle">Urgency</h4><p id="familyGoalUrgencyMeta">Low, normal, and high urgency</p></div>
+                  </div>
+                  <div class="family-urgency-chart" id="familyGoalUrgencyChart"></div>
+                </article>
+              </div>
+              <div class="stats-empty family-stats-empty" id="familyStatsEmpty">先完成家庭目标基础功能，再接入家庭统计。</div>
+            </section>
           </div>
         </section>
 
@@ -935,6 +1072,7 @@
           <button class="personalization-tab" data-personalization-tab="seed" role="tab" aria-selected="false" type="button">习惯种子</button>
           <button class="personalization-tab" data-personalization-tab="quotes" role="tab" aria-selected="false" type="button">自我照顾语录</button>
           <button class="personalization-tab" data-personalization-tab="calendar" role="tab" aria-selected="false" type="button">日历</button>
+          <button class="personalization-tab" data-personalization-tab="family-category" role="tab" aria-selected="false" type="button">Family categories</button>
         </div>
 
         <section class="personalization-section active" data-personalization-section="focus">
@@ -986,6 +1124,19 @@
           </div>
         </section>
 
+        <section class="personalization-section" data-personalization-section="family-category">
+          <div class="family-category-settings-state" id="familyCategorySettingsState"></div>
+          <div class="personalization-list" id="familyCategorySettingsList"></div>
+          <div class="personalization-add-row family-category-add-row" id="familyCategoryAddRow">
+            <input id="newFamilyCategoryName" type="text" maxlength="24" placeholder="New family category" />
+            <div class="definition-color-picker" data-color-picker>
+              <input id="newFamilyCategoryColor" type="hidden" value="#8baa97" />
+              <button class="definition-color-trigger" type="button" aria-label="Choose family category color" aria-expanded="false" style="--selected-color:#8baa97"></button>
+            </div>
+            <button class="personalization-add" id="addFamilyCategory" type="button">Add</button>
+          </div>
+        </section>
+
         <p class="personalization-note" id="personalizationNote">停用后不会出现在选择器中，过去的数据仍会保留。</p>
       </form>
       <div class="definition-color-palette" id="definitionColorPalette" role="listbox" aria-label="颜色选择" hidden></div>
@@ -993,6 +1144,10 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-config.js?v=20260608-2"></script>
-    <script src="app.js?v=20260619-4"></script>
+    <script src="src/core/language.js?v=20260701-1"></script>
+    <script src="src/core/storage.js?v=20260701-1"></script>
+    <script src="src/modules/goals.js?v=20260701-1"></script>
+    <script src="src/modules/family.js?v=20260702-family-categories-2"></script>
+    <script src="app.js?v=20260702-family-form-2"></script>
   </body>
 </html>

@@ -1,6 +1,6 @@
 # Current State
 
-Last updated: 2026-06-19
+Last updated: 2026-07-01
 
 ## Product
 
@@ -17,6 +17,8 @@ Last updated: 2026-06-19
 - The Low Energy Mode content uses a responsive, soft wellness layout with bilingual typography.
 - Goals use a custom bilingual deadline calendar and support guarded single-goal deletion.
 - Focus timing continues accurately when the page is not active.
+- Morning quote language cleanup and Stats skin-status labels now use shared language helpers.
+- Goals deadline and statistics calculations now use shared Goals domain helpers, ready for Family Goal reuse.
 - User data is stored locally first.
 
 ## Data and Deployment
@@ -25,17 +27,27 @@ Last updated: 2026-06-19
 - Row Level Security isolates each user's cloud state.
 - Cloud history, JSON backup, import, and restore protections are available.
 - Cloud writes use revision checks so a stale device cannot silently replace newer cloud data.
+- Family sharing schema now defines separate families, members, invitations, family goal categories, and family goals tables.
+- Family data is separate from private `app_states`; RLS policies limit access to family members and invited users where appropriate.
+- Goals now has separate Personal Goal and Family Goal sub-sections, keeping shared goal UI out of the personal goal flow.
+- Family Goal MVP can add shared goals with deadline, separate family category, urgency, completion note, reopen, and delete actions.
 - GitHub `main` deploys through Cloudflare Pages.
 
 ## Current Limitations
 
-- Family sharing is not implemented.
+- Family sharing still needs remove-member UI, richer family category management, and two-account permission testing.
+- Family statistics are scaffolded separately from personal statistics, but the charts are not wired yet.
 - External health and wearable data cannot yet be imported.
 
 ## Repository
 
 - Current application files are a static HTML, CSS, and JavaScript SPA.
-- The roadmap now points to Version 2 family sharing.
+- The app now has a small gradual module foundation under `src/`.
+- `src/core/language.js` owns language-safe quote cleanup and skin label formatting.
+- `src/core/storage.js` owns local JSON read/write, deep clone, and default state merging.
+- `src/modules/goals.js` owns reusable goal sorting, deadline, and stats calculations.
+- `src/modules/family.js` owns Supabase family operations and maps database rows into app-friendly objects.
+- The roadmap still points to Version 2 family sharing, after the foundation pass.
 - `assets/images/my-care-linkedin-thumbnail.png` remains an unrelated untracked file.
 
 ## Latest Validation
@@ -46,3 +58,7 @@ Last updated: 2026-06-19
 - Legacy Goals, notes, custom definitions, and bilingual Quote records migrate into the current state.
 - Cloud sync and JSON backup serialize the full application state and normalize restored settings.
 - Goals calendar, single-goal deletion, personalization, color selection, personal calendar, and language flows were regression checked locally.
+- `node scripts/check-phase0-language.js`, `node scripts/check-core-storage.js`, and `node scripts/check-goals-module.js` pass.
+- `node scripts/check-family-schema.js` passes for the Family Sharing schema foundation.
+- `node scripts/check-family-service.js` passes for family row mapping and shared goal stats.
+- `node scripts/check-goals-stats-structure.js` passes and checks that Personal/Family Goals and Stats stay separated.
