@@ -1,6 +1,6 @@
 # Current State
 
-Last updated: 2026-07-02
+Last updated: 2026-07-03
 
 ## Product
 
@@ -33,13 +33,18 @@ Last updated: 2026-07-02
 - Goals now has separate Personal Goal and Family Goal sub-sections, keeping shared goal UI out of the personal goal flow.
 - Family Goal MVP can add shared goals with deadline, separate family category, urgency, completion note, reopen, and delete actions.
 - Personal Stats now has an opt-in family sharing panel with preview before saving.
-- Family Stats can show family goal charts and shared personal summary snapshots.
+- Family Stats can show family goal charts and member-grouped shared personal summary snapshots.
+- Personal Stats shared summaries now show shared/not-shared status and can be stopped from the preview cards.
+- Personal Stats sharing can be limited to selected summary types: skin, wake, focus, or goals.
+- Personal Stats sharing can use its own range: today, this week, or this month, separate from the main Stats chart range.
+- Family Stats now includes low-pressure family garden cards based only on opt-in shared summaries.
 - GitHub `main` deploys through Cloudflare Pages.
 
 ## Current Limitations
 
 - Family sharing still needs remove-member UI, richer family category management, and two-account permission testing.
 - Family statistics are scaffolded separately from personal statistics and can show family goals plus opt-in shared summaries.
+- Shared personal stats currently expose lightweight summaries only; richer member-level sharing rules are still future work.
 - External health and wearable data cannot yet be imported.
 
 ## Repository
@@ -67,3 +72,4 @@ Last updated: 2026-07-02
 - `node scripts/check-family-service.js` passes for family row mapping and shared goal stats.
 - `node scripts/check-sharing-module.js` passes for privacy-safe personal stats snapshot generation.
 - `node scripts/check-goals-stats-structure.js` passes and checks that Personal/Family Goals and Stats stay separated.
+- `node --check app.js` passes after the shared-summary control update.

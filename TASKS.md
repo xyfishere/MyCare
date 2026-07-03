@@ -31,3 +31,7 @@
 - [x] Add a small `sharing` service/module for summary snapshots.
 - [x] Add Personal Stats share settings with preview.
 - [x] Add Family Stats shared-summary display.
+- [x] Add shared-summary status, stop-sharing control, and member-grouped Family Stats display.
+- [x] Let users choose which personal stat summaries to share with family.
+- [x] Let users choose the shared-summary time range: today, this week, or this month.
+- [x] Add a low-pressure Family member overview based on opt-in shared summaries.

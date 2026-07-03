@@ -821,6 +821,8 @@
                 <div class="stats-inline-summary" id="personalShareSummary"></div>
               </header>
               <div class="shared-stats-panel">
+                <div class="shared-stats-type-picker" id="personalShareTypes" aria-label="Choose shared summary types"></div>
+                <div class="shared-stats-type-picker shared-stats-range-picker" id="personalShareRange" aria-label="Choose shared summary range"></div>
                 <div class="shared-stats-preview" id="personalSharePreview"></div>
                 <div class="shared-stats-actions">
                   <button class="secondary shared-stats-refresh" id="previewSharedStats" type="button">Preview</button>
@@ -983,6 +985,13 @@
                     <div><h4 id="familyGoalUrgencyTitle">Urgency</h4><p id="familyGoalUrgencyMeta">Low, normal, and high urgency</p></div>
                   </div>
                   <div class="family-urgency-chart" id="familyGoalUrgencyChart"></div>
+                </article>
+                <article class="stats-chart-card family-member-card">
+                  <div class="stats-chart-title">
+                    <span class="mini-people-icon" aria-hidden="true"></span>
+                    <div><h4 id="familyMemberOverviewTitle">Member overview</h4><p id="familyMemberOverviewMeta">Shared summaries by family member</p></div>
+                  </div>
+                  <div class="family-member-overview" id="familyMemberOverviewChart"></div>
                 </article>
                 <article class="stats-chart-card family-shared-card">
                   <div class="stats-chart-title">

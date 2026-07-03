@@ -56,6 +56,9 @@ const defaultHabitSeeds = [
   { id: "soft-skills", labelZh: "Soft Skills", labelEn: "Soft Skills", color: "#ad9fbe", active: true, builtIn: true },
 ];
 
+const shareableStatsTypes = ["skin", "sleep", "focus", "goals"];
+const shareableStatsRanges = ["day", "week", "month"];
+
 const personalizationColorPalette = [
   "#9eb39f", "#7fa98d", "#b4c49b", "#8faebe",
   "#a8bec6", "#9ba7c2", "#ad9fbe", "#c0a8c0",
@@ -80,6 +83,8 @@ const defaults = {
     language: "zh",
     focusCategories: defaultFocusCategories,
     habitSeedTypes: defaultHabitSeeds,
+    sharedStatsTypes: shareableStatsTypes,
+    sharedStatsRange: "week",
     selfCareQuotes: [],
     recordDataResetVersion: RECORD_DATA_RESET_VERSION,
     lastLocalChangeAt: "",
@@ -1257,7 +1262,19 @@ function migrateNightMusicPlaylists(savedPlaylists = {}) {
 function normalizePersonalizationSettings(settings) {
   settings.focusCategories = normalizeDefinitionList(settings.focusCategories, defaultFocusCategories);
   settings.habitSeedTypes = normalizeDefinitionList(settings.habitSeedTypes, defaultHabitSeeds);
+  settings.sharedStatsTypes = normalizeSharedStatsTypes(settings.sharedStatsTypes);
+  settings.sharedStatsRange = normalizeSharedStatsRange(settings.sharedStatsRange);
   settings.selfCareQuotes = normalizeQuoteDefinitions(settings.selfCareQuotes);
+}
+
+function normalizeSharedStatsTypes(saved) {
+  if (!Array.isArray(saved)) return [...shareableStatsTypes];
+  const selected = saved.filter((type) => shareableStatsTypes.includes(type));
+  return [...new Set(selected)];
+}
+
+function normalizeSharedStatsRange(saved) {
+  return shareableStatsRanges.includes(saved) ? saved : "week";
 }
 
 function normalizeDefinitionList(saved, fallback) {
@@ -2863,6 +2880,8 @@ function renderStatsLanguage() {
     familyGoalCategoryMeta: zh ? "按家庭分类查看共享目标" : "Shared goals by category",
     familyGoalUrgencyTitle: zh ? "紧急程度" : "Urgency",
     familyGoalUrgencyMeta: zh ? "低、普通、紧急的分布" : "Low, normal, and high urgency",
+    familyMemberOverviewTitle: zh ? "\u5173\u5fc3\u4fe1\u53f7" : "Care signals",
+    familyMemberOverviewMeta: zh ? "\u7528\u6210\u5458\u6388\u6743\u7684\u6458\u8981\u770b\u89c1\u72b6\u6001\u53d8\u5316" : "State changes from opt-in summaries",
   });
   Object.assign(labels, {
     personalShareEyebrow: zh ? "\u6e29\u67d4\u5206\u4eab" : "Share softly",
@@ -2932,11 +2951,11 @@ function renderStatsScope() {
 
 async function refreshStatsFamilyContext() {
   if (!supabaseClient || !currentUser || familyState.loading || familyState.families.length) {
-    renderPersonalSharedStats(getStatsDays());
+    renderPersonalSharedStats();
     return;
   }
   await loadFamilyRoom({ keepMessage: true });
-  renderPersonalSharedStats(getStatsDays());
+  renderPersonalSharedStats();
   renderFamilyStats(getStatsDays());
 }
 
@@ -4985,8 +5004,11 @@ function bindStats() {
   $("#previewSharedStats")?.addEventListener("click", () => {
     sharedStatsError = false;
     sharedStatsMessage = getSharingText().previewed;
-    renderPersonalSharedStats(getStatsDays());
+    renderPersonalSharedStats();
   });
+  $("#personalShareTypes")?.addEventListener("click", handleSharedStatsTypeToggle);
+  $("#personalShareRange")?.addEventListener("click", handleSharedStatsRangeToggle);
+  $("#personalSharePreview")?.addEventListener("click", handleSharedStatsPreviewAction);
   $("#saveSharedStats")?.addEventListener("click", sharePersonalStatsWithFamily);
   $$(".stats-scope-option").forEach((button) => {
     button.addEventListener("click", () => {
@@ -5144,7 +5166,7 @@ function drawCharts() {
   drawCategoryChart($("#categoryChart"), days);
   renderSkinTimeline(days);
   renderStatsSummaries(days, focusSessions);
-  renderPersonalSharedStats(days);
+  renderPersonalSharedStats();
   renderGoalStats(days);
   renderFamilyStats(days);
   renderSeedStats(days, focusSessions);
@@ -5499,7 +5521,10 @@ function getSharingText() {
     previewSignedOut: zh ? "\u8fd9\u662f\u672c\u5730\u9884\u89c8\u3002\u767b\u5f55\u540e\u624d\u80fd\u5206\u4eab\u7ed9\u5bb6\u5ead\u3002" : "This is a local preview. Sign in to share it with family.",
     previewNoFamily: zh ? "\u8fd9\u662f\u672c\u5730\u9884\u89c8\u3002\u52a0\u5165\u5bb6\u5ead\u540e\u624d\u80fd\u4fdd\u5b58\u5206\u4eab\u3002" : "This is a local preview. Join a family to save it as shared.",
     saved: zh ? "\u5df2\u5206\u4eab\u7ed9\u5bb6\u5ead\u3002" : "Shared with family.",
+    stopped: zh ? "\u5df2\u505c\u6b62\u5206\u4eab\u8fd9\u4efd\u6458\u8981\u3002" : "Stopped sharing this summary.",
     failed: zh ? "\u6682\u65f6\u65e0\u6cd5\u5206\u4eab\u3002" : "Could not share right now.",
+    stopFailed: zh ? "\u6682\u65f6\u65e0\u6cd5\u505c\u6b62\u5206\u4eab\u3002" : "Could not stop sharing right now.",
+    selectOne: zh ? "\u8bf7\u81f3\u5c11\u9009\u62e9\u4e00\u4e2a\u60f3\u5206\u4eab\u7684\u6458\u8981\u3002" : "Choose at least one summary to share.",
     missingTable: zh
       ? "\u8fd8\u6ca1\u6709\u521b\u5efa family_shared_stats \u8868\u3002\u8bf7\u5148\u5728 Supabase SQL Editor \u8fd0\u884c supabase/create-family-shared-stats.sql\u3002"
       : "The family_shared_stats table is missing. Run supabase/create-family-shared-stats.sql in Supabase SQL Editor first.",
@@ -5516,6 +5541,31 @@ function getSharingText() {
     open: zh ? "\u8fdb\u884c\u4e2d" : "open",
     noShared: zh ? "\u8fd8\u6ca1\u6709\u5bb6\u5ead\u6210\u5458\u5206\u4eab\u7edf\u8ba1\u6458\u8981\u3002" : "No shared personal summaries yet.",
     hidden: zh ? "\u79c1\u5bc6\u7b14\u8bb0\u4e0d\u4f1a\u88ab\u5206\u4eab" : "Private notes are not shared",
+    shareTypesTitle: zh ? "\u9009\u62e9\u5206\u4eab\u5185\u5bb9" : "Choose what to share",
+    shareTypesHint: zh ? "\u53ea\u4fdd\u5b58\u4f60\u9009\u4e2d\u7684\u6458\u8981" : "Only selected summaries will be saved",
+    shareRangeTitle: zh ? "\u9009\u62e9\u5206\u4eab\u8303\u56f4" : "Choose a time range",
+    shareRangeHint: zh ? "\u53ea\u5206\u4eab\u8fd9\u4e2a\u8303\u56f4\u7684\u8f7b\u91cf\u6458\u8981" : "Only this range will be summarized",
+    dayRange: zh ? "\u4eca\u5929" : "Today",
+    weekRange: zh ? "\u672c\u5468" : "This week",
+    monthRange: zh ? "\u672c\u6708" : "This month",
+    shared: zh ? "\u5df2\u5206\u4eab" : "Shared",
+    notShared: zh ? "\u672a\u5206\u4eab" : "Not shared",
+    stopSharing: zh ? "\u505c\u6b62\u5206\u4eab" : "Stop sharing",
+    sharedBy: zh ? "\u6765\u81ea" : "From",
+    summaries: zh ? "\u4efd\u6458\u8981" : "summaries",
+    careSteady: zh ? "\u770b\u8d77\u6765\u6bd4\u8f83\u7a33\u5b9a" : "Looks steady",
+    careCheckIn: zh ? "\u53ef\u4ee5\u6e29\u67d4\u5173\u5fc3\u4e00\u4e0b" : "Worth a gentle check-in",
+    careLimited: zh ? "\u4fe1\u53f7\u8fd8\u5f88\u5c11" : "Not much shared yet",
+    skinSignal: zh ? "\u76ae\u80a4\u72b6\u6001" : "Skin state",
+    wakeSignal: zh ? "\u5e73\u5747\u8d77\u5e8a" : "Avg wake",
+    focusSignal: zh ? "\u4e13\u6ce8\u53d8\u5316" : "Focus change",
+    goalsSignal: zh ? "\u76ee\u6807\u72b6\u6001" : "Goal state",
+    noSignal: zh ? "\u8fd8\u6ca1\u6709\u53ef\u5224\u65ad\u7684\u72b6\u6001\u53d8\u5316" : "No clear state change yet",
+    laterThanBefore: zh ? "\u6bd4\u4e0a\u6b21\u665a" : "later than last share",
+    earlierThanBefore: zh ? "\u6bd4\u4e0a\u6b21\u65e9" : "earlier than last share",
+    lessThanBefore: zh ? "\u6bd4\u4e0a\u6b21\u5c11" : "less than last share",
+    moreThanBefore: zh ? "\u6bd4\u4e0a\u6b21\u591a" : "more than last share",
+    openGoalsWaiting: zh ? "\u8fd8\u6709\u76ee\u6807\u5728\u7b49\u5f85" : "open goals waiting",
   };
 }
 
@@ -5527,14 +5577,126 @@ function getSharedStatsPeriod(days = getStatsDays()) {
   };
 }
 
-function getSharedStatsSnapshots(days = getStatsDays()) {
+function getSharedStatsDaysForRange(range = getSelectedSharedStatsRange()) {
+  if (range === "day") return recentDays(1);
+  if (range === "month") return recentDays(30);
+  return recentDays(7);
+}
+
+function getSharedStatsTypeOptions() {
+  const text = getSharingText();
+  return [
+    { key: "skin", label: text.skin },
+    { key: "sleep", label: text.sleep },
+    { key: "focus", label: text.focus },
+    { key: "goals", label: text.goals },
+  ];
+}
+
+function getSharedStatsRangeOptions() {
+  const text = getSharingText();
+  return [
+    { key: "day", label: text.dayRange },
+    { key: "week", label: text.weekRange },
+    { key: "month", label: text.monthRange },
+  ];
+}
+
+function getSelectedSharedStatsTypes() {
+  state.settings.sharedStatsTypes = normalizeSharedStatsTypes(state.settings.sharedStatsTypes);
+  return state.settings.sharedStatsTypes;
+}
+
+function getSelectedSharedStatsRange() {
+  state.settings.sharedStatsRange = normalizeSharedStatsRange(state.settings.sharedStatsRange);
+  return state.settings.sharedStatsRange;
+}
+
+function getSelectedSharedStatsRangeLabel() {
+  const selected = getSelectedSharedStatsRange();
+  return getSharedStatsRangeOptions().find((item) => item.key === selected)?.label || getSharingText().weekRange;
+}
+
+function handleSharedStatsTypeToggle(event) {
+  const button = event.target.closest("[data-shared-stats-type]");
+  if (!button) return;
+  const type = button.dataset.sharedStatsType;
+  if (!shareableStatsTypes.includes(type)) return;
+  const selected = new Set(getSelectedSharedStatsTypes());
+  if (selected.has(type)) {
+    selected.delete(type);
+  } else {
+    selected.add(type);
+  }
+  state.settings.sharedStatsTypes = shareableStatsTypes.filter((item) => selected.has(item));
+  sharedStatsError = false;
+  sharedStatsMessage = getSharingText().previewed;
+  saveState();
+  renderPersonalSharedStats();
+}
+
+function handleSharedStatsRangeToggle(event) {
+  const button = event.target.closest("[data-shared-stats-range]");
+  if (!button) return;
+  const range = button.dataset.sharedStatsRange;
+  if (!shareableStatsRanges.includes(range)) return;
+  state.settings.sharedStatsRange = range;
+  sharedStatsError = false;
+  sharedStatsMessage = getSharingText().previewed;
+  saveState();
+  renderPersonalSharedStats();
+}
+
+function renderSharedStatsTypeControls() {
+  const target = $("#personalShareTypes");
+  if (!target) return;
+  const text = getSharingText();
+  const selected = new Set(getSelectedSharedStatsTypes());
+  target.innerHTML = `
+    <div>
+      <span>${escapeHtml(text.shareTypesTitle)}</span>
+      <small>${escapeHtml(text.shareTypesHint)}</small>
+    </div>
+    <div class="shared-stats-type-options">
+      ${getSharedStatsTypeOptions().map((item) => `
+        <button class="shared-stats-type${selected.has(item.key) ? " active" : ""}" type="button" data-shared-stats-type="${escapeHtml(item.key)}" aria-pressed="${selected.has(item.key) ? "true" : "false"}">
+          <i aria-hidden="true"></i>
+          ${escapeHtml(item.label)}
+        </button>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderSharedStatsRangeControls() {
+  const target = $("#personalShareRange");
+  if (!target) return;
+  const text = getSharingText();
+  const selected = getSelectedSharedStatsRange();
+  target.innerHTML = `
+    <div>
+      <span>${escapeHtml(text.shareRangeTitle)}</span>
+      <small>${escapeHtml(text.shareRangeHint)}</small>
+    </div>
+    <div class="shared-stats-type-options">
+      ${getSharedStatsRangeOptions().map((item) => `
+        <button class="shared-stats-type${selected === item.key ? " active" : ""}" type="button" data-shared-stats-range="${escapeHtml(item.key)}" aria-pressed="${selected === item.key ? "true" : "false"}">
+          <i aria-hidden="true"></i>
+          ${escapeHtml(item.label)}
+        </button>
+      `).join("")}
+    </div>
+  `;
+}
+
+function getSharedStatsSnapshots(days = getStatsDays(), summaryTypes = getSelectedSharedStatsTypes()) {
   const family = getActiveFamily();
   const period = getSharedStatsPeriod(days);
   return window.MyCare.sharing.buildPersonalStatsSnapshots(state, {
     familyId: family?.id || "",
     periodStart: period.periodStart,
     periodEnd: period.periodEnd,
-    summaryTypes: ["skin", "sleep", "focus", "goals"],
+    summaryTypes,
   });
 }
 
@@ -5570,7 +5732,17 @@ function getSharedStatsTitle(type) {
   }[type] || type;
 }
 
-function renderPersonalSharedStats(days = getStatsDays()) {
+function findSharedStatForSnapshot(snapshot) {
+  if (!currentUser) return null;
+  return (familyState.sharedStats || []).find((item) => item.visible !== false
+    && item.ownerId === currentUser.id
+    && item.familyId === snapshot.familyId
+    && item.periodStart === snapshot.periodStart
+    && item.periodEnd === snapshot.periodEnd
+    && item.summaryType === snapshot.summaryType) || null;
+}
+
+function renderPersonalSharedStats(days = getSharedStatsDaysForRange()) {
   const preview = $("#personalSharePreview");
   const summary = $("#personalShareSummary");
   const message = $("#sharedStatsMessage");
@@ -5581,24 +5753,66 @@ function renderPersonalSharedStats(days = getStatsDays()) {
   const family = getActiveFamily();
   const signedIn = Boolean(supabaseClient && currentUser);
   const period = getSharedStatsPeriod(days);
+  const selectedTypes = getSelectedSharedStatsTypes();
+  const hasSelectedTypes = selectedTypes.length > 0;
 
   summary.innerHTML = summaryPills([
-    [selectedStatsRange === "all" ? "All" : days.length, text.period],
-    [family ? 1 : 0, getLanguage() === "zh" ? "\u5bb6\u5ead" : "Family"],
+    [getSelectedSharedStatsRangeLabel(), text.period],
+    [selectedTypes.length, text.shareTypesTitle],
   ]);
   message.classList.toggle("is-error", sharedStatsError);
-  message.textContent = sharedStatsMessage || (!signedIn ? text.previewSignedOut : !family ? text.previewNoFamily : text.ready);
-  saveButton.disabled = !signedIn || !family;
+  message.textContent = sharedStatsMessage || (!hasSelectedTypes ? text.selectOne : !signedIn ? text.previewSignedOut : !family ? text.previewNoFamily : text.ready);
+  saveButton.disabled = !signedIn || !family || !hasSelectedTypes;
   previewButton.disabled = false;
+  renderSharedStatsTypeControls();
+  renderSharedStatsRangeControls();
 
-  const snapshots = getSharedStatsSnapshots(days);
-  preview.innerHTML = snapshots.map((snapshot) => `
-    <article class="shared-stat-preview-card" data-shared-type="${escapeHtml(snapshot.summaryType)}">
-      <span>${escapeHtml(getSharedStatsTitle(snapshot.summaryType))}</span>
+  const snapshots = getSharedStatsSnapshots(days, selectedTypes);
+  preview.innerHTML = snapshots.length
+    ? snapshots.map((snapshot) => `
+    ${renderSharedStatsPreviewCard(snapshot, period)}
+  `).join("")
+    : `<div class="shared-stats-state">${escapeHtml(text.selectOne)}</div>`;
+}
+
+function renderSharedStatsPreviewCard(snapshot, period) {
+  const text = getSharingText();
+  const shared = findSharedStatForSnapshot(snapshot);
+  return `
+    <article class="shared-stat-preview-card${shared ? " is-shared" : ""}" data-shared-type="${escapeHtml(snapshot.summaryType)}">
+      <div class="shared-stat-preview-top">
+        <span>${escapeHtml(getSharedStatsTitle(snapshot.summaryType))}</span>
+        <em>${escapeHtml(shared ? text.shared : text.notShared)}</em>
+      </div>
       <strong>${escapeHtml(formatSharedStatsValue(snapshot))}</strong>
       <small>${escapeHtml(period.periodStart)} - ${escapeHtml(period.periodEnd)}</small>
+      ${shared ? `<button class="shared-stat-stop" type="button" data-shared-stat-action="stop" data-shared-stat-id="${escapeHtml(shared.id)}">${escapeHtml(text.stopSharing)}</button>` : ""}
     </article>
-  `).join("");
+  `;
+}
+
+async function handleSharedStatsPreviewAction(event) {
+  const button = event.target.closest("[data-shared-stat-action='stop']");
+  if (!button) return;
+  const statId = button.dataset.sharedStatId;
+  const text = getSharingText();
+  if (!statId || !supabaseClient || !currentUser) return;
+  button.disabled = true;
+  try {
+    await window.MyCare.sharing.setSharedStatVisibility(supabaseClient, currentUser, statId, false);
+    familyState.sharedStats = (familyState.sharedStats || []).map((item) => (
+      item.id === statId ? { ...item, visible: false } : item
+    ));
+    sharedStatsError = false;
+    sharedStatsMessage = text.stopped;
+    renderPersonalSharedStats();
+    renderFamilyStats(getStatsDays());
+  } catch (error) {
+    console.error("Stopping shared stat failed", error);
+    sharedStatsError = true;
+    sharedStatsMessage = `${text.stopFailed} ${error?.message || ""}`.trim();
+    renderPersonalSharedStats();
+  }
 }
 
 async function sharePersonalStatsWithFamily() {
@@ -5606,24 +5820,31 @@ async function sharePersonalStatsWithFamily() {
   const text = getSharingText();
   if (!supabaseClient || !currentUser) {
     sharedStatsMessage = text.signedOut;
-    renderPersonalSharedStats(getStatsDays());
+    renderPersonalSharedStats();
     return;
   }
   if (!family) {
     sharedStatsMessage = text.noFamily;
-    renderPersonalSharedStats(getStatsDays());
+    renderPersonalSharedStats();
+    return;
+  }
+  const selectedTypes = getSelectedSharedStatsTypes();
+  if (!selectedTypes.length) {
+    sharedStatsError = true;
+    sharedStatsMessage = text.selectOne;
+    renderPersonalSharedStats();
     return;
   }
   try {
     sharedStatsError = false;
     sharedStatsMessage = text.loading;
-    renderPersonalSharedStats(getStatsDays());
-    const snapshots = getSharedStatsSnapshots(getStatsDays());
+    renderPersonalSharedStats();
+    const snapshots = getSharedStatsSnapshots(getSharedStatsDaysForRange(), selectedTypes);
     const saved = await window.MyCare.sharing.saveSharedStats(supabaseClient, currentUser, snapshots);
     familyState.sharedStats = mergeSharedStats(familyState.sharedStats, saved);
     sharedStatsError = false;
     sharedStatsMessage = text.saved;
-    renderPersonalSharedStats(getStatsDays());
+    renderPersonalSharedStats();
     renderFamilyStats(getStatsDays());
   } catch (error) {
     console.error("Sharing stats failed", error);
@@ -5632,7 +5853,7 @@ async function sharePersonalStatsWithFamily() {
     sharedStatsMessage = message.includes("family_shared_stats")
       ? text.missingTable
       : `${text.failed} ${message}`.trim();
-    renderPersonalSharedStats(getStatsDays());
+    renderPersonalSharedStats();
   }
 }
 
@@ -5661,15 +5882,259 @@ function renderFamilySharedStats(days = getStatsDays()) {
     target.innerHTML = `<div class="stats-empty">${escapeHtml(text.noShared)}</div>`;
     return;
   }
-  target.innerHTML = stats.slice(0, 12).map((item) => `
-    <article class="family-shared-stat-row" data-shared-type="${escapeHtml(item.summaryType)}">
-      <div>
-        <span>${escapeHtml(getSharedStatsTitle(item.summaryType))}</span>
-        <strong>${escapeHtml(formatSharedStatsValue(item))}</strong>
+  const groups = stats.reduce((acc, item) => {
+    const key = item.ownerId || "unknown";
+    if (!acc.has(key)) acc.set(key, []);
+    acc.get(key).push(item);
+    return acc;
+  }, new Map());
+  target.innerHTML = [...groups.entries()].slice(0, 6).map(([ownerId, items]) => `
+    <section class="family-shared-stat-group">
+      <header>
+        <h5>${escapeHtml(getSharedStatsOwnerLabel(ownerId))}</h5>
+        <small>${items.length} ${escapeHtml(text.summaries)}</small>
+      </header>
+      <div class="family-shared-stat-group-list">
+        ${items.slice(0, 6).map((item) => `
+          <article class="family-shared-stat-row" data-shared-type="${escapeHtml(item.summaryType)}">
+            <div>
+              <span>${escapeHtml(getSharedStatsTitle(item.summaryType))}</span>
+              <strong>${escapeHtml(formatSharedStatsValue(item))}</strong>
+            </div>
+            <small>${escapeHtml(item.periodStart)} - ${escapeHtml(item.periodEnd)}</small>
+          </article>
+        `).join("")}
       </div>
-      <small>${escapeHtml(getSharedStatsOwnerLabel(item.ownerId))}<br>${escapeHtml(item.periodStart)} - ${escapeHtml(item.periodEnd)}</small>
-    </article>
+    </section>
   `).join("");
+}
+
+function getFamilySharedStatsInRange(days = getStatsDays()) {
+  const { periodStart, periodEnd } = getSharedStatsPeriod(days);
+  return (familyState.sharedStats || [])
+    .filter((item) => item.visible !== false)
+    .filter((item) => !(item.periodEnd < periodStart || item.periodStart > periodEnd));
+}
+
+function createFamilyMemberOverviewRow(ownerId) {
+  return {
+    ownerId,
+    label: getSharedStatsOwnerLabel(ownerId),
+    summaries: 0,
+    focusMinutes: 0,
+    focusSessions: 0,
+    goalCompleted: 0,
+    skinDays: 0,
+    wakeRecords: 0,
+    types: new Set(),
+    byType: {},
+  };
+}
+
+function getFamilyMemberOverviewRows(days = getStatsDays()) {
+  const stats = getFamilySharedStatsInRange(days)
+    .sort((a, b) => String(b.periodEnd || "").localeCompare(String(a.periodEnd || ""))
+      || String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")));
+  const rows = new Map();
+  familyState.members.forEach((member) => {
+    rows.set(member.userId, createFamilyMemberOverviewRow(member.userId));
+  });
+  stats.forEach((item) => {
+    const ownerId = item.ownerId || "unknown";
+    if (!rows.has(ownerId)) {
+      rows.set(ownerId, createFamilyMemberOverviewRow(ownerId));
+    }
+    const row = rows.get(ownerId);
+    const payload = item.payload || {};
+    row.summaries += 1;
+    row.types.add(item.summaryType);
+    if (!row.byType[item.summaryType]) {
+      row.byType[item.summaryType] = { latest: item, previous: null };
+    } else if (!row.byType[item.summaryType].previous) {
+      row.byType[item.summaryType].previous = item;
+    }
+    if (item.summaryType === "focus") {
+      row.focusMinutes += Number(payload.minutes || 0);
+      row.focusSessions += Number(payload.sessions || 0);
+    }
+    if (item.summaryType === "goals") {
+      row.goalCompleted += Number(payload.completed || 0);
+    }
+    if (item.summaryType === "skin") {
+      row.skinDays += Number(payload.totalDays || 0);
+    }
+    if (item.summaryType === "sleep") {
+      row.wakeRecords += Number(payload.recordCount || 0);
+    }
+  });
+  return [...rows.values()];
+}
+
+function minutesFromClockText(value = "") {
+  const match = String(value || "").match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  return hour * 60 + minute;
+}
+
+function formatMinuteDelta(minutes) {
+  const absolute = Math.abs(Math.round(minutes));
+  if (absolute < 60) return `${absolute}m`;
+  const hours = Math.floor(absolute / 60);
+  const mins = absolute % 60;
+  return mins ? `${hours}h ${mins}m` : `${hours}h`;
+}
+
+function isStableSkinStatus(status = "") {
+  return ["stable", "\u7a33\u5b9a", "\u7a33\u5b9a", "绋冲畾"].includes(String(status || "").trim().toLowerCase())
+    || formatSkinStateLabel(status).toLowerCase() === "stable";
+}
+
+function getMemberCareSignals(row) {
+  const text = getSharingText();
+  const signals = [];
+  let concernScore = 0;
+  const skin = row.byType.skin;
+  const sleep = row.byType.sleep;
+  const focus = row.byType.focus;
+  const goals = row.byType.goals;
+
+  if (skin?.latest?.payload?.topStatus) {
+    const current = skin.latest.payload.topStatus;
+    const previous = skin.previous?.payload?.topStatus || "";
+    const label = formatSkinStateLabel(current);
+    const changed = previous && previous !== current;
+    const concern = !isStableSkinStatus(current);
+    if (concern) concernScore += 1;
+    signals.push({
+      type: "skin",
+      concern,
+      label: text.skinSignal,
+      value: label,
+      detail: changed ? `${formatSkinStateLabel(previous)} → ${label}` : `${skin.latest.payload.totalDays || 0} ${text.days}`,
+    });
+  }
+
+  if (sleep?.latest?.payload?.averageWakeTime) {
+    const current = sleep.latest.payload.averageWakeTime;
+    const previous = sleep.previous?.payload?.averageWakeTime || "";
+    const currentMinutes = minutesFromClockText(current);
+    const previousMinutes = minutesFromClockText(previous);
+    const delta = Number.isFinite(currentMinutes) && Number.isFinite(previousMinutes)
+      ? currentMinutes - previousMinutes
+      : 0;
+    const hasDelta = Number.isFinite(currentMinutes) && Number.isFinite(previousMinutes);
+    const concern = hasDelta && delta > 45;
+    if (concern) concernScore += 1;
+    signals.push({
+      type: "sleep",
+      concern,
+      label: text.wakeSignal,
+      value: current,
+      detail: hasDelta && Math.abs(delta) >= 15
+        ? `${formatMinuteDelta(delta)} ${delta > 0 ? text.laterThanBefore : text.earlierThanBefore}`
+        : `${sleep.latest.payload.recordCount || 0} ${text.records}`,
+    });
+  }
+
+  if (focus?.latest) {
+    const current = Number(focus.latest.payload?.minutes || 0);
+    const previous = focus.previous ? Number(focus.previous.payload?.minutes || 0) : null;
+    const delta = previous === null ? 0 : current - previous;
+    const concern = previous !== null && delta < -20;
+    if (concern) concernScore += 1;
+    signals.push({
+      type: "focus",
+      concern,
+      label: text.focusSignal,
+      value: `${current} ${text.minutes}`,
+      detail: previous !== null && Math.abs(delta) >= 10
+        ? `${formatMinuteDelta(delta)} ${delta < 0 ? text.lessThanBefore : text.moreThanBefore}`
+        : `${focus.latest.payload?.sessions || 0} ${text.sessions}`,
+    });
+  }
+
+  if (goals?.latest) {
+    const completed = Number(goals.latest.payload?.completed || 0);
+    const open = Number(goals.latest.payload?.open || 0);
+    const concern = open > 0 && completed === 0;
+    if (concern) concernScore += 1;
+    signals.push({
+      type: "goals",
+      concern,
+      label: text.goalsSignal,
+      value: `${completed} ${text.completed}`,
+      detail: open > 0 ? `${open} ${text.open} · ${text.openGoalsWaiting}` : text.careSteady,
+    });
+  }
+
+  return {
+    concernScore,
+    level: !row.summaries ? "quiet" : concernScore > 0 ? "check" : "steady",
+    signals,
+  };
+}
+
+function renderFamilyMemberOverview(days = getStatsDays()) {
+  const target = $("#familyMemberOverviewChart");
+  if (!target) return;
+  const text = getSharingText();
+  const rows = getFamilyMemberOverviewRows(days);
+  const hasShared = rows.some((row) => row.summaries > 0);
+  if (!hasShared) {
+    target.innerHTML = `<div class="stats-empty">${escapeHtml(text.noShared)}</div>`;
+    return;
+  }
+  const maxSummaries = Math.max(...rows.map((row) => row.summaries), 1);
+  const maxFocus = Math.max(...rows.map((row) => row.focusMinutes), 1);
+  const maxCare = Math.max(...rows.map((row) => row.skinDays + row.wakeRecords), 1);
+  target.innerHTML = rows.map((row) => {
+    const care = getMemberCareSignals(row);
+    const initial = (row.label || "?").trim().charAt(0).toUpperCase();
+    const typeIcons = shareableStatsTypes.map((type) => `
+      <span class="${row.types.has(type) ? "active" : ""}" data-member-type="${escapeHtml(type)}" title="${escapeHtml(getSharedStatsTitle(type))}">
+        <i aria-hidden="true"></i>${escapeHtml(getSharedStatsTitle(type))}
+      </span>
+    `).join("");
+    const careTotal = row.skinDays + row.wakeRecords;
+    const careOpacity = Math.max(0.25, Math.min(1, careTotal / maxCare));
+    const signalCards = care.signals.length
+      ? care.signals.map((signal) => `
+        <div class="family-member-signal${signal.concern ? " is-concern" : ""}" data-signal-type="${escapeHtml(signal.type)}">
+          <span>${escapeHtml(signal.label)}</span>
+          <strong>${escapeHtml(signal.value)}</strong>
+          <small>${escapeHtml(signal.detail)}</small>
+        </div>
+      `).join("")
+      : `<div class="family-member-signal is-muted"><span>${escapeHtml(text.noSignal)}</span></div>`;
+    return `
+      <article class="family-member-row${row.summaries ? "" : " is-quiet"}" data-care-level="${escapeHtml(care.level)}" style="--member-width:${(row.summaries / maxSummaries) * 100}%;--member-focus:${(row.focusMinutes / maxFocus) * 100}%;--member-care-opacity:${careOpacity}">
+        <div class="family-member-row-head">
+          <div class="family-member-person">
+            <span class="family-member-avatar" aria-hidden="true">${escapeHtml(initial)}</span>
+            <div>
+              <strong>${escapeHtml(row.label)}</strong>
+              <small>${row.summaries} ${escapeHtml(text.summaries)}</small>
+            </div>
+          </div>
+          <div class="family-member-types">${typeIcons}</div>
+        </div>
+        <div class="family-member-care-banner">
+          <i aria-hidden="true"></i>
+          <span>${escapeHtml(care.level === "check" ? text.careCheckIn : care.level === "quiet" ? text.careLimited : text.careSteady)}</span>
+        </div>
+        <div class="family-member-state-list">${signalCards}</div>
+        <div class="family-member-metrics">
+          <span><b>${escapeHtml(text.focus)}</b>${row.focusMinutes} ${escapeHtml(text.minutes)}</span>
+          <span><b>${escapeHtml(text.goals)}</b>${row.goalCompleted} ${escapeHtml(text.completed)}</span>
+          <span><b>${escapeHtml(text.skin)}</b>${row.skinDays} ${escapeHtml(text.days)}</span>
+          <span><b>${escapeHtml(text.sleep)}</b>${row.wakeRecords} ${escapeHtml(text.records)}</span>
+        </div>
+      </article>
+    `;
+  }).join("");
 }
 
 function renderFamilyStats(days) {
@@ -5797,6 +6262,7 @@ function renderFamilyStats(days) {
       <strong>${item.count}</strong>
     </div>
   `).join("");
+  renderFamilyMemberOverview(days);
   renderFamilySharedStats(days);
 }
 
