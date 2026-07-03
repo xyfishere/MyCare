@@ -32,17 +32,21 @@ Last updated: 2026-07-03
 - Family data is separate from private `app_states`; RLS policies limit access to family members and invited users where appropriate.
 - Goals now has separate Personal Goal and Family Goal sub-sections, keeping shared goal UI out of the personal goal flow.
 - Family Goal MVP can add shared goals with deadline, separate family category, urgency, completion note, reopen, and delete actions.
+- Family categories can be customized separately from personal focus categories and Habit Seeds.
 - Personal Stats now has an opt-in family sharing panel with preview before saving.
 - Family Stats can show family goal charts and member-grouped shared personal summary snapshots.
 - Personal Stats shared summaries now show shared/not-shared status and can be stopped from the preview cards.
 - Personal Stats sharing can be limited to selected summary types: skin, wake, focus, or goals.
 - Personal Stats sharing can use its own range: today, this week, or this month, separate from the main Stats chart range.
 - Family Stats now includes low-pressure family garden cards based only on opt-in shared summaries.
+- Family Stats shared personal summaries now use visual cards for skin distribution, wake-time trend, focus minutes, and goal progress instead of text-only rows.
+- Two-account family synchronization was manually tested for the current Family Sharing flow.
 - GitHub `main` deploys through Cloudflare Pages.
 
 ## Current Limitations
 
-- Family sharing still needs remove-member UI, richer family category management, and two-account permission testing.
+- Family sharing still needs owner remove-member UI.
+- Family goal deletion may still need a guarded confirmation if the current delete action feels too easy to tap.
 - Family statistics are scaffolded separately from personal statistics and can show family goals plus opt-in shared summaries.
 - Shared personal stats currently expose lightweight summaries only; richer member-level sharing rules are still future work.
 - External health and wearable data cannot yet be imported.
@@ -56,17 +60,18 @@ Last updated: 2026-07-03
 - `src/modules/goals.js` owns reusable goal sorting, deadline, and stats calculations.
 - `src/modules/family.js` owns Supabase family operations and maps database rows into app-friendly objects.
 - `src/modules/sharing.js` owns summary-only personal stats snapshots for future Family Stats sharing.
-- The roadmap still points to Version 2 family sharing, after the foundation pass.
+- The roadmap still points to Version 2 family sharing, with owner remove-member UI and final polish remaining before external health data.
 - `assets/images/my-care-linkedin-thumbnail.png` remains an unrelated untracked file.
 
 ## Latest Validation
 
-- JavaScript syntax and diff checks pass.
+- JavaScript syntax and diff checks pass after Family Stats visual summary updates.
 - The local backend regression suite passes all four authentication, state, and revision-conflict tests.
 - Desktop and 390px mobile layouts load successfully in a real headless browser.
 - Legacy Goals, notes, custom definitions, and bilingual Quote records migrate into the current state.
 - Cloud sync and JSON backup serialize the full application state and normalize restored settings.
 - Goals calendar, single-goal deletion, personalization, color selection, personal calendar, and language flows were regression checked locally.
+- Two-account family sync was manually tested by the user with no current blockers reported.
 - `node scripts/check-phase0-language.js`, `node scripts/check-core-storage.js`, and `node scripts/check-goals-module.js` pass.
 - `node scripts/check-family-schema.js` passes for the Family Sharing schema foundation.
 - `node scripts/check-family-service.js` passes for family row mapping and shared goal stats.

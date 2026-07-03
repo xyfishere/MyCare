@@ -5566,6 +5566,9 @@ function getSharingText() {
     lessThanBefore: zh ? "\u6bd4\u4e0a\u6b21\u5c11" : "less than last share",
     moreThanBefore: zh ? "\u6bd4\u4e0a\u6b21\u591a" : "more than last share",
     openGoalsWaiting: zh ? "\u8fd8\u6709\u76ee\u6807\u5728\u7b49\u5f85" : "open goals waiting",
+    latest: zh ? "\u6700\u65b0" : "Latest",
+    top: zh ? "\u4e3b\u8981" : "Top",
+    noData: zh ? "\u6682\u65e0\u6570\u636e" : "No data",
   };
 }
 
@@ -5870,6 +5873,161 @@ function getSharedStatsOwnerLabel(ownerId) {
   return String(ownerId || "").slice(0, 8) || "Family member";
 }
 
+function sortSharedStatsNewest(items = []) {
+  return [...items].sort((a, b) => String(b.periodEnd || "").localeCompare(String(a.periodEnd || ""))
+    || String(b.updatedAt || b.createdAt || "").localeCompare(String(a.updatedAt || a.createdAt || "")));
+}
+
+function sortSharedStatsOldest(items = []) {
+  return [...items].sort((a, b) => String(a.periodEnd || "").localeCompare(String(b.periodEnd || ""))
+    || String(a.updatedAt || a.createdAt || "").localeCompare(String(b.updatedAt || b.createdAt || "")));
+}
+
+function getSharedStatsVisualModels(items = []) {
+  const byType = new Map();
+  sortSharedStatsNewest(items).forEach((item) => {
+    if (!byType.has(item.summaryType)) byType.set(item.summaryType, []);
+    byType.get(item.summaryType).push(item);
+  });
+  return shareableStatsTypes
+    .filter((type) => byType.has(type))
+    .map((type) => {
+      const newest = byType.get(type);
+      return {
+        type,
+        latest: newest[0],
+        previous: newest[1] || null,
+        series: sortSharedStatsOldest(newest).slice(-6),
+      };
+    });
+}
+
+function getSkinStatusColor(status) {
+  const value = String(status || "").trim().toLowerCase();
+  if (["stable", "\u7a33\u5b9a", "绋冲畾"].includes(value)) return "#82a98f";
+  if (["dry", "\u5e72\u71e5", "骞茬嚗"].includes(value)) return "#c2a96f";
+  if (["acne", "\u75d8\u75d8", "breakout", "\u7206\u75d8"].includes(value)) return "#c58e91";
+  if (["sensitive", "\u654f\u611f", "irritated"].includes(value)) return "#a99ac6";
+  if (["oily", "\u51fa\u6cb9"].includes(value)) return "#7faeb2";
+  return "#9eb79d";
+}
+
+function renderMiniSparkline(values = [], options = {}) {
+  const nums = values.map(Number).filter(Number.isFinite);
+  if (!nums.length) return `<div class="family-shared-mini-empty">${escapeHtml(getSharingText().noData)}</div>`;
+  const padded = nums.length === 1 ? [nums[0], nums[0]] : nums;
+  const min = Math.min(...padded);
+  const max = Math.max(...padded);
+  const range = Math.max(max - min, 1);
+  const points = padded.map((value, index) => {
+    const x = padded.length === 1 ? 50 : (index / (padded.length - 1)) * 100;
+    const normalized = (value - min) / range;
+    const y = options.invert ? 32 - normalized * 26 : 6 + normalized * 26;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  const last = points.split(" ").at(-1) || "100,19";
+  const [lastX, lastY] = last.split(",");
+  return `
+    <svg class="family-shared-sparkline" viewBox="0 0 100 38" aria-hidden="true" focusable="false">
+      <path d="M0 33 H100" />
+      <polyline points="${points}" />
+      <circle cx="${lastX}" cy="${lastY}" r="2.8" />
+    </svg>
+  `;
+}
+
+function renderSkinSharedChart(item) {
+  const text = getSharingText();
+  const payload = item.payload || {};
+  const counts = payload.counts && typeof payload.counts === "object" ? payload.counts : {};
+  const entries = Object.entries(counts).filter(([, value]) => Number(value) > 0);
+  const fallbackStatus = payload.topStatus || "";
+  const chartEntries = entries.length ? entries : (fallbackStatus ? [[fallbackStatus, payload.totalDays || 1]] : []);
+  const total = chartEntries.reduce((sum, [, value]) => sum + Number(value || 0), 0) || 1;
+  return `
+    <div class="family-shared-stack" aria-label="${escapeHtml(text.skin)}">
+      ${chartEntries.map(([status, value]) => `
+        <i style="--share-segment-color:${getSkinStatusColor(status)};--share-segment-size:${Math.max(7, (Number(value || 0) / total) * 100)}%"></i>
+      `).join("")}
+    </div>
+    <div class="family-shared-legend">
+      ${chartEntries.slice(0, 4).map(([status, value]) => `
+        <span><i style="--share-segment-color:${getSkinStatusColor(status)}"></i>${escapeHtml(formatSkinStateLabel(status))} ${Number(value || 0)}</span>
+      `).join("") || `<span>${escapeHtml(text.noData)}</span>`}
+    </div>
+    <p>${escapeHtml(text.top)}: ${escapeHtml(fallbackStatus ? formatSkinStateLabel(fallbackStatus) : "-")} · ${Number(payload.totalDays || 0)} ${escapeHtml(text.days)}</p>
+  `;
+}
+
+function renderWakeSharedChart(model) {
+  const text = getSharingText();
+  const payload = model.latest.payload || {};
+  const values = model.series.map((item) => minutesFromClockText(item.payload?.averageWakeTime)).filter(Number.isFinite);
+  const latestMinutes = minutesFromClockText(payload.averageWakeTime);
+  const marker = Number.isFinite(latestMinutes) ? Math.min(100, Math.max(0, ((latestMinutes - 300) / 480) * 100)) : 50;
+  return `
+    ${renderMiniSparkline(values, { invert: false })}
+    <div class="family-shared-time-scale">
+      <span>5</span>
+      <i style="--wake-marker:${marker}%"></i>
+      <span>13</span>
+    </div>
+    <p>${escapeHtml(text.latest)}: ${escapeHtml(payload.averageWakeTime || "-")} · ${Number(payload.recordCount || 0)} ${escapeHtml(text.records)}</p>
+  `;
+}
+
+function renderFocusSharedChart(model) {
+  const text = getSharingText();
+  const payload = model.latest.payload || {};
+  const values = model.series.map((item) => Number(item.payload?.minutes || 0));
+  const max = Math.max(...values, Number(payload.minutes || 0), 1);
+  return `
+    <div class="family-shared-bars">
+      ${values.length ? values.map((value) => `
+        <i style="--share-bar-height:${Math.max(8, (value / max) * 100)}%"></i>
+      `).join("") : `<span>${escapeHtml(text.noData)}</span>`}
+    </div>
+    <p>${Number(payload.minutes || 0)} ${escapeHtml(text.minutes)} · ${Number(payload.sessions || 0)} ${escapeHtml(text.sessions)}</p>
+    <small>${escapeHtml(payload.topCategory ? displayFocusCategory(payload.topCategory) : "-")}</small>
+  `;
+}
+
+function renderGoalsSharedChart(item) {
+  const text = getSharingText();
+  const payload = item.payload || {};
+  const completed = Number(payload.completed || 0);
+  const open = Number(payload.open || 0);
+  const total = Math.max(completed + open, 1);
+  const completedPct = Math.round((completed / total) * 100);
+  return `
+    <div class="family-shared-donut" style="--goal-done:${completedPct}%">
+      <strong>${completedPct}%</strong>
+    </div>
+    <p>${completed} ${escapeHtml(text.completed)} · ${open} ${escapeHtml(text.open)}</p>
+  `;
+}
+
+function renderFamilySharedVisualCard(model) {
+  const text = getSharingText();
+  const item = model.latest;
+  let chart = "";
+  if (model.type === "skin") chart = renderSkinSharedChart(item);
+  if (model.type === "sleep") chart = renderWakeSharedChart(model);
+  if (model.type === "focus") chart = renderFocusSharedChart(model);
+  if (model.type === "goals") chart = renderGoalsSharedChart(item);
+  return `
+    <article class="family-shared-visual-card" data-shared-type="${escapeHtml(model.type)}">
+      <div class="family-shared-visual-top">
+        <span>${escapeHtml(getSharedStatsTitle(model.type))}</span>
+        <small>${escapeHtml(item.periodStart)} - ${escapeHtml(item.periodEnd)}</small>
+      </div>
+      <div class="family-shared-visual-body">
+        ${chart || `<p>${escapeHtml(formatSharedStatsValue(item))}</p>`}
+      </div>
+    </article>
+  `;
+}
+
 function renderFamilySharedStats(days = getStatsDays()) {
   const target = $("#familySharedStatsList");
   if (!target) return;
@@ -5889,21 +6047,13 @@ function renderFamilySharedStats(days = getStatsDays()) {
     return acc;
   }, new Map());
   target.innerHTML = [...groups.entries()].slice(0, 6).map(([ownerId, items]) => `
-    <section class="family-shared-stat-group">
+    <section class="family-shared-stat-group family-shared-stat-group-visual">
       <header>
         <h5>${escapeHtml(getSharedStatsOwnerLabel(ownerId))}</h5>
         <small>${items.length} ${escapeHtml(text.summaries)}</small>
       </header>
-      <div class="family-shared-stat-group-list">
-        ${items.slice(0, 6).map((item) => `
-          <article class="family-shared-stat-row" data-shared-type="${escapeHtml(item.summaryType)}">
-            <div>
-              <span>${escapeHtml(getSharedStatsTitle(item.summaryType))}</span>
-              <strong>${escapeHtml(formatSharedStatsValue(item))}</strong>
-            </div>
-            <small>${escapeHtml(item.periodStart)} - ${escapeHtml(item.periodEnd)}</small>
-          </article>
-        `).join("")}
+      <div class="family-shared-visual-grid">
+        ${getSharedStatsVisualModels(items).map(renderFamilySharedVisualCard).join("")}
       </div>
     </section>
   `).join("");

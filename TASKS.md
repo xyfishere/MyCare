@@ -16,12 +16,13 @@
 - [x] Keep notes, self-care records, and health data private by default.
 - [x] Add Supabase tables and Row Level Security policies.
 - [x] Add a thin Family service layer for Supabase family operations.
-- [ ] Build create, join, leave, and remove-member flows.
+- [x] Build create, join, and leave family flows.
+- [ ] Add remove-member flow for family owners.
 - [x] Wire the Family Goals MVP to the Family service layer.
 - [x] Add family goal title, deadline, separate family category, urgency, completion, reopen, and delete controls.
-- [ ] Add dedicated family category management beyond type-to-create categories.
+- [x] Add dedicated family category management beyond type-to-create categories.
 - [ ] Add guarded family goal deletion confirmation if the MVP delete flow feels too easy to tap.
-- [ ] Test two-account synchronization and permission boundaries.
+- [x] Test two-account synchronization and permission boundaries.
 
 ## Next - Personal Stats Sharing
 
@@ -35,3 +36,4 @@
 - [x] Let users choose which personal stat summaries to share with family.
 - [x] Let users choose the shared-summary time range: today, this week, or this month.
 - [x] Add a low-pressure Family member overview based on opt-in shared summaries.
+- [x] Convert shared personal summaries from text rows into visual Family Stats cards.
