@@ -64,6 +64,116 @@ Includes:
 
 Family members should not query raw personal records directly. If data is shared, the app should generate a limited shared view.
 
+### Personal Stats Sharing Design
+
+Personal stats sharing should be opt-in, summary-only, and reversible.
+
+The first version should not share raw personal records. It should generate a small weekly snapshot from the user's private data and write only that snapshot to a family-visible table.
+
+#### Shareable Summary Types
+
+Good first candidates:
+
+- Skin status summary: counts by status, most common status, optional one-line trend.
+- Sleep or wake rhythm summary: average wake time or sleep duration once wearable/manual sleep data exists.
+- Focus summary: total focus minutes, number of sessions, top category or Habit Seed.
+- Goal summary: completed personal goals count, not the full goal titles unless the user explicitly shares them.
+
+Do not share in the first version:
+
+- Morning notes.
+- Future-self notes.
+- Raw skin records by date.
+- Raw hunger values.
+- Raw wearable rows.
+- Any free-text private journal content.
+
+#### Suggested Table
+
+Use a dedicated table instead of expanding family goals:
+
+```sql
+family_shared_stats
+```
+
+Suggested shape:
+
+```text
+id uuid primary key
+family_id uuid not null
+owner_id uuid not null
+period_start date not null
+period_end date not null
+summary_type text not null
+payload jsonb not null
+visible boolean not null default true
+created_at timestamptz not null
+updated_at timestamptz not null
+```
+
+Example payload:
+
+```json
+{
+  "skin": {
+    "totalDays": 5,
+    "topStatus": "stable",
+    "counts": { "stable": 3, "dry": 1, "sensitive": 1 }
+  },
+  "focus": {
+    "minutes": 210,
+    "sessions": 7,
+    "topCategory": "Study"
+  }
+}
+```
+
+#### Row Level Security
+
+Minimum RLS rule:
+
+- Owner can create, update, and delete their own shared snapshots.
+- Family members can read snapshots for families they belong to.
+- Family members cannot read the owner's raw personal data.
+- Leaving a family should remove or hide that user's shared snapshots from that family.
+
+#### UI Direction
+
+Add sharing settings only after the data model is clear.
+
+Recommended first UI:
+
+- A small `Share with family` control in Personal Stats.
+- Clear toggles for `Skin summary`, `Sleep rhythm`, `Focus summary`, and `Goal summary`.
+- A preview card showing exactly what family members will see.
+- A `Stop sharing` action that immediately hides future and existing shared snapshots.
+
+Family Stats can then show a light `Shared by family members` section. It should compare gently, not rank people.
+
+Avoid:
+
+- Leaderboards.
+- Streak pressure.
+- Showing who is "doing better".
+- Exposing exact private records.
+
+#### Module Boundary
+
+Implement this later as a small module:
+
+```text
+src/modules/sharing.js
+```
+
+The module should own:
+
+- Building summary snapshots from personal state.
+- Saving snapshots to Supabase.
+- Loading family-visible snapshots.
+- Mapping shared data into chart-friendly objects.
+
+Stats rendering should call this module instead of reading another user's private state directly.
+
 ### 4. Future AI Lightweight Mode
 
 Possible future AI features:

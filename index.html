@@ -6,7 +6,7 @@
     <meta property="og:image" content="assets/images/my-care-logo.png?v=20260609-2" />
     <title>My Care</title>
     <link rel="icon" type="image/png" href="assets/images/my-care-logo.png?v=20260609-2" />
-    <link rel="stylesheet" href="styles.css?v=20260702-family-form-2" />
+    <link rel="stylesheet" href="styles.css?v=20260702-whats-new-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -128,6 +128,7 @@
                 <small>查看记录、趋势和专注分类</small>
               </button>
             </div>
+            <button class="home-whats-new-link" id="whatsNewTrigger" type="button">see what's new</button>
           </div>
         </section>
 
@@ -809,6 +810,26 @@
 
           <div class="stats-scope active" id="personalStatsScope" data-stats-scope-panel="personal">
             <div class="stats-sections">
+            <section class="stats-section stats-share-section">
+              <header class="stats-section-head">
+                <span class="stats-section-icon share-icon" aria-hidden="true"></span>
+                <div>
+                  <p class="eyebrow" id="personalShareEyebrow">Share softly</p>
+                  <h3 id="personalShareTitle">Share a gentle summary</h3>
+                  <p id="personalShareSubtitle">Only a small weekly summary is shared. Private notes stay private.</p>
+                </div>
+                <div class="stats-inline-summary" id="personalShareSummary"></div>
+              </header>
+              <div class="shared-stats-panel">
+                <div class="shared-stats-preview" id="personalSharePreview"></div>
+                <div class="shared-stats-actions">
+                  <button class="secondary shared-stats-refresh" id="previewSharedStats" type="button">Preview</button>
+                  <button class="primary shared-stats-save" id="saveSharedStats" type="button">Share with family</button>
+                </div>
+                <p class="shared-stats-message" id="sharedStatsMessage" aria-live="polite"></p>
+              </div>
+            </section>
+
             <section class="stats-section stats-health-section">
               <header class="stats-section-head">
                 <span class="stats-section-icon" aria-hidden="true">♡</span>
@@ -963,6 +984,13 @@
                   </div>
                   <div class="family-urgency-chart" id="familyGoalUrgencyChart"></div>
                 </article>
+                <article class="stats-chart-card family-shared-card">
+                  <div class="stats-chart-title">
+                    <span class="mini-share-icon" aria-hidden="true"></span>
+                    <div><h4 id="familySharedStatsTitle">Shared personal summaries</h4><p id="familySharedStatsMeta">Opt-in snapshots from family members</p></div>
+                  </div>
+                  <div class="family-shared-stats" id="familySharedStatsList"></div>
+                </article>
               </div>
               <div class="stats-empty family-stats-empty" id="familyStatsEmpty">先完成家庭目标基础功能，再接入家庭统计。</div>
             </section>
@@ -1026,6 +1054,30 @@
 
         <p class="account-message" id="accountMessage" role="status"></p>
         <p class="account-privacy" id="accountPrivacy">Cloud sync is optional. Your data stays on this device until you sign in.</p>
+      </form>
+    </dialog>
+
+    <dialog class="whats-new-dialog" id="whatsNewDialog" aria-labelledby="whatsNewTitle">
+      <form method="dialog" class="whats-new-card">
+        <button class="whats-new-close" value="close" type="submit" aria-label="Close">×</button>
+        <p class="eyebrow" id="whatsNewEyebrow">This week</p>
+        <h2 id="whatsNewTitle">what's new this week</h2>
+        <p id="whatsNewIntro">A softer update for shared goals, personalization, and clearer progress.</p>
+        <ul class="whats-new-list">
+          <li>
+            <strong id="whatsNewItemOneTitle">Family goals feel more complete.</strong>
+            <span id="whatsNewItemOneCopy">Create shared goals, choose family categories, set urgency, and see completed items.</span>
+          </li>
+          <li>
+            <strong id="whatsNewItemTwoTitle">Personalization is easier to find.</strong>
+            <span id="whatsNewItemTwoCopy">Customize focus categories, habit seeds, self-care quotes, calendars, and family categories in one calm place.</span>
+          </li>
+          <li>
+            <strong id="whatsNewItemThreeTitle">Stats are more useful now.</strong>
+            <span id="whatsNewItemThreeCopy">Review health, focus, goals, habit seeds, and family goal patterns with cleaner charts.</span>
+          </li>
+        </ul>
+        <button class="whats-new-primary" value="done" type="submit" id="whatsNewDone">Try it gently</button>
       </form>
     </dialog>
 
@@ -1148,6 +1200,7 @@
     <script src="src/core/storage.js?v=20260701-1"></script>
     <script src="src/modules/goals.js?v=20260701-1"></script>
     <script src="src/modules/family.js?v=20260702-family-categories-2"></script>
-    <script src="app.js?v=20260702-family-form-2"></script>
+    <script src="src/modules/sharing.js?v=20260702-sharing-1"></script>
+    <script src="app.js?v=20260702-whats-new-1"></script>
   </body>
 </html>

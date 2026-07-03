@@ -11,7 +11,10 @@ const positions = {
   familyGoalForm: html.indexOf('id="familyGoalForm"'),
   familyGoalList: html.indexOf('id="familyGoalList"'),
   personalStats: html.indexOf('id="personalStatsScope"'),
+  personalSharePreview: html.indexOf('id="personalSharePreview"'),
+  saveSharedStats: html.indexOf('id="saveSharedStats"'),
   familyStats: html.indexOf('id="familyStatsScope"'),
+  familySharedStatsList: html.indexOf('id="familySharedStatsList"'),
 };
 
 for (const [name, index] of Object.entries(positions)) {
@@ -29,6 +32,16 @@ if (!(positions.personalGoals < positions.workList
 
 if (!(positions.personalStats < positions.familyStats)) {
   throw new Error("Family stats should stay separate from personal stats.");
+}
+
+if (!(positions.personalStats < positions.personalSharePreview
+  && positions.personalSharePreview < positions.saveSharedStats
+  && positions.saveSharedStats < positions.familyStats)) {
+  throw new Error("Personal stats sharing controls should stay inside the personal stats scope.");
+}
+
+if (!(positions.familyStats < positions.familySharedStatsList)) {
+  throw new Error("Shared family summaries should stay inside the family stats scope.");
 }
 
 if (!(positions.familyRoom < positions.familyGoalForm && positions.familyGoalForm < positions.familyGoalList)) {

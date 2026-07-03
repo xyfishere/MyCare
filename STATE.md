@@ -1,6 +1,6 @@
 # Current State
 
-Last updated: 2026-07-01
+Last updated: 2026-07-02
 
 ## Product
 
@@ -28,15 +28,18 @@ Last updated: 2026-07-01
 - Cloud history, JSON backup, import, and restore protections are available.
 - Cloud writes use revision checks so a stale device cannot silently replace newer cloud data.
 - Family sharing schema now defines separate families, members, invitations, family goal categories, and family goals tables.
+- Personal-to-family stats sharing now has a summary-only `family_shared_stats` table and RLS foundation.
 - Family data is separate from private `app_states`; RLS policies limit access to family members and invited users where appropriate.
 - Goals now has separate Personal Goal and Family Goal sub-sections, keeping shared goal UI out of the personal goal flow.
 - Family Goal MVP can add shared goals with deadline, separate family category, urgency, completion note, reopen, and delete actions.
+- Personal Stats now has an opt-in family sharing panel with preview before saving.
+- Family Stats can show family goal charts and shared personal summary snapshots.
 - GitHub `main` deploys through Cloudflare Pages.
 
 ## Current Limitations
 
 - Family sharing still needs remove-member UI, richer family category management, and two-account permission testing.
-- Family statistics are scaffolded separately from personal statistics, but the charts are not wired yet.
+- Family statistics are scaffolded separately from personal statistics and can show family goals plus opt-in shared summaries.
 - External health and wearable data cannot yet be imported.
 
 ## Repository
@@ -47,6 +50,7 @@ Last updated: 2026-07-01
 - `src/core/storage.js` owns local JSON read/write, deep clone, and default state merging.
 - `src/modules/goals.js` owns reusable goal sorting, deadline, and stats calculations.
 - `src/modules/family.js` owns Supabase family operations and maps database rows into app-friendly objects.
+- `src/modules/sharing.js` owns summary-only personal stats snapshots for future Family Stats sharing.
 - The roadmap still points to Version 2 family sharing, after the foundation pass.
 - `assets/images/my-care-linkedin-thumbnail.png` remains an unrelated untracked file.
 
@@ -61,4 +65,5 @@ Last updated: 2026-07-01
 - `node scripts/check-phase0-language.js`, `node scripts/check-core-storage.js`, and `node scripts/check-goals-module.js` pass.
 - `node scripts/check-family-schema.js` passes for the Family Sharing schema foundation.
 - `node scripts/check-family-service.js` passes for family row mapping and shared goal stats.
+- `node scripts/check-sharing-module.js` passes for privacy-safe personal stats snapshot generation.
 - `node scripts/check-goals-stats-structure.js` passes and checks that Personal/Family Goals and Stats stay separated.

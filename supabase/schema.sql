@@ -197,6 +197,31 @@ on public.family_goals (category_id);
 
 alter table public.family_goals enable row level security;
 
+create table if not exists public.family_shared_stats (
+  id uuid primary key default gen_random_uuid(),
+  family_id uuid not null references public.families(id) on delete cascade,
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  period_start date not null,
+  period_end date not null,
+  summary_type text not null check (summary_type in ('skin', 'sleep', 'focus', 'goals')),
+  payload jsonb not null default '{}'::jsonb,
+  visible boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (period_end >= period_start)
+);
+
+create unique index if not exists family_shared_stats_unique_period_idx
+on public.family_shared_stats (family_id, owner_id, period_start, period_end, summary_type);
+
+create index if not exists family_shared_stats_family_period_idx
+on public.family_shared_stats (family_id, visible, period_end desc);
+
+create index if not exists family_shared_stats_owner_idx
+on public.family_shared_stats (owner_id, period_end desc);
+
+alter table public.family_shared_stats enable row level security;
+
 -- Repair older family tables created before the full Family Sharing schema.
 -- `create table if not exists` does not add missing columns to existing tables.
 alter table public.families
@@ -240,12 +265,35 @@ alter table public.family_goals
   add column if not exists created_at timestamptz not null default now(),
   add column if not exists updated_at timestamptz not null default now();
 
+alter table public.family_shared_stats
+  add column if not exists owner_id uuid references auth.users(id) on delete cascade,
+  add column if not exists period_start date,
+  add column if not exists period_end date,
+  add column if not exists summary_type text,
+  add column if not exists payload jsonb not null default '{}'::jsonb,
+  add column if not exists visible boolean not null default true,
+  add column if not exists created_at timestamptz not null default now(),
+  add column if not exists updated_at timestamptz not null default now();
+
 do $$
 begin
   alter table public.family_goals drop constraint if exists family_goals_urgency_check;
   alter table public.family_goals
     add constraint family_goals_urgency_check
     check (urgency in ('low', 'normal', 'high'));
+end $$;
+
+do $$
+begin
+  alter table public.family_shared_stats drop constraint if exists family_shared_stats_summary_type_check;
+  alter table public.family_shared_stats
+    add constraint family_shared_stats_summary_type_check
+    check (summary_type in ('skin', 'sleep', 'focus', 'goals'));
+
+  alter table public.family_shared_stats drop constraint if exists family_shared_stats_period_check;
+  alter table public.family_shared_stats
+    add constraint family_shared_stats_period_check
+    check (period_end >= period_start);
 end $$;
 
 update public.families family
@@ -483,6 +531,11 @@ create trigger touch_family_goals_before_update
 before update on public.family_goals
 for each row execute function public.touch_updated_at();
 
+drop trigger if exists touch_family_shared_stats_before_update on public.family_shared_stats;
+create trigger touch_family_shared_stats_before_update
+before update on public.family_shared_stats
+for each row execute function public.touch_updated_at();
+
 drop trigger if exists validate_family_goal_category_before_write on public.family_goals;
 create trigger validate_family_goal_category_before_write
 before insert or update on public.family_goals
@@ -608,3 +661,39 @@ drop policy if exists "Family members can delete family goals" on public.family_
 create policy "Family members can delete family goals"
 on public.family_goals for delete
 using (public.is_family_member(family_id));
+
+drop policy if exists "Family members can read visible shared stats" on public.family_shared_stats;
+create policy "Family members can read visible shared stats"
+on public.family_shared_stats for select
+using (
+  public.is_family_member(family_id)
+  and (visible = true or owner_id = auth.uid())
+);
+
+drop policy if exists "Users can create their own shared stats" on public.family_shared_stats;
+create policy "Users can create their own shared stats"
+on public.family_shared_stats for insert
+with check (
+  public.is_family_member(family_id)
+  and auth.uid() = owner_id
+);
+
+drop policy if exists "Users can update their own shared stats" on public.family_shared_stats;
+create policy "Users can update their own shared stats"
+on public.family_shared_stats for update
+using (
+  public.is_family_member(family_id)
+  and auth.uid() = owner_id
+)
+with check (
+  public.is_family_member(family_id)
+  and auth.uid() = owner_id
+);
+
+drop policy if exists "Users can delete their own shared stats" on public.family_shared_stats;
+create policy "Users can delete their own shared stats"
+on public.family_shared_stats for delete
+using (
+  public.is_family_member(family_id)
+  and auth.uid() = owner_id
+);
