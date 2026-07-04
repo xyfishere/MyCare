@@ -125,6 +125,19 @@
     };
   }
 
+  function mapFamilySecretNote(row = {}) {
+    return {
+      id: row.id,
+      familyId: row.family_id || row.familyId,
+      body: row.body || "",
+      mood: row.mood || "",
+      visible: row.visible !== false,
+      createdBy: row.created_by || row.createdBy,
+      createdAt: row.created_at || row.createdAt,
+      updatedAt: row.updated_at || row.updatedAt,
+    };
+  }
+
   function toFamilyGoalInsert(input = {}, user) {
     const userId = requireUser(user);
     return {
@@ -166,12 +179,25 @@
     };
   }
 
+  function toFamilySecretNoteInsert(input = {}, user) {
+    const userId = requireUser(user);
+    return {
+      family_id: ensureFamilyId(input.familyId),
+      body: String(input.body || "").trim(),
+      mood: String(input.mood || "").trim() || null,
+      created_by: userId,
+      visible: true,
+    };
+  }
+
   const invitationSelect = "id, family_id, email, token, status, invited_by, accepted_by, accepted_at, expires_at, created_at, updated_at";
   const minimalInvitationSelect = "id, family_id, email, token, status, invited_by, created_at";
   const familyCategorySelect = "id, family_id, name, color, active, created_by, created_at, updated_at";
   const minimalFamilyCategorySelect = "id, family_id, name, color, active, created_by, created_at";
   const familyGoalSelect = "id, family_id, title, category_label, urgency, deadline, status, note, completion_note, created_by, completed_by, completed_at, created_at, updated_at";
   const minimalFamilyGoalSelect = "id, family_id, title, urgency, deadline, status, created_by, completed_by, completed_at, created_at, updated_at";
+  const familySecretNoteSelect = "id, family_id, body, mood, visible, created_by, created_at, updated_at";
+  const minimalFamilySecretNoteSelect = "id, family_id, body, mood, visible, created_by, created_at";
 
   async function selectFamilyInvitation(queryBuilder) {
     try {
@@ -210,6 +236,15 @@
     } catch (error) {
       if (!isFamilyGoalSchemaError(error)) throw error;
       return throwIfError(await queryBuilder(minimalFamilyGoalSelect));
+    }
+  }
+
+  async function selectFamilySecretNote(queryBuilder) {
+    try {
+      return throwIfError(await queryBuilder(familySecretNoteSelect));
+    } catch (error) {
+      if (!isSchemaColumnError(error, "updated_at")) throw error;
+      return throwIfError(await queryBuilder(minimalFamilySecretNoteSelect));
     }
   }
 
@@ -553,6 +588,42 @@
     return true;
   }
 
+  async function listFamilySecretNotes(client, familyId) {
+    requireClient(client);
+    const data = await selectFamilySecretNote((columns) => client
+      .from("family_secret_notes")
+      .select(columns)
+      .eq("family_id", ensureFamilyId(familyId))
+      .eq("visible", true)
+      .order("created_at", { ascending: false })
+      .limit(24));
+    return (data || []).map(mapFamilySecretNote);
+  }
+
+  async function createFamilySecretNote(client, user, input = {}) {
+    requireClient(client);
+    const insert = toFamilySecretNoteInsert(input, user);
+    if (!insert.body) throw new Error("Secret note cannot be empty");
+    const note = await selectFamilySecretNote((columns) => client
+      .from("family_secret_notes")
+      .insert(insert)
+      .select(columns)
+      .single());
+    return mapFamilySecretNote(note);
+  }
+
+  async function hideFamilySecretNote(client, user, noteId) {
+    requireClient(client);
+    requireUser(user);
+    const note = await selectFamilySecretNote((columns) => client
+      .from("family_secret_notes")
+      .update({ visible: false })
+      .eq("id", noteId)
+      .select(columns)
+      .single());
+    return mapFamilySecretNote(note);
+  }
+
   function buildFamilyGoalStats(rows = [], options = {}) {
     if (!namespace.goals?.buildGoalStats) throw new Error("Goals module is required");
     return namespace.goals.buildGoalStats(rows.map(mapFamilyGoal), options);
@@ -565,24 +636,29 @@
     createFamily,
     createFamilyGoal,
     createFamilyGoalCategory,
+    createFamilySecretNote,
     createInvitation,
     deleteFamilyGoal,
     getFamilyMembers,
+    hideFamilySecretNote,
     leaveFamily,
     listFamilies,
     listFamilyGoalCategories,
     listFamilyGoals,
+    listFamilySecretNotes,
     listInvitations,
     mapFamily,
     mapFamilyCategory,
     mapFamilyGoal,
     mapFamilyInvitation,
     mapFamilyMember,
+    mapFamilySecretNote,
     minimalInvitationSelect,
     normalizeEmail,
     normalizeUrgency,
     reopenFamilyGoal,
     toFamilyGoalCompletionPatch,
+    toFamilySecretNoteInsert,
     toConstraintSafeFamilyGoalInsert,
     toFamilyGoalInsert,
     toFamilyGoalReopenPatch,

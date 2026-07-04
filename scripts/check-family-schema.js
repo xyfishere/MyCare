@@ -16,6 +16,7 @@ function assertIncludes(snippet, message) {
   "public.family_goal_categories",
   "public.family_goals",
   "public.family_shared_stats",
+  "public.family_secret_notes",
 ].forEach((table) => {
   assertIncludes(`create table if not exists ${table}`, `${table} table is missing`);
   assertIncludes(`alter table ${table} enable row level security`, `${table} RLS is missing`);
@@ -46,6 +47,10 @@ function assertIncludes(snippet, message) {
   "Users can create their own shared stats",
   "Users can update their own shared stats",
   "Users can delete their own shared stats",
+  "Family members can read visible secret notes",
+  "Family members can create secret notes",
+  "Users can hide their own secret notes",
+  "Users can delete their own secret notes",
 ].forEach((policy) => assertIncludes(policy, `${policy} policy is missing`));
 
 assertIncludes("email text", "family members should include display email");
@@ -54,8 +59,11 @@ assertIncludes("urgency text not null default 'normal'", "family goals should in
 assertIncludes("family_shared_stats_unique_period_idx", "shared stats upsert index is missing");
 assertIncludes("summary_type text not null check", "shared stats should constrain summary type");
 assertIncludes("payload jsonb not null default '{}'::jsonb", "shared stats should use json payloads");
+assertIncludes("family_secret_notes_family_visible_idx", "secret notes visible index is missing");
+assertIncludes("body text not null check", "secret notes should constrain note body");
 assertIncludes("validate_family_goal_category_before_write", "family goal category validation trigger is missing");
 assertIncludes("touch_family_shared_stats_before_update", "shared stats updated_at trigger is missing");
+assertIncludes("touch_family_secret_notes_before_update", "secret notes updated_at trigger is missing");
 assertIncludes("Family records are separate from each user's private app_states JSON.", "privacy boundary note is missing");
 
 console.log("Family schema checks passed.");

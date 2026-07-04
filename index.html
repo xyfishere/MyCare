@@ -6,7 +6,7 @@
     <meta property="og:image" content="assets/images/my-care-logo.png?v=20260609-2" />
     <title>My Care</title>
     <link rel="icon" type="image/png" href="assets/images/my-care-logo.png?v=20260609-2" />
-    <link rel="stylesheet" href="styles.css?v=20260702-whats-new-1" />
+    <link rel="stylesheet" href="styles.css?v=20260703-secret-note-ui-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -782,6 +782,25 @@
                 </form>
                 <div class="family-goal-list" id="familyGoalList" aria-live="polite"></div>
               </section>
+              <section class="family-secret-panel" aria-labelledby="familySecretTitle">
+                <div class="family-secret-head">
+                  <div>
+                    <p class="eyebrow" id="familySecretEyebrow">Secret notes</p>
+                    <h4 id="familySecretTitle">Anonymous little notes</h4>
+                    <p id="familySecretCopy">Leave a small note for the family room. Names stay hidden on the page.</p>
+                  </div>
+                </div>
+                <form class="family-secret-form" id="familySecretForm">
+                  <label>
+                    <span id="familySecretInputLabel">Secret note</span>
+                    <textarea id="familySecretInput" rows="3" maxlength="180" placeholder="Write one soft sentence..."></textarea>
+                  </label>
+                  <div class="family-secret-theme-picker" id="familySecretThemePicker" aria-label="Secret note color theme"></div>
+                  <button class="primary family-secret-submit" id="familySecretSubmit" type="submit">Post anonymously</button>
+                </form>
+                <p class="family-secret-message" id="familySecretMessage" role="status"></p>
+                <div class="family-secret-list" id="familySecretList" aria-live="polite"></div>
+              </section>
             </div>
           </section>
           </div>
@@ -1208,8 +1227,8 @@
     <script src="src/core/language.js?v=20260701-1"></script>
     <script src="src/core/storage.js?v=20260701-1"></script>
     <script src="src/modules/goals.js?v=20260701-1"></script>
-    <script src="src/modules/family.js?v=20260702-family-categories-2"></script>
+    <script src="src/modules/family.js?v=20260703-secret-notes-1"></script>
     <script src="src/modules/sharing.js?v=20260702-sharing-1"></script>
-    <script src="app.js?v=20260702-whats-new-1"></script>
+    <script src="app.js?v=20260703-secret-note-ui-2"></script>
   </body>
 </html>

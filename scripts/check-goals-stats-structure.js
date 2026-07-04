@@ -10,6 +10,8 @@ const positions = {
   familyRoom: html.indexOf('id="familyRoomPanel"'),
   familyGoalForm: html.indexOf('id="familyGoalForm"'),
   familyGoalList: html.indexOf('id="familyGoalList"'),
+  familySecretForm: html.indexOf('id="familySecretForm"'),
+  familySecretList: html.indexOf('id="familySecretList"'),
   personalStats: html.indexOf('id="personalStatsScope"'),
   personalShareTypes: html.indexOf('id="personalShareTypes"'),
   personalShareRange: html.indexOf('id="personalShareRange"'),
@@ -52,6 +54,10 @@ if (!(positions.familyStats < positions.familyMemberOverview
 
 if (!(positions.familyRoom < positions.familyGoalForm && positions.familyGoalForm < positions.familyGoalList)) {
   throw new Error("Family goal controls should live inside the family goals scope.");
+}
+
+if (!(positions.familyGoalList < positions.familySecretForm && positions.familySecretForm < positions.familySecretList)) {
+  throw new Error("Family secret notes should live after Family Goals inside the family scope.");
 }
 
 console.log("Goals and stats structure checks passed.");

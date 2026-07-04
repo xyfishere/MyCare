@@ -21,6 +21,7 @@
 - [x] Wire the Family Goals MVP to the Family service layer.
 - [x] Add family goal title, deadline, separate family category, urgency, completion, reopen, and delete controls.
 - [x] Add dedicated family category management beyond type-to-create categories.
+- [x] Add Family Secret Notes MVP with anonymous display and author-owned hide action.
 - [ ] Add guarded family goal deletion confirmation if the MVP delete flow feels too easy to tap.
 - [x] Test two-account synchronization and permission boundaries.
 

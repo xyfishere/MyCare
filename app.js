@@ -226,14 +226,24 @@ let familyState = {
   categories: [],
   goals: [],
   sharedStats: [],
+  secretNotes: [],
   message: "",
   error: "",
   goalMessage: "",
+  secretNoteMessage: "",
+  secretNoteError: "",
   categoryMessage: "",
   categoryError: "",
 };
 let sharedStatsMessage = "";
 let familyGoalCategoryMode = "preset";
+let selectedFamilySecretTheme = "sage";
+const familySecretThemeOptions = [
+  { id: "sage", zh: "\u68ee\u6797", en: "Sage", color: "#9caf9a" },
+  { id: "ice", zh: "\u51b0\u84dd", en: "Ice", color: "#8fb2c5" },
+  { id: "lavender", zh: "\u85b0\u8863\u8349", en: "Lavender", color: "#b6a5c8" },
+  { id: "warm", zh: "\u6696\u5149", en: "Warm", color: "#d4b89a" },
+];
 let sharedStatsError = false;
 let focusTimer = {
   mode: "focus",
@@ -416,6 +426,17 @@ const copy = {
       familyGoalDeleted: "家庭目标已删除。",
       familyCompletionNote: "完成 note",
       familyCompletionPlaceholder: "可以简单写一句完成情况。",
+      familySecretEyebrow: "\u79d8\u5bc6\u7eb8\u6761",
+      familySecretTitle: "\u5bb6\u5ead\u79d8\u5bc6\u7eb8\u6761",
+      familySecretCopy: "\u7ed9\u5bb6\u5ead\u7a7a\u95f4\u7559\u4e00\u53e5\u8bdd\u3002\u9875\u9762\u4e0a\u4e0d\u4f1a\u663e\u793a\u662f\u8c01\u5199\u7684\u3002",
+      familySecretInputLabel: "\u5c0f\u7eb8\u6761",
+      familySecretPlaceholder: "\u5199\u4e00\u53e5\u8f7b\u8f7b\u7684\u8bdd...",
+      familySecretAdd: "\u533f\u540d\u7559\u4e0b",
+      familySecretEmpty: "\u8fd8\u6ca1\u6709\u79d8\u5bc6\u7eb8\u6761\u3002\u53ef\u4ee5\u5148\u7559\u4e00\u53e5\u5f88\u5c0f\u7684\u5173\u5fc3\u3002",
+      familySecretAdded: "\u79d8\u5bc6\u7eb8\u6761\u5df2\u7559\u4e0b\u3002",
+      familySecretDeleted: "\u8fd9\u5f20\u7eb8\u6761\u5df2\u6536\u8d77\u3002",
+      familySecretAnonymous: "\u533f\u540d\u5bb6\u5ead\u6210\u5458",
+      familySecretSchemaMissing: "\u8fd8\u6ca1\u6709\u521b\u5efa family_secret_notes \u8868\u3002\u8bf7\u5148\u5728 Supabase SQL Editor \u8fd0\u884c supabase/create-family-secret-notes.sql\u3002",
       familyUrgency: {
         low: "低",
         normal: "普通",
@@ -798,6 +819,17 @@ const copy = {
       familyGoalDeleted: "Family goal deleted.",
       familyCompletionNote: "Completion note",
       familyCompletionPlaceholder: "Add a short note about how it went.",
+      familySecretEyebrow: "Secret Notes",
+      familySecretTitle: "Anonymous little notes",
+      familySecretCopy: "Leave a small note for the family room. Names stay hidden on the page.",
+      familySecretInputLabel: "Secret note",
+      familySecretPlaceholder: "Write one soft sentence...",
+      familySecretAdd: "Post anonymously",
+      familySecretEmpty: "No secret notes yet. Leave one small kind note first.",
+      familySecretAdded: "Secret note posted.",
+      familySecretDeleted: "This note was tucked away.",
+      familySecretAnonymous: "Anonymous family member",
+      familySecretSchemaMissing: "The family_secret_notes table is missing. Run supabase/create-family-secret-notes.sql in Supabase SQL Editor first.",
       familyUrgency: {
         low: "Low",
         normal: "Normal",
@@ -4176,9 +4208,12 @@ function resetFamilyState() {
     categories: [],
     goals: [],
     sharedStats: [],
+    secretNotes: [],
     message: "",
     error: "",
     goalMessage: "",
+    secretNoteMessage: "",
+    secretNoteError: "",
     categoryMessage: "",
     categoryError: "",
   };
@@ -4379,6 +4414,63 @@ function bindFamilyRoom() {
       }
     });
   });
+  $("#familySecretForm")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const family = getActiveFamily();
+    if (!family || !supabaseClient || !currentUser) return;
+    const input = $("#familySecretInput");
+    const body = input?.value.trim() || "";
+    if (!body) {
+      input?.focus();
+      return;
+    }
+    await runFamilyAction(async () => {
+      try {
+        const note = await window.MyCare.family.createFamilySecretNote(supabaseClient, currentUser, {
+          familyId: family.id,
+          body,
+          mood: selectedFamilySecretTheme,
+        });
+        familyState.secretNotes = [note, ...familyState.secretNotes.filter((item) => item.id !== note.id)];
+        familyState.secretNoteMessage = t().work.familySecretAdded;
+        familyState.secretNoteError = "";
+        input.value = "";
+        renderFamilyRoom();
+        await loadFamilyRoom({ keepMessage: true });
+      } catch (error) {
+        const message = String(error?.message || "");
+        familyState.secretNoteError = message.includes("family_secret_notes") ? t().work.familySecretSchemaMissing : message;
+        familyState.loading = false;
+        renderFamilyRoom();
+      }
+    });
+  });
+  $("#familySecretThemePicker")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-family-secret-theme]");
+    if (!button) return;
+    selectedFamilySecretTheme = getFamilySecretTheme(button.dataset.familySecretTheme).id;
+    renderFamilySecretThemePicker();
+  });
+  $("#familySecretList")?.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-family-secret-action='hide']");
+    if (!button || !supabaseClient || !currentUser) return;
+    const noteId = button.closest("[data-family-secret-note-id]")?.dataset.familySecretNoteId;
+    if (!noteId) return;
+    await runFamilyAction(async () => {
+      try {
+        await window.MyCare.family.hideFamilySecretNote(supabaseClient, currentUser, noteId);
+        familyState.secretNotes = familyState.secretNotes.filter((item) => item.id !== noteId);
+        familyState.secretNoteMessage = t().work.familySecretDeleted;
+        familyState.secretNoteError = "";
+        renderFamilyRoom();
+        await loadFamilyRoom({ keepMessage: true });
+      } catch (error) {
+        familyState.secretNoteError = error?.message || t().work.familyError;
+        familyState.loading = false;
+        renderFamilyRoom();
+      }
+    });
+  });
 }
 
 async function runFamilyAction(action) {
@@ -4418,6 +4510,7 @@ async function loadFamilyRoom(options = {}) {
     familyState.categories = active ? await loadFamilyGoalCategoriesSafely(active.id) : [];
     familyState.goals = active ? await window.MyCare.family.listFamilyGoals(supabaseClient, active.id) : [];
     familyState.sharedStats = active ? await loadFamilySharedStatsSafely(active.id) : [];
+    familyState.secretNotes = active ? await loadFamilySecretNotesSafely(active.id) : [];
     familyState.loading = false;
     if (!familyState.message && families.length) familyState.message = t().work.familyReady;
     renderFamilyRoom();
@@ -4441,6 +4534,18 @@ async function loadFamilySharedStatsSafely(familyId) {
     return await window.MyCare.sharing.listSharedStats(supabaseClient, familyId);
   } catch (error) {
     console.warn("Shared stats could not load", error);
+    return [];
+  }
+}
+
+async function loadFamilySecretNotesSafely(familyId) {
+  try {
+    familyState.secretNoteError = "";
+    return await window.MyCare.family.listFamilySecretNotes(supabaseClient, familyId);
+  } catch (error) {
+    console.warn("Family secret notes could not load", error);
+    const message = String(error?.message || "");
+    familyState.secretNoteError = message.includes("family_secret_notes") ? t().work.familySecretSchemaMissing : message;
     return [];
   }
 }
@@ -4486,6 +4591,13 @@ function renderFamilyRoomLanguage() {
   $("#familyGoalUrgencyLabel").textContent = text.familyGoalUrgencyLabel;
   $("#familyGoalDeadlineLabel").textContent = text.familyGoalDeadlineLabel;
   $("#familyGoalSubmit").textContent = text.familyGoalAdd;
+  $("#familySecretEyebrow").textContent = text.familySecretEyebrow;
+  $("#familySecretTitle").textContent = text.familySecretTitle;
+  $("#familySecretCopy").textContent = text.familySecretCopy;
+  $("#familySecretInputLabel").textContent = text.familySecretInputLabel;
+  $("#familySecretInput").placeholder = text.familySecretPlaceholder;
+  $("#familySecretSubmit").textContent = text.familySecretAdd;
+  renderFamilySecretThemePicker();
   renderFamilyRoom();
 }
 
@@ -4530,6 +4642,7 @@ function renderFamilyRoom() {
     : `<p class="family-empty">${escapeHtml(text.familyInviteEmpty)}</p>`;
   renderFamilyGoalControls();
   renderFamilyGoals();
+  renderFamilySecretNotes();
 }
 
 function getFamilyMemberDisplayName(member = {}) {
@@ -4609,6 +4722,71 @@ function renderFamilyGoals() {
   target.innerHTML = error + message + (goals.length
     ? goals.map(renderFamilyGoalCard).join("")
     : `<div class="empty-note family-goal-empty">${escapeHtml(t().work.familyGoalEmpty)}</div>`);
+}
+
+function getFamilySecretTheme(themeId) {
+  return familySecretThemeOptions.find((theme) => theme.id === themeId) || familySecretThemeOptions[0];
+}
+
+function renderFamilySecretThemePicker() {
+  const picker = $("#familySecretThemePicker");
+  if (!picker) return;
+  picker.innerHTML = familySecretThemeOptions.map((theme) => {
+    const active = theme.id === selectedFamilySecretTheme;
+    const label = getLanguage() === "zh" ? theme.zh : theme.en;
+    return `
+      <button class="family-secret-theme-choice ${active ? "active" : ""}" type="button" data-family-secret-theme="${escapeHtml(theme.id)}" style="--secret-theme: ${escapeHtml(theme.color)};" aria-pressed="${active}">
+        <span aria-hidden="true"></span>
+        ${escapeHtml(label)}
+      </button>
+    `;
+  }).join("");
+}
+
+function renderFamilySecretNotes() {
+  const list = $("#familySecretList");
+  const message = $("#familySecretMessage");
+  const form = $("#familySecretForm");
+  const submit = $("#familySecretSubmit");
+  if (!list || !message || !form || !submit) return;
+  const text = t().work;
+  const active = getActiveFamily();
+  const canWrite = Boolean(active && supabaseClient && currentUser && !familyState.loading);
+  form.classList.toggle("is-disabled", !canWrite);
+  submit.disabled = !canWrite;
+  renderFamilySecretThemePicker();
+  message.classList.toggle("is-error", Boolean(familyState.secretNoteError));
+  message.textContent = familyState.secretNoteError || familyState.secretNoteMessage || "";
+  const notes = (familyState.secretNotes || []).filter((note) => note.visible !== false);
+  list.innerHTML = notes.length
+    ? notes.map(renderFamilySecretNoteCard).join("")
+    : `<div class="empty-note family-secret-empty">${escapeHtml(text.familySecretEmpty)}</div>`;
+}
+
+function renderFamilySecretNoteCard(note) {
+  const text = t().work;
+  const ownNote = Boolean(currentUser?.id && note.createdBy === currentUser.id);
+  const theme = getFamilySecretTheme(note.mood);
+  return `
+    <article class="family-secret-note" data-family-secret-note-id="${escapeHtml(note.id)}" data-secret-theme="${escapeHtml(theme.id)}" style="--secret-theme: ${escapeHtml(theme.color)};">
+      <div class="family-secret-note-pin" aria-hidden="true"></div>
+      <p>${escapeHtml(note.body)}</p>
+      <footer>
+        <span>${escapeHtml(text.familySecretAnonymous)}</span>
+        <time>${escapeHtml(formatSecretNoteTime(note.createdAt))}</time>
+        ${ownNote ? `<button class="family-secret-hide" data-family-secret-action="hide" type="button">${escapeHtml(getLanguage() === "zh" ? "\u6536\u8d77" : "Hide")}</button>` : ""}
+      </footer>
+    </article>
+  `;
+}
+
+function formatSecretNoteTime(value) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString(getLanguage() === "zh" ? "zh-CN" : "en-CA", {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function renderFamilyGoalCard(goal) {

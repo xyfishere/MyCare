@@ -67,6 +67,32 @@ const legacyReopen = family.toFamilyGoalReopenPatch({ includeCompletionColumns: 
 assert(legacyReopen.status === "open", "legacy reopen patch should reopen");
 assert(!Object.prototype.hasOwnProperty.call(legacyReopen, "completion_note"), "legacy reopen patch should omit completion columns");
 
+const secretNoteInsert = family.toFamilySecretNoteInsert({
+  familyId: "family-1",
+  body: "  We are quietly doing our best.  ",
+  mood: "warm",
+}, user);
+
+assert(secretNoteInsert.family_id === "family-1", "secret note family id should map");
+assert(secretNoteInsert.body === "We are quietly doing our best.", "secret note body should trim");
+assert(secretNoteInsert.mood === "warm", "secret note mood should map");
+assert(secretNoteInsert.created_by === "user-1", "secret note created_by should use signed-in user");
+assert(secretNoteInsert.visible === true, "secret note should be visible by default");
+
+const secretNote = family.mapFamilySecretNote({
+  id: "note-1",
+  family_id: "family-1",
+  body: "Anonymous kindness",
+  mood: "soft",
+  visible: true,
+  created_by: "user-1",
+  created_at: "2026-07-03T09:00:00.000Z",
+});
+
+assert(secretNote.familyId === "family-1", "secret note should expose familyId");
+assert(secretNote.body === "Anonymous kindness", "secret note body should map");
+assert(secretNote.createdBy === "user-1", "secret note should keep createdBy for permissions");
+
 const mapped = family.mapFamilyGoal({
   id: "goal-1",
   family_id: "family-1",
