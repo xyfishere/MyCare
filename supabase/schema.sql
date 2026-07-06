@@ -539,6 +539,109 @@ $$;
 
 grant execute on function public.create_family_goal_category(text, uuid, text) to authenticated;
 
+create or replace function public.create_family_invitation(
+  p_family_id uuid,
+  p_email text
+)
+returns public.family_invitations
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  created_invitation public.family_invitations;
+  normalized_email text;
+begin
+  if auth.uid() is null then
+    raise exception 'Sign in is required';
+  end if;
+
+  if not public.is_family_member(p_family_id) then
+    raise exception 'You must be a family member to invite people';
+  end if;
+
+  normalized_email := lower(trim(p_email));
+  if normalized_email = '' then
+    raise exception 'Invite email is required';
+  end if;
+
+  insert into public.family_invitations (family_id, email, invited_by)
+  values (p_family_id, normalized_email, auth.uid())
+  returning * into created_invitation;
+
+  return created_invitation;
+end;
+$$;
+
+grant execute on function public.create_family_invitation(uuid, text) to authenticated;
+
+drop function if exists public.accept_family_invitation(uuid);
+
+create or replace function public.accept_family_invitation(
+  p_invitation_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_invitation public.family_invitations;
+  accepted_invitation public.family_invitations;
+  created_membership public.family_members;
+  requester_email text;
+begin
+  if auth.uid() is null then
+    raise exception 'Sign in is required';
+  end if;
+
+  requester_email := lower(coalesce(auth.jwt() ->> 'email', ''));
+  if requester_email = '' then
+    raise exception 'Signed-in email is required';
+  end if;
+
+  select *
+  into target_invitation
+  from public.family_invitations
+  where id = p_invitation_id
+    and status = 'pending'
+    and lower(email) = requester_email
+    and expires_at > now()
+  for update;
+
+  if target_invitation.id is null then
+    raise exception 'Invitation not found or expired';
+  end if;
+
+  insert into public.family_members (family_id, user_id, email, role)
+  values (target_invitation.family_id, auth.uid(), requester_email, 'member')
+  on conflict (family_id, user_id)
+  do update set
+    email = excluded.email,
+    role = case
+      when public.family_members.role = 'owner' then 'owner'
+      else excluded.role
+    end
+  returning * into created_membership;
+
+  update public.family_invitations
+  set
+    status = 'accepted',
+    accepted_by = auth.uid(),
+    accepted_at = now(),
+    updated_at = now()
+  where id = target_invitation.id
+  returning * into accepted_invitation;
+
+  return jsonb_build_object(
+    'invitation', to_jsonb(accepted_invitation),
+    'membership', to_jsonb(created_membership)
+  );
+end;
+$$;
+
+grant execute on function public.accept_family_invitation(uuid) to authenticated;
+
 drop trigger if exists touch_families_before_update on public.families;
 create trigger touch_families_before_update
 before update on public.families
@@ -575,9 +678,13 @@ before insert or update on public.family_goals
 for each row execute function public.validate_family_goal_category();
 
 drop policy if exists "Family members can read families" on public.families;
-create policy "Family members can read families"
+drop policy if exists "Family members and invitees can read families" on public.families;
+create policy "Family members and invitees can read families"
 on public.families for select
-using (public.is_family_member(id));
+using (
+  public.is_family_member(id)
+  or public.has_pending_family_invitation(id)
+);
 
 drop policy if exists "Users can create families" on public.families;
 create policy "Users can create families"

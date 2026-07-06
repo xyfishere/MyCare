@@ -13,6 +13,17 @@ assert(family.normalizeUrgency("High") === "high", "urgency should normalize cas
 assert(family.normalizeUrgency("urgent") === "high", "urgent alias should normalize to high");
 assert(family.normalizeUrgency("panic") === "normal", "unknown urgency should fallback");
 assert(!family.minimalInvitationSelect.includes("updated_at"), "legacy invitation select should not require updated_at");
+assert(typeof family.listReceivedInvitations === "function", "received invitation inbox should be exported");
+assert(typeof family.acceptInvitationById === "function", "accept by invitation id should be exported");
+
+const receivedInvitation = family.mapFamilyInvitation({
+  id: "invite-1",
+  family_id: "family-1",
+  email: "me@example.com",
+  status: "pending",
+  families: { name: "Little White Cat Home" },
+});
+assert(receivedInvitation.familyName === "Little White Cat Home", "received invitations should map family name");
 
 const member = family.mapFamilyMember({
   family_id: "family-1",

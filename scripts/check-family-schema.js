@@ -27,11 +27,13 @@ function assertIncludes(snippet, message) {
   "public.is_family_owner",
   "public.is_family_creator",
   "public.has_pending_family_invitation",
+  "public.create_family_invitation",
+  "public.accept_family_invitation",
   "public.validate_family_goal_category",
 ].forEach((fn) => assertIncludes(`function ${fn}`, `${fn} helper is missing`));
 
 [
-  "Family members can read families",
+  "Family members and invitees can read families",
   "Users can create families",
   "Owners can add family members",
   "Family members and invitees can read invitations",

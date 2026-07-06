@@ -223,6 +223,7 @@ let familyState = {
   activeFamilyId: "",
   members: [],
   invitations: [],
+  receivedInvitations: [],
   categories: [],
   goals: [],
   sharedStats: [],
@@ -388,7 +389,7 @@ const copy = {
       familyTitle: "家庭共享",
       familyCopy: "为共享目标准备一个安静的家庭空间。个人记录仍然默认私密。",
       familySignedOut: "登录后可以创建或加入家庭。",
-      familyNoFamily: "还没有家庭空间。可以先创建一个，或输入邀请 token 加入。",
+      familyNoFamily: "\u8fd8\u6ca1\u6709\u5bb6\u5ead\u7a7a\u95f4\u3002\u53ef\u4ee5\u5148\u521b\u5efa\u4e00\u4e2a\uff0c\u6216\u63a5\u53d7\u4f60\u6536\u5230\u7684\u5bb6\u5ead\u9080\u8bf7\u3002",
       familyLoading: "正在读取家庭空间...",
       familyReady: "家庭空间已准备好。",
       familyError: "家庭空间暂时无法加载。",
@@ -396,20 +397,24 @@ const copy = {
       familyNameLabel: "家庭名称",
       familyNamePlaceholder: "例如：小白猫的家",
       familyCreate: "创建家庭",
-      familyTokenLabel: "邀请 token",
-      familyTokenPlaceholder: "粘贴邀请 token",
-      familyAccept: "接受邀请",
+      familyReceivedLabel: "\u6536\u5230\u7684\u9080\u8bf7",
+      familyReceivedCopy: "\u5982\u679c\u6709\u4eba\u7528\u4f60\u7684\u90ae\u7bb1\u9080\u8bf7\u4f60\uff0c\u4f1a\u663e\u793a\u5728\u8fd9\u91cc\u3002",
+      familyReceivedEmpty: "\u6682\u65f6\u6ca1\u6709\u5f85\u63a5\u53d7\u7684\u9080\u8bf7\u3002",
+      familyReceivedFrom: "\u9080\u8bf7\u4f60\u52a0\u5165 {family}",
+      familyReceivedFallback: "\u5bb6\u5ead\u7a7a\u95f4",
+      familyReceivedAccept: "\u63a5\u53d7",
+      familyReceivedAccepted: "\u5df2\u63a5\u53d7\u9080\u8bf7\u3002",
       familyCurrent: "当前家庭",
       familyMembers: "{count} 位成员",
       familyLeave: "离开",
       familyInviteLabel: "通过邮箱邀请",
       familyInvitePlaceholder: "family@example.com",
       familyInvite: "创建邀请",
-      familyInviteCreated: "邀请已创建。把 token 发给对方即可加入。",
+      familyInviteCreated: "\u9080\u8bf7\u5df2\u521b\u5efa\u3002\u5bf9\u65b9\u767b\u5f55\u540e\u4f1a\u5728 app \u91cc\u770b\u5230\u8fd9\u4e2a\u9080\u8bf7\u3002",
       familyInviteEmpty: "还没有待处理邀请。",
+      familyInvitePending: "\u7b49\u5f85\u5bf9\u65b9\u63a5\u53d7",
       familyOwner: "Owner",
       familyMember: "Member",
-      familyTokenPrefix: "Token",
       familyGoalsEyebrow: "Shared Goals",
       familyGoalsTitle: "家庭目标",
       familyGoalSummary: "{open} open · {done} completed",
@@ -781,7 +786,7 @@ const copy = {
       familyTitle: "Family sharing",
       familyCopy: "Prepare a calm shared space for family goals. Personal records stay private by default.",
       familySignedOut: "Sign in to create or join a family.",
-      familyNoFamily: "No family space yet. Create one, or paste an invitation token to join.",
+      familyNoFamily: "No family space yet. Create one, or accept a family invitation sent to your email.",
       familyLoading: "Loading family space...",
       familyReady: "Family space is ready.",
       familyError: "Family space could not load.",
@@ -789,20 +794,24 @@ const copy = {
       familyNameLabel: "Family name",
       familyNamePlaceholder: "For example: Little White Cat Home",
       familyCreate: "Create family",
-      familyTokenLabel: "Invitation token",
-      familyTokenPlaceholder: "Paste invitation token",
-      familyAccept: "Accept invitation",
+      familyReceivedLabel: "Received invitations",
+      familyReceivedCopy: "If someone invites your email, the invitation will appear here.",
+      familyReceivedEmpty: "No invitations waiting right now.",
+      familyReceivedFrom: "Invitation to join {family}",
+      familyReceivedFallback: "Family room",
+      familyReceivedAccept: "Accept",
+      familyReceivedAccepted: "Invitation accepted.",
       familyCurrent: "Current family",
       familyMembers: "{count} members",
       familyLeave: "Leave",
       familyInviteLabel: "Invite by email",
       familyInvitePlaceholder: "family@example.com",
       familyInvite: "Create invitation",
-      familyInviteCreated: "Invitation created. Share the token with them to join.",
+      familyInviteCreated: "Invitation created. They will see it in the app after signing in.",
       familyInviteEmpty: "No pending invitations yet.",
+      familyInvitePending: "Waiting for them to accept",
       familyOwner: "Owner",
       familyMember: "Member",
-      familyTokenPrefix: "Token",
       familyGoalsEyebrow: "Shared Goals",
       familyGoalsTitle: "Family goals",
       familyGoalSummary: "{open} open · {done} completed",
@@ -1360,6 +1369,28 @@ function saveState({ skipCloud = false, preserveTimestamp = false } = {}) {
   if (!skipCloud && !applyingCloudState) queueCloudSync();
 }
 
+function disableSavedInputHistory(root = document) {
+  root.querySelectorAll("form, input, textarea, select").forEach((field) => {
+    field.setAttribute("autocomplete", "off");
+  });
+}
+
+function bindInputHistoryProtection() {
+  disableSavedInputHistory();
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      mutation.addedNodes.forEach((node) => {
+        if (!(node instanceof Element)) return;
+        if (node.matches("form, input, textarea, select")) {
+          node.setAttribute("autocomplete", "off");
+        }
+        disableSavedInputHistory(node);
+      });
+    });
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+}
+
 function init() {
   setRandomBackground();
   loadMorningQuotes();
@@ -1368,6 +1399,7 @@ function init() {
   $("#nightMusicUrl").value = getNightMusicUrl();
   $("#wakeTime").value = new Date().toTimeString().slice(0, 5);
 
+  bindInputHistoryProtection();
   bindLanguageToggle();
   bindNavigation();
   bindMorning();
@@ -4205,6 +4237,7 @@ function resetFamilyState() {
     activeFamilyId: "",
     members: [],
     invitations: [],
+    receivedInvitations: [],
     categories: [],
     goals: [],
     sharedStats: [],
@@ -4246,23 +4279,16 @@ function bindFamilyRoom() {
       await loadFamilyRoom({ keepMessage: true });
     });
   });
-  $("#acceptInvitationForm")?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    if (!supabaseClient || !currentUser) {
-      familyState.error = t().work.familySignedOut;
-      renderFamilyRoom();
-      return;
-    }
-    const token = $("#familyInvitationToken").value.trim();
-    if (!token) {
-      $("#familyInvitationToken").focus();
-      return;
-    }
+  $("#receivedInvitationList")?.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-family-invitation-action='accept']");
+    if (!button || !supabaseClient || !currentUser) return;
+    const invitationId = button.closest("[data-family-invitation-id]")?.dataset.familyInvitationId;
+    if (!invitationId) return;
     await runFamilyAction(async () => {
-      const result = await window.MyCare.family.acceptInvitation(supabaseClient, currentUser, token);
+      const result = await window.MyCare.family.acceptInvitationById(supabaseClient, currentUser, invitationId);
       familyState.activeFamilyId = result.membership.familyId;
-      $("#familyInvitationToken").value = "";
-      familyState.message = t().work.familyReady;
+      familyState.receivedInvitations = familyState.receivedInvitations.filter((invite) => invite.id !== invitationId);
+      familyState.message = t().work.familyReceivedAccepted;
       await loadFamilyRoom({ keepMessage: true });
     });
   });
@@ -4281,7 +4307,7 @@ function bindFamilyRoom() {
         email,
       });
       $("#familyInviteEmail").value = "";
-      familyState.message = `${t().work.familyInviteCreated} ${t().work.familyTokenPrefix}: ${invitation.token}`;
+      familyState.message = t().work.familyInviteCreated;
       await loadFamilyRoom({ keepMessage: true });
     });
   });
@@ -4501,6 +4527,7 @@ async function loadFamilyRoom(options = {}) {
   try {
     const families = await window.MyCare.family.listFamilies(supabaseClient);
     familyState.families = families;
+    familyState.receivedInvitations = await loadReceivedInvitationsSafely();
     if (!families.some((family) => family.id === familyState.activeFamilyId)) {
       familyState.activeFamilyId = families[0]?.id || "";
     }
@@ -4525,6 +4552,15 @@ async function loadFamilyGoalCategoriesSafely(familyId) {
   try {
     return await window.MyCare.family.listFamilyGoalCategories(supabaseClient, familyId);
   } catch {
+    return [];
+  }
+}
+
+async function loadReceivedInvitationsSafely() {
+  try {
+    return await window.MyCare.family.listReceivedInvitations(supabaseClient, currentUser);
+  } catch (error) {
+    console.warn("Received family invitations could not load", error);
     return [];
   }
 }
@@ -4574,9 +4610,8 @@ function renderFamilyRoomLanguage() {
   $("#familyNameLabel").textContent = text.familyNameLabel;
   $("#familyNameInput").placeholder = text.familyNamePlaceholder;
   $("#createFamilyButton").textContent = text.familyCreate;
-  $("#familyTokenLabel").textContent = text.familyTokenLabel;
-  $("#familyInvitationToken").placeholder = text.familyTokenPlaceholder;
-  $("#acceptInvitationButton").textContent = text.familyAccept;
+  $("#familyReceivedLabel").textContent = text.familyReceivedLabel;
+  $("#familyReceivedCopy").textContent = text.familyReceivedCopy;
   $("#familyActiveEyebrow").textContent = text.familyCurrent;
   $("#leaveFamilyButton").textContent = text.familyLeave;
   $("#familyInviteLabel").textContent = text.familyInviteLabel;
@@ -4612,10 +4647,9 @@ function renderFamilyRoom() {
   $("#familyRoomMessage").textContent = message;
   $("#familyRoomMessage").classList.toggle("is-error", Boolean(familyState.error));
   $("#createFamilyForm").classList.toggle("is-disabled", !signedIn || familyState.loading);
-  $("#acceptInvitationForm").classList.toggle("is-disabled", !signedIn || familyState.loading);
   $("#createFamilyButton").disabled = !signedIn || familyState.loading;
-  $("#acceptInvitationButton").disabled = !signedIn || familyState.loading;
   $("#refreshFamilyRoom").disabled = !signedIn || familyState.loading;
+  renderReceivedInvitations();
   $("#familyActiveCard").hidden = !active;
   if (!active) return;
 
@@ -4636,13 +4670,37 @@ function renderFamilyRoom() {
     ? pending.slice(0, 4).map((invite) => `
       <div class="family-invite-pill">
         <span>${escapeHtml(invite.email)}</span>
-        <small>${escapeHtml(text.familyTokenPrefix)}: ${escapeHtml(invite.token)}</small>
+        <small>${escapeHtml(text.familyInvitePending)}</small>
       </div>
     `).join("")
     : `<p class="family-empty">${escapeHtml(text.familyInviteEmpty)}</p>`;
   renderFamilyGoalControls();
   renderFamilyGoals();
   renderFamilySecretNotes();
+}
+
+function renderReceivedInvitations() {
+  const target = $("#receivedInvitationList");
+  if (!target) return;
+  const text = t().work;
+  const signedIn = Boolean(supabaseClient && currentUser);
+  const invites = signedIn ? (familyState.receivedInvitations || []).filter((invite) => invite.status === "pending") : [];
+  target.innerHTML = invites.length
+    ? invites.slice(0, 4).map((invite) => {
+      const familyName = invite.familyName || text.familyReceivedFallback;
+      return `
+        <article class="family-received-invite" data-family-invitation-id="${escapeHtml(invite.id)}">
+          <div>
+            <strong>${escapeHtml(interpolate(text.familyReceivedFrom, { family: familyName }))}</strong>
+            <small>${escapeHtml(invite.email || currentUser?.email || "")}</small>
+          </div>
+          <button class="secondary family-received-accept" data-family-invitation-action="accept" type="button" ${familyState.loading ? "disabled" : ""}>
+            ${escapeHtml(text.familyReceivedAccept)}
+          </button>
+        </article>
+      `;
+    }).join("")
+    : `<p class="family-empty">${escapeHtml(signedIn ? text.familyReceivedEmpty : text.familySignedOut)}</p>`;
 }
 
 function getFamilyMemberDisplayName(member = {}) {

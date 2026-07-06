@@ -6,7 +6,7 @@
     <meta property="og:image" content="assets/images/my-care-logo.png?v=20260609-2" />
     <title>My Care</title>
     <link rel="icon" type="image/png" href="assets/images/my-care-logo.png?v=20260609-2" />
-    <link rel="stylesheet" href="styles.css?v=20260703-secret-note-ui-1" />
+    <link rel="stylesheet" href="styles.css?v=20260706-invite-inbox-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -154,7 +154,7 @@
               </div>
               <h3 id="morningPrompt">爱自己是一生浪漫的开始。</h3>
               <p id="morningHint" hidden></p>
-              <form class="inline-record is-hidden" id="morningForm">
+              <form class="inline-record is-hidden" id="morningForm" autocomplete="off">
                 <label class="morning-field" data-morning-field="skin">
                   皮肤状态
                   <select id="skinState">
@@ -659,7 +659,7 @@
             </div>
 
             <div class="work-view" id="workAddView">
-              <form class="panel work-form" id="workGoalForm">
+              <form class="panel work-form" id="workGoalForm" autocomplete="off">
                 <div class="panel-title">
                   <h3>新增目标</h3>
                   <span>轻量记录</span>
@@ -717,20 +717,20 @@
               </div>
               <p class="family-room-message" id="familyRoomMessage" role="status"></p>
               <div class="family-room-grid">
-                <form class="family-mini-card" id="createFamilyForm">
+                <form class="family-mini-card" id="createFamilyForm" autocomplete="off">
                   <label>
                     <span id="familyNameLabel">家庭名称</span>
                     <input id="familyNameInput" type="text" maxlength="80" placeholder="例如：小白猫的家" />
                   </label>
                   <button class="secondary" id="createFamilyButton" type="submit">Create family</button>
                 </form>
-                <form class="family-mini-card" id="acceptInvitationForm">
-                  <label>
-                    <span id="familyTokenLabel">邀请 token</span>
-                    <input id="familyInvitationToken" type="text" autocomplete="off" placeholder="Paste invitation token" />
-                  </label>
-                  <button class="secondary" id="acceptInvitationButton" type="submit">Accept invitation</button>
-                </form>
+                <div class="family-mini-card family-received-card" id="receivedInvitationCard">
+                  <div>
+                    <span class="family-card-label" id="familyReceivedLabel">收到的邀请</span>
+                    <p id="familyReceivedCopy">如果你的邮箱收到家庭邀请，会显示在这里。</p>
+                  </div>
+                  <div class="family-received-list" id="receivedInvitationList" aria-live="polite"></div>
+                </div>
               </div>
               <div class="family-active-card" id="familyActiveCard" hidden>
                 <div class="family-active-head">
@@ -742,10 +742,10 @@
                   <button class="family-leave-button" id="leaveFamilyButton" type="button">Leave</button>
                 </div>
                 <div class="family-member-list" id="familyMemberList"></div>
-              <form class="family-invite-row" id="familyInviteForm">
+              <form class="family-invite-row" id="familyInviteForm" autocomplete="off">
                 <label>
                   <span id="familyInviteLabel">Invite by email</span>
-                  <input id="familyInviteEmail" type="email" autocomplete="email" placeholder="family@example.com" />
+                  <input id="familyInviteEmail" type="email" autocomplete="off" placeholder="family@example.com" />
                 </label>
                 <button class="primary" id="familyInviteButton" type="submit">Create invitation</button>
               </form>
@@ -758,7 +758,7 @@
                   </div>
                   <span id="familyGoalSummary">0 open · 0 completed</span>
                 </div>
-                <form class="family-goal-form" id="familyGoalForm">
+                <form class="family-goal-form" id="familyGoalForm" autocomplete="off">
                   <label class="family-goal-title-field">
                     <span id="familyGoalTitleLabel">Goal</span>
                     <input id="familyGoalTitleInput" type="text" maxlength="90" placeholder="For example: take a family walk" />
@@ -790,7 +790,7 @@
                     <p id="familySecretCopy">Leave a small note for the family room. Names stay hidden on the page.</p>
                   </div>
                 </div>
-                <form class="family-secret-form" id="familySecretForm">
+                <form class="family-secret-form" id="familySecretForm" autocomplete="off">
                   <label>
                     <span id="familySecretInputLabel">Secret note</span>
                     <textarea id="familySecretInput" rows="3" maxlength="180" placeholder="Write one soft sentence..."></textarea>
@@ -1029,7 +1029,7 @@
     </div>
 
     <dialog class="account-dialog" id="accountDialog" aria-labelledby="accountDialogTitle">
-      <form method="dialog" class="account-dialog-card">
+      <form method="dialog" class="account-dialog-card" autocomplete="off">
         <button class="account-dialog-close" value="cancel" type="submit" aria-label="Close">×</button>
         <p class="eyebrow" id="accountDialogEyebrow">Private cloud sync</p>
         <h2 id="accountDialogTitle">Your My Care account</h2>
@@ -1037,7 +1037,7 @@
 
         <div class="account-signed-out" id="accountSignedOut">
           <label for="accountEmail" id="accountEmailLabel">Email address</label>
-          <input id="accountEmail" name="email" type="email" autocomplete="email" placeholder="you@example.com" />
+          <input id="accountEmail" name="email" type="email" autocomplete="off" placeholder="you@example.com" />
           <button class="primary account-action" id="sendMagicLink" type="button">Send magic link</button>
         </div>
 
@@ -1086,7 +1086,7 @@
     </dialog>
 
     <dialog class="whats-new-dialog" id="whatsNewDialog" aria-labelledby="whatsNewTitle">
-      <form method="dialog" class="whats-new-card">
+      <form method="dialog" class="whats-new-card" autocomplete="off">
         <button class="whats-new-close" value="close" type="submit" aria-label="Close">×</button>
         <p class="eyebrow" id="whatsNewEyebrow">This week</p>
         <h2 id="whatsNewTitle">what's new this week</h2>
@@ -1110,7 +1110,7 @@
     </dialog>
 
     <dialog class="work-reset-dialog" id="workResetDialog" aria-labelledby="workResetTitle">
-      <form method="dialog" class="work-reset-dialog-card">
+      <form method="dialog" class="work-reset-dialog-card" autocomplete="off">
         <span class="work-reset-symbol" aria-hidden="true"></span>
         <p class="eyebrow" id="workResetEyebrow">New journey</p>
         <h2 id="workResetTitle">你确定要开始新的 journey 吗？</h2>
@@ -1123,7 +1123,7 @@
     </dialog>
 
     <dialog class="work-delete-dialog" id="workDeleteDialog" aria-labelledby="workDeleteTitle">
-      <form method="dialog" class="work-delete-dialog-card">
+      <form method="dialog" class="work-delete-dialog-card" autocomplete="off">
         <span class="work-delete-symbol" aria-hidden="true"></span>
         <p class="eyebrow" id="workDeleteEyebrow">Remove goal</p>
         <h2 id="workDeleteTitle">确定要删除这个 goal 吗？</h2>
@@ -1136,7 +1136,7 @@
     </dialog>
 
     <dialog class="personalization-dialog" id="personalizationDialog" aria-labelledby="personalizationTitle">
-      <form method="dialog" class="personalization-card">
+      <form method="dialog" class="personalization-card" autocomplete="off">
         <button class="personalization-language-toggle" id="personalizationLanguageToggle" type="button" aria-label="Switch language">
           <span data-lang-label="zh">中文</span>
           <span aria-hidden="true">/</span>
@@ -1227,8 +1227,8 @@
     <script src="src/core/language.js?v=20260701-1"></script>
     <script src="src/core/storage.js?v=20260701-1"></script>
     <script src="src/modules/goals.js?v=20260701-1"></script>
-    <script src="src/modules/family.js?v=20260703-secret-notes-1"></script>
+    <script src="src/modules/family.js?v=20260706-accept-invite-rpc-1"></script>
     <script src="src/modules/sharing.js?v=20260702-sharing-1"></script>
-    <script src="app.js?v=20260703-secret-note-ui-2"></script>
+    <script src="app.js?v=20260706-invite-inbox-1"></script>
   </body>
 </html>

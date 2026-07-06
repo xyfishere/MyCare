@@ -53,6 +53,11 @@
       || message.toLowerCase().includes("violates row-level security policy");
   }
 
+  function isMissingFunctionError(error, functionName) {
+    const message = String(error?.message || error?.details || "");
+    return message.includes(functionName) || message.includes("function") && message.includes("does not exist");
+  }
+
   function mapFamily(row = {}) {
     const family = row.family || row.families || row;
     return {
@@ -77,9 +82,11 @@
   }
 
   function mapFamilyInvitation(row = {}) {
+    const family = row.family || row.families || {};
     return {
       id: row.id,
       familyId: row.family_id || row.familyId,
+      familyName: row.familyName || family.name || "",
       email: row.email,
       token: row.token,
       status: row.status,
@@ -320,6 +327,18 @@
     const userId = requireUser(user);
     const email = normalizeEmail(input.email);
     if (!email) throw new Error("Invite email is required");
+    if (client.rpc) {
+      try {
+        const invitation = throwIfError(await client.rpc("create_family_invitation", {
+          p_family_id: ensureFamilyId(input.familyId),
+          p_email: email,
+        }));
+        return mapFamilyInvitation(Array.isArray(invitation) ? invitation[0] : invitation);
+      } catch (error) {
+        const message = String(error?.message || "");
+        if (!message.includes("create_family_invitation")) throw error;
+      }
+    }
     const payload = {
       family_id: ensureFamilyId(input.familyId),
       email,
@@ -343,18 +362,52 @@
     return (data || []).map(mapFamilyInvitation);
   }
 
-  async function acceptInvitation(client, user, token) {
+  async function listReceivedInvitations(client, user) {
     requireClient(client);
-    const userId = requireUser(user);
-    const inviteToken = String(token || "").trim();
-    if (!inviteToken) throw new Error("Invitation token is required");
+    const email = normalizeEmail(user?.email);
+    if (!email) return [];
+    try {
+      const data = await selectFamilyInvitation((columns) => client
+        .from("family_invitations")
+        .select(`${columns}, families(id, name)`)
+        .eq("status", "pending")
+        .eq("email", email)
+        .order("created_at", { ascending: false }));
+      return (data || []).map(mapFamilyInvitation);
+    } catch {
+      const data = await selectFamilyInvitation((columns) => client
+        .from("family_invitations")
+        .select(columns)
+        .eq("status", "pending")
+        .eq("email", email)
+        .order("created_at", { ascending: false }));
+      return (data || []).map(mapFamilyInvitation);
+    }
+  }
 
-    const invitation = await selectFamilyInvitation((columns) => client
-      .from("family_invitations")
-      .select(columns)
-      .eq("token", inviteToken)
-      .eq("status", "pending")
-      .single());
+  async function acceptInvitationRecord(client, user, invitation) {
+    const userId = requireUser(user);
+    if (!invitation?.id || !invitation?.family_id) throw new Error("Invitation could not be found");
+
+    if (client.rpc) {
+      try {
+        const result = throwIfError(await client.rpc("accept_family_invitation", {
+          p_invitation_id: invitation.id,
+        }));
+        const payload = Array.isArray(result) ? result[0] : result;
+        return {
+          invitation: mapFamilyInvitation(payload?.invitation || payload),
+          membership: mapFamilyMember(payload?.membership || {
+            family_id: invitation.family_id,
+            user_id: userId,
+            email: normalizeEmail(invitation.email || user?.email),
+            role: "member",
+          }),
+        };
+      } catch (error) {
+        if (!isMissingFunctionError(error, "accept_family_invitation")) throw error;
+      }
+    }
 
     const membership = throwIfError(await client
       .from("family_members")
@@ -391,6 +444,36 @@
       invitation: mapFamilyInvitation(accepted),
       membership: mapFamilyMember(membership),
     };
+  }
+
+  async function acceptInvitation(client, user, token) {
+    requireClient(client);
+    requireUser(user);
+    const inviteToken = String(token || "").trim();
+    if (!inviteToken) throw new Error("Invitation token is required");
+
+    const invitation = await selectFamilyInvitation((columns) => client
+      .from("family_invitations")
+      .select(columns)
+      .eq("token", inviteToken)
+      .eq("status", "pending")
+      .single());
+
+    return acceptInvitationRecord(client, user, invitation);
+  }
+
+  async function acceptInvitationById(client, user, invitationId) {
+    requireClient(client);
+    requireUser(user);
+    const id = String(invitationId || "").trim();
+    if (!id) throw new Error("Invitation id is required");
+    const invitation = await selectFamilyInvitation((columns) => client
+      .from("family_invitations")
+      .select(columns)
+      .eq("id", id)
+      .eq("status", "pending")
+      .single());
+    return acceptInvitationRecord(client, user, invitation);
   }
 
   async function leaveFamily(client, user, familyId) {
@@ -631,6 +714,7 @@
 
   namespace.family = {
     acceptInvitation,
+    acceptInvitationById,
     buildFamilyGoalStats,
     completeFamilyGoal,
     createFamily,
@@ -647,6 +731,7 @@
     listFamilyGoals,
     listFamilySecretNotes,
     listInvitations,
+    listReceivedInvitations,
     mapFamily,
     mapFamilyCategory,
     mapFamilyGoal,
