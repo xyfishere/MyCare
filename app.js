@@ -423,7 +423,7 @@ const copy = {
       familyGoalCategoryLabel: "家庭分类",
       familyGoalCategoryPlaceholder: "家务 / 健康 / 一起完成",
       familyGoalUrgencyLabel: "紧急程度",
-      familyGoalDeadlineLabel: "Deadline",
+      familyGoalDeadlineLabel: "\u622a\u6b62\u65e5\u671f",
       familyGoalAdd: "添加家庭目标",
       familyGoalEmpty: "还没有家庭目标。先添加一个轻量共享目标就好。",
       familyGoalAdded: "家庭目标已添加。",
@@ -4349,6 +4349,8 @@ function bindFamilyRoom() {
     $("#familyGoalUrgencyInput").value = button.dataset.familyGoalUrgency || "normal";
     renderFamilyGoalUrgencyPicker();
   });
+  $("#familyGoalDeadlineInput")?.addEventListener("change", renderFamilyGoalDeadlineDisplay);
+  $("#familyGoalDeadlineInput")?.addEventListener("input", renderFamilyGoalDeadlineDisplay);
   $("#familyGoalForm")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const family = getActiveFamily();
@@ -4382,6 +4384,7 @@ function bindFamilyRoom() {
       familyGoalCategoryMode = "preset";
       $("#familyGoalUrgencyInput").value = "normal";
       $("#familyGoalDeadlineInput").value = "";
+      renderFamilyGoalDeadlineDisplay();
       familyState.goalMessage = t().work.familyGoalAdded;
       renderFamilyRoom();
       await loadFamilyRoom({ keepMessage: true });
@@ -4625,6 +4628,7 @@ function renderFamilyRoomLanguage() {
   $("#familyGoalCategoryCustomInput").placeholder = text.familyGoalCategoryPlaceholder;
   $("#familyGoalUrgencyLabel").textContent = text.familyGoalUrgencyLabel;
   $("#familyGoalDeadlineLabel").textContent = text.familyGoalDeadlineLabel;
+  renderFamilyGoalDeadlineDisplay();
   $("#familyGoalSubmit").textContent = text.familyGoalAdd;
   $("#familySecretEyebrow").textContent = text.familySecretEyebrow;
   $("#familySecretTitle").textContent = text.familySecretTitle;
@@ -4760,6 +4764,18 @@ function renderFamilyGoalUrgencyPicker() {
   `).join("");
 }
 
+function renderFamilyGoalDeadlineDisplay() {
+  const input = $("#familyGoalDeadlineInput");
+  const display = $("#familyGoalDeadlineDisplay");
+  if (!input || !display) return;
+  const value = input.value || "";
+  const text = t().work;
+  const label = value ? formatLongDate(value) : text.chooseDeadline;
+  display.textContent = label;
+  input.setAttribute("aria-label", `${text.familyGoalDeadlineLabel}: ${label}`);
+  input.closest(".family-deadline-field")?.classList.toggle("has-date", Boolean(value));
+}
+
 function renderFamilyGoalControls() {
   const text = t().work;
   const open = familyState.goals.filter((goal) => goal.status !== "done").length;
@@ -4767,6 +4783,7 @@ function renderFamilyGoalControls() {
   $("#familyGoalSummary").textContent = interpolate(text.familyGoalSummary, { open, done });
   renderFamilyGoalCategoryPicker();
   renderFamilyGoalUrgencyPicker();
+  renderFamilyGoalDeadlineDisplay();
   $("#familyGoalForm").classList.toggle("is-disabled", familyState.loading);
   $("#familyGoalSubmit").disabled = familyState.loading;
 }

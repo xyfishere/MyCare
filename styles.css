@@ -2143,6 +2143,51 @@ body[data-language="zh"] .low-energy-hero h2 {
   box-shadow: 0 0 0 4px rgba(127, 179, 140, 0.1);
 }
 
+.family-deadline-field {
+  position: relative;
+}
+
+.family-deadline-field input[type="date"] {
+  position: relative;
+  z-index: 2;
+  color: transparent;
+  cursor: pointer;
+  caret-color: transparent;
+}
+
+.family-deadline-field input[type="date"]::-webkit-datetime-edit,
+.family-deadline-field input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+.family-deadline-field input[type="date"]::-webkit-datetime-edit-text,
+.family-deadline-field input[type="date"]::-webkit-datetime-edit-month-field,
+.family-deadline-field input[type="date"]::-webkit-datetime-edit-day-field,
+.family-deadline-field input[type="date"]::-webkit-datetime-edit-year-field {
+  color: transparent;
+}
+
+.family-deadline-field input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 0.82;
+  cursor: pointer;
+  filter: sepia(18%) saturate(480%) hue-rotate(86deg) brightness(76%);
+}
+
+.family-date-display {
+  position: absolute;
+  left: 14px;
+  right: 42px;
+  bottom: 0;
+  z-index: 3;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  color: rgba(40, 69, 54, 0.78);
+  font: 700 0.95rem/1 var(--font-ui);
+  pointer-events: none;
+}
+
+.family-deadline-field:not(.has-date) .family-date-display {
+  color: rgba(58, 82, 69, 0.48);
+}
+
 .family-secret-form {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(220px, 0.42fr) auto;
