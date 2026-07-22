@@ -270,7 +270,10 @@ let selectedNoteDelay = { type: "days", days: 7 };
 let selectedNoteRecipient = "self";
 let noteCalendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let workDeadlineMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let familyDeadlineMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 let pendingDeleteGoalId = "";
+let pendingFamilyDeleteGoalId = "";
+let pendingFamilyRemoveMemberId = "";
 let currentBackgroundCredit = "";
 let selectedHabitStart = { task: "", category: "工作" };
 
@@ -429,6 +432,10 @@ const copy = {
       familyGoalAdded: "家庭目标已添加。",
       familyGoalCompleted: "家庭目标已完成。",
       familyGoalDeleted: "家庭目标已删除。",
+      familyGoalDeleteConfirm: "再点一次确认删除",
+      familyMemberRemoved: "家庭成员已移除。",
+      familyRemoveMember: "移除",
+      familyRemoveMemberConfirm: "确认移除",
       familyCompletionNote: "完成 note",
       familyCompletionPlaceholder: "可以简单写一句完成情况。",
       familySecretEyebrow: "\u79d8\u5bc6\u7eb8\u6761",
@@ -826,6 +833,10 @@ const copy = {
       familyGoalAdded: "Family goal added.",
       familyGoalCompleted: "Family goal completed.",
       familyGoalDeleted: "Family goal deleted.",
+      familyGoalDeleteConfirm: "Confirm delete",
+      familyMemberRemoved: "Family member removed.",
+      familyRemoveMember: "Remove",
+      familyRemoveMemberConfirm: "Confirm remove",
       familyCompletionNote: "Completion note",
       familyCompletionPlaceholder: "Add a short note about how it went.",
       familySecretEyebrow: "Secret Notes",
@@ -4231,6 +4242,8 @@ function getLegacyHabitSeedKey(entry) {
 }
 
 function resetFamilyState() {
+  pendingFamilyDeleteGoalId = "";
+  pendingFamilyRemoveMemberId = "";
   familyState = {
     loading: false,
     families: [],
@@ -4254,6 +4267,23 @@ function resetFamilyState() {
 
 function getActiveFamily() {
   return familyState.families.find((family) => family.id === familyState.activeFamilyId) || familyState.families[0] || null;
+}
+
+function getCurrentFamilyMember() {
+  return familyState.members.find((member) => member.userId && member.userId === currentUser?.id) || null;
+}
+
+function isCurrentFamilyOwner() {
+  return getCurrentFamilyMember()?.role === "owner" || getActiveFamily()?.role === "owner";
+}
+
+function canRemoveFamilyMember(member = {}) {
+  return Boolean(
+    isCurrentFamilyOwner()
+    && member.userId
+    && member.userId !== currentUser?.id
+    && member.role !== "owner",
+  );
 }
 
 function bindFamilyRoom() {
@@ -4321,6 +4351,27 @@ function bindFamilyRoom() {
       await loadFamilyRoom();
     });
   });
+  $("#familyMemberList")?.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-family-member-action='remove']");
+    if (!button) return;
+    const family = getActiveFamily();
+    const memberUserId = button.closest("[data-family-member-id]")?.dataset.familyMemberId;
+    const member = familyState.members.find((item) => item.userId === memberUserId);
+    if (!family || !member || !canRemoveFamilyMember(member)) return;
+    if (pendingFamilyRemoveMemberId !== member.userId) {
+      pendingFamilyRemoveMemberId = member.userId;
+      renderFamilyRoom();
+      return;
+    }
+    await runFamilyAction(async () => {
+      await window.MyCare.family.removeFamilyMember(supabaseClient, family.id, member.userId);
+      pendingFamilyRemoveMemberId = "";
+      familyState.members = familyState.members.filter((item) => item.userId !== member.userId);
+      familyState.message = t().work.familyMemberRemoved;
+      renderFamilyRoom();
+      await loadFamilyRoom({ keepMessage: true });
+    });
+  });
   $("#familyGoalCategoryPicker")?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-family-goal-category]");
     if (!button) return;
@@ -4349,8 +4400,7 @@ function bindFamilyRoom() {
     $("#familyGoalUrgencyInput").value = button.dataset.familyGoalUrgency || "normal";
     renderFamilyGoalUrgencyPicker();
   });
-  $("#familyGoalDeadlineInput")?.addEventListener("change", renderFamilyGoalDeadlineDisplay);
-  $("#familyGoalDeadlineInput")?.addEventListener("input", renderFamilyGoalDeadlineDisplay);
+  bindFamilyDeadlinePicker();
   $("#familyGoalForm")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const family = getActiveFamily();
@@ -4362,7 +4412,8 @@ function bindFamilyRoom() {
       return;
     }
     if (!deadline) {
-      $("#familyGoalDeadlineInput").focus();
+      $("#familyGoalDeadlineTrigger")?.focus();
+      $("#familyGoalDeadlineTrigger")?.click();
       return;
     }
     await runFamilyAction(async () => {
@@ -4383,8 +4434,7 @@ function bindFamilyRoom() {
       $("#familyGoalCategoryCustomInput").value = "";
       familyGoalCategoryMode = "preset";
       $("#familyGoalUrgencyInput").value = "normal";
-      $("#familyGoalDeadlineInput").value = "";
-      renderFamilyGoalDeadlineDisplay();
+      selectFamilyDeadline("");
       familyState.goalMessage = t().work.familyGoalAdded;
       renderFamilyRoom();
       await loadFamilyRoom({ keepMessage: true });
@@ -4401,8 +4451,19 @@ function bindFamilyRoom() {
     const card = button.closest("[data-family-goal-id]");
     const goal = familyState.goals.find((item) => item.id === card?.dataset.familyGoalId);
     if (!goal) return;
+    const action = button.dataset.familyGoalAction;
+    if (!["complete", "reopen", "delete"].includes(action)) return;
+    if (action === "delete" && pendingFamilyDeleteGoalId !== goal.id) {
+      pendingFamilyDeleteGoalId = goal.id;
+      renderFamilyRoom();
+      return;
+    }
+    if (action !== "delete" && pendingFamilyDeleteGoalId) {
+      pendingFamilyDeleteGoalId = "";
+      renderFamilyRoom();
+    }
     await runFamilyAction(async () => {
-      if (button.dataset.familyGoalAction === "complete") {
+      if (action === "complete") {
         const note = card.querySelector(".family-goal-note")?.value.trim() || "";
         const updated = await window.MyCare.family.completeFamilyGoal(supabaseClient, currentUser, goal.id, note);
         familyState.goals = window.MyCare.goals.sortGoals(familyState.goals.map((item) => item.id === goal.id ? updated : item));
@@ -4416,7 +4477,7 @@ function bindFamilyRoom() {
         }
         return;
       }
-      if (button.dataset.familyGoalAction === "reopen") {
+      if (action === "reopen") {
         const updated = await window.MyCare.family.reopenFamilyGoal(supabaseClient, goal.id);
         familyState.goals = window.MyCare.goals.sortGoals(familyState.goals.map((item) => item.id === goal.id ? updated : item));
         familyState.goalMessage = "";
@@ -4428,8 +4489,9 @@ function bindFamilyRoom() {
         }
         return;
       }
-      if (button.dataset.familyGoalAction === "delete") {
+      if (action === "delete") {
         await window.MyCare.family.deleteFamilyGoal(supabaseClient, goal.id);
+        pendingFamilyDeleteGoalId = "";
         familyState.goals = familyState.goals.filter((item) => item.id !== goal.id);
         familyState.goalMessage = t().work.familyGoalDeleted;
         renderFamilyRoom();
@@ -4628,7 +4690,7 @@ function renderFamilyRoomLanguage() {
   $("#familyGoalCategoryCustomInput").placeholder = text.familyGoalCategoryPlaceholder;
   $("#familyGoalUrgencyLabel").textContent = text.familyGoalUrgencyLabel;
   $("#familyGoalDeadlineLabel").textContent = text.familyGoalDeadlineLabel;
-  renderFamilyGoalDeadlineDisplay();
+  renderFamilyDeadlinePicker();
   $("#familyGoalSubmit").textContent = text.familyGoalAdd;
   $("#familySecretEyebrow").textContent = text.familySecretEyebrow;
   $("#familySecretTitle").textContent = text.familySecretTitle;
@@ -4662,12 +4724,7 @@ function renderFamilyRoom() {
   $("#leaveFamilyButton").disabled = familyState.loading;
   $("#familyInviteButton").disabled = familyState.loading;
   $("#familyMemberList").innerHTML = familyState.members.length
-    ? familyState.members.map((member) => `
-      <div class="family-member-pill">
-        <span>${escapeHtml(getFamilyMemberDisplayName(member))}</span>
-        <small>${escapeHtml(member.role === "owner" ? text.familyOwner : text.familyMember)}</small>
-      </div>
-    `).join("")
+    ? familyState.members.map(renderFamilyMemberPill).join("")
     : `<p class="family-empty">${escapeHtml(text.familyNoFamily)}</p>`;
   const pending = familyState.invitations.filter((invite) => invite.status === "pending");
   $("#familyInvitationList").innerHTML = pending.length
@@ -4709,6 +4766,25 @@ function renderReceivedInvitations() {
 
 function getFamilyMemberDisplayName(member = {}) {
   return member.email || (member.userId ? `${member.userId.slice(0, 8)}...` : "?");
+}
+
+function renderFamilyMemberPill(member = {}) {
+  const text = t().work;
+  const removable = canRemoveFamilyMember(member);
+  const confirming = pendingFamilyRemoveMemberId === member.userId;
+  return `
+    <div class="family-member-pill ${removable ? "can-manage" : ""}" data-family-member-id="${escapeHtml(member.userId || "")}">
+      <span>${escapeHtml(getFamilyMemberDisplayName(member))}</span>
+      <div class="family-member-meta">
+        <small>${escapeHtml(member.role === "owner" ? text.familyOwner : text.familyMember)}</small>
+        ${removable ? `
+          <button class="family-member-remove ${confirming ? "is-confirming" : ""}" data-family-member-action="remove" type="button" ${familyState.loading ? "disabled" : ""}>
+            ${escapeHtml(confirming ? text.familyRemoveMemberConfirm : text.familyRemoveMember)}
+          </button>
+        ` : ""}
+      </div>
+    </div>
+  `;
 }
 
 function getFamilyGoalCategoryValue() {
@@ -4764,6 +4840,112 @@ function renderFamilyGoalUrgencyPicker() {
   `).join("");
 }
 
+function bindFamilyDeadlinePicker() {
+  $("#familyGoalDeadlineTrigger")?.addEventListener("click", () => {
+    const calendar = $("#familyDeadlineCalendar");
+    if (!calendar) return;
+    const selected = $("#familyGoalDeadlineInput")?.value;
+    if (calendar.hidden) {
+      const reference = selected ? new Date(`${selected}T00:00:00`) : new Date();
+      familyDeadlineMonth = new Date(reference.getFullYear(), reference.getMonth(), 1);
+    }
+    calendar.hidden = !calendar.hidden;
+    $("#familyGoalForm")?.classList.toggle("calendar-open", !calendar.hidden);
+    $("#familyGoalDeadlineTrigger")?.setAttribute("aria-expanded", String(!calendar.hidden));
+    renderFamilyDeadlinePicker();
+  });
+  $("#familyDeadlinePrev")?.addEventListener("click", () => {
+    familyDeadlineMonth = new Date(familyDeadlineMonth.getFullYear(), familyDeadlineMonth.getMonth() - 1, 1);
+    renderFamilyDeadlinePicker();
+  });
+  $("#familyDeadlineNext")?.addEventListener("click", () => {
+    familyDeadlineMonth = new Date(familyDeadlineMonth.getFullYear(), familyDeadlineMonth.getMonth() + 1, 1);
+    renderFamilyDeadlinePicker();
+  });
+  $("#familyDeadlineToday")?.addEventListener("click", () => selectFamilyDeadline(todayKey()));
+  $("#familyDeadlineClear")?.addEventListener("click", () => selectFamilyDeadline(""));
+  $("#familyDeadlineDays")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-family-deadline-date]");
+    if (button) selectFamilyDeadline(button.dataset.familyDeadlineDate);
+  });
+  document.addEventListener("click", (event) => {
+    const field = $(".family-deadline-field");
+    if (!field?.contains(event.target)) closeFamilyDeadlinePicker();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeFamilyDeadlinePicker();
+  });
+  renderFamilyDeadlinePicker();
+}
+
+function closeFamilyDeadlinePicker() {
+  const calendar = $("#familyDeadlineCalendar");
+  if (!calendar || calendar.hidden) return;
+  calendar.hidden = true;
+  $("#familyGoalForm")?.classList.remove("calendar-open");
+  $("#familyGoalDeadlineTrigger")?.setAttribute("aria-expanded", "false");
+}
+
+function selectFamilyDeadline(value) {
+  const input = $("#familyGoalDeadlineInput");
+  if (!input) return;
+  input.value = value;
+  if (value) {
+    const date = new Date(`${value}T00:00:00`);
+    familyDeadlineMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+  }
+  closeFamilyDeadlinePicker();
+  renderFamilyDeadlinePicker();
+}
+
+function renderFamilyDeadlinePicker() {
+  const title = $("#familyDeadlineCalendarTitle");
+  const weekdays = $("#familyDeadlineWeekdays");
+  const daysTarget = $("#familyDeadlineDays");
+  if (!title || !weekdays || !daysTarget) return;
+  const text = t().work;
+  const zh = getLanguage() === "zh";
+  const locale = zh ? "zh-CN" : "en-US";
+  const selected = $("#familyGoalDeadlineInput")?.value || "";
+  renderFamilyGoalDeadlineDisplay();
+  title.textContent = new Intl.DateTimeFormat(locale, { year: "numeric", month: "long" }).format(familyDeadlineMonth);
+  $("#familyDeadlinePrev")?.setAttribute("aria-label", text.previousMonth);
+  $("#familyDeadlineNext")?.setAttribute("aria-label", text.nextMonth);
+  $("#familyDeadlineToday").textContent = text.calendarToday;
+  $("#familyDeadlineClear").textContent = text.calendarClear;
+  weekdays.innerHTML = (zh ? ["\u4e00", "\u4e8c", "\u4e09", "\u56db", "\u4e94", "\u516d", "\u65e5"] : ["M", "T", "W", "T", "F", "S", "S"])
+    .map((day) => `<span>${day}</span>`).join("");
+
+  const year = familyDeadlineMonth.getFullYear();
+  const month = familyDeadlineMonth.getMonth();
+  const firstOffset = (new Date(year, month, 1).getDay() + 6) % 7;
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  const previousLastDay = new Date(year, month, 0).getDate();
+  const cells = [];
+  for (let index = 0; index < 42; index += 1) {
+    const dayNumber = index - firstOffset + 1;
+    let cellDate;
+    let muted = false;
+    if (dayNumber < 1) {
+      cellDate = new Date(year, month - 1, previousLastDay + dayNumber);
+      muted = true;
+    } else if (dayNumber > lastDay) {
+      cellDate = new Date(year, month + 1, dayNumber - lastDay);
+      muted = true;
+    } else {
+      cellDate = new Date(year, month, dayNumber);
+    }
+    const key = toLocalDateKey(cellDate);
+    const className = [
+      muted ? "is-muted" : "",
+      key === selected ? "is-selected" : "",
+      key === todayKey() ? "is-today" : "",
+    ].filter(Boolean).join(" ");
+    cells.push(`<button type="button" data-family-deadline-date="${key}" class="${className}" aria-label="${key}">${cellDate.getDate()}</button>`);
+  }
+  daysTarget.innerHTML = cells.join("");
+}
+
 function renderFamilyGoalDeadlineDisplay() {
   const input = $("#familyGoalDeadlineInput");
   const display = $("#familyGoalDeadlineDisplay");
@@ -4773,7 +4955,7 @@ function renderFamilyGoalDeadlineDisplay() {
   const label = value ? formatLongDate(value) : text.chooseDeadline;
   display.textContent = label;
   input.setAttribute("aria-label", `${text.familyGoalDeadlineLabel}: ${label}`);
-  input.closest(".family-deadline-field")?.classList.toggle("has-date", Boolean(value));
+  $("#familyGoalDeadlineTrigger")?.classList.toggle("has-date", Boolean(value));
 }
 
 function renderFamilyGoalControls() {
@@ -4873,6 +5055,7 @@ function renderFamilyGoalCard(goal) {
   });
   const urgencyLabel = text.familyUrgency[goal.urgency] || goal.urgency || text.familyUrgency.normal;
   const category = goal.category || text.familyGoalCategoryLabel;
+  const deleteConfirming = pendingFamilyDeleteGoalId === goal.id;
   return `
     <article class="work-goal-card family-goal-card ${isDone ? "done" : ""}" data-family-goal-id="${escapeHtml(goal.id)}" data-urgency="${escapeHtml(goal.urgency || "normal")}">
       <div class="work-goal-main">
@@ -4891,9 +5074,9 @@ function renderFamilyGoalCard(goal) {
             ${isDone
               ? `<span class="work-completed">${escapeHtml(text.completed)} · ${escapeHtml(formatShortDate(goal.completedAt?.slice(0, 10)))}</span><button class="secondary" data-family-goal-action="reopen" type="button">${escapeHtml(text.reopen)}</button>`
               : `<button class="primary" data-family-goal-action="complete" type="button">${escapeHtml(text.complete)}</button>`}
-            <button class="work-delete-button" data-family-goal-action="delete" type="button" aria-label="${escapeHtml(text.delete)}">
+            <button class="work-delete-button ${deleteConfirming ? "is-confirming" : ""}" data-family-goal-action="delete" type="button" aria-label="${escapeHtml(deleteConfirming ? text.familyGoalDeleteConfirm : text.delete)}">
               <span aria-hidden="true"></span>
-              ${escapeHtml(text.delete)}
+              ${escapeHtml(deleteConfirming ? text.familyGoalDeleteConfirm : text.delete)}
             </button>
           </div>
         </div>

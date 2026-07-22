@@ -274,20 +274,20 @@ Family tables need Row Level Security from the start.
 
 ### Wearable Import
 
-First version should use file import, not direct watch APIs.
+Wearable data should enter My Care through a dedicated health import/sync boundary, not directly through Personal Stats or Family Stats rendering code.
 
-Supported first step:
+Recommended first paths:
 
-- CSV or JSON import.
-- Map imported fields to an internal health record format.
-- Show a table and simple summary.
+- Google Health API for the first direct web-friendly sync path.
+- Manual Apple Health export import as the first Apple Watch-friendly path.
+- Health Connect or HealthKit later only if My Care adds a native mobile companion.
 
-Possible internal shape:
+All sources should normalize into one internal health record format:
 
 ```js
 {
   id: "health-import-record-id",
-  source: "apple-health-export",
+  source: "google-health",
   date: "2026-07-01",
   metric: "sleep_minutes",
   value: 430,
@@ -295,7 +295,9 @@ Possible internal shape:
 }
 ```
 
-Direct Apple Health, Fitbit, Google Fit, or smartwatch API integrations can come later.
+Provider-specific token handling should live server-side. Raw health records stay private by default. Family members should only see explicitly shared summaries generated from the user's private data.
+
+See `WEARABLE_HEALTH.md` for the current source strategy, privacy model, and implementation order.
 
 ## Implementation Order
 
@@ -331,7 +333,9 @@ Direct Apple Health, Fitbit, Google Fit, or smartwatch API integrations can come
 
 ### Phase 4: Wearable Import MVP
 
-- Add manual file import.
+- Add normalized health record helpers.
+- Add manual file import as the lowest-risk first path.
+- Add Google Health API sync design before direct API implementation.
 - Normalize health metrics.
 - Render a clean table.
 - Add simple, non-diagnostic summaries.

@@ -6,7 +6,7 @@
     <meta property="og:image" content="assets/images/my-care-logo.png?v=20260609-2" />
     <title>My Care</title>
     <link rel="icon" type="image/png" href="assets/images/my-care-logo.png?v=20260609-2" />
-    <link rel="stylesheet" href="styles.css?v=20260707-family-deadline-1" />
+    <link rel="stylesheet" href="styles.css?v=20260720-family-date-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -776,8 +776,25 @@
                   </label>
                   <label class="family-deadline-field">
                     <span id="familyGoalDeadlineLabel">Deadline</span>
-                    <input id="familyGoalDeadlineInput" type="date" />
-                    <span class="family-date-display" id="familyGoalDeadlineDisplay" aria-hidden="true">Choose a date</span>
+                    <input id="familyGoalDeadlineInput" type="hidden" />
+                    <button class="work-date-trigger family-date-trigger" id="familyGoalDeadlineTrigger" type="button" aria-haspopup="dialog" aria-expanded="false">
+                      <span class="work-date-icon" aria-hidden="true"></span>
+                      <b id="familyGoalDeadlineDisplay">Choose a date</b>
+                      <span class="work-date-chevron" aria-hidden="true"></span>
+                    </button>
+                    <div class="work-calendar family-calendar" id="familyDeadlineCalendar" role="dialog" aria-labelledby="familyDeadlineCalendarTitle" hidden>
+                      <header class="work-calendar-head">
+                        <button id="familyDeadlinePrev" type="button" aria-label="Previous month">‹</button>
+                        <strong id="familyDeadlineCalendarTitle"></strong>
+                        <button id="familyDeadlineNext" type="button" aria-label="Next month">›</button>
+                      </header>
+                      <div class="work-calendar-weekdays" id="familyDeadlineWeekdays" aria-hidden="true"></div>
+                      <div class="work-calendar-days" id="familyDeadlineDays"></div>
+                      <footer class="work-calendar-foot">
+                        <button id="familyDeadlineToday" type="button">Today</button>
+                        <button id="familyDeadlineClear" type="button">Clear</button>
+                      </footer>
+                    </div>
                   </label>
                   <button class="primary family-goal-submit" id="familyGoalSubmit" type="submit">Add family goal</button>
                 </form>
@@ -1230,6 +1247,6 @@
     <script src="src/modules/goals.js?v=20260701-1"></script>
     <script src="src/modules/family.js?v=20260706-accept-invite-rpc-1"></script>
     <script src="src/modules/sharing.js?v=20260702-sharing-1"></script>
-    <script src="app.js?v=20260707-family-deadline-1"></script>
+    <script src="app.js?v=20260720-family-date-1"></script>
   </body>
 </html>

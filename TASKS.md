@@ -17,12 +17,12 @@
 - [x] Add Supabase tables and Row Level Security policies.
 - [x] Add a thin Family service layer for Supabase family operations.
 - [x] Build create, join, and leave family flows.
-- [ ] Add remove-member flow for family owners.
+- [x] Add remove-member flow for family owners.
 - [x] Wire the Family Goals MVP to the Family service layer.
 - [x] Add family goal title, deadline, separate family category, urgency, completion, reopen, and delete controls.
 - [x] Add dedicated family category management beyond type-to-create categories.
 - [x] Add Family Secret Notes MVP with anonymous display and author-owned hide action.
-- [ ] Add guarded family goal deletion confirmation if the MVP delete flow feels too easy to tap.
+- [x] Add guarded family goal deletion confirmation if the MVP delete flow feels too easy to tap.
 - [x] Test two-account synchronization and permission boundaries.
 
 ## Next - Personal Stats Sharing
@@ -38,3 +38,14 @@
 - [x] Let users choose the shared-summary time range: today, this week, or this month.
 - [x] Add a low-pressure Family member overview based on opt-in shared summaries.
 - [x] Convert shared personal summaries from text rows into visual Family Stats cards.
+
+## Next - Wearable Health Data
+
+- [x] Compare official wearable data paths and choose a first integration direction.
+- [x] Write a maintainable wearable health integration plan.
+- [ ] Decide whether first imported health records are local-only or Supabase-backed.
+- [ ] Define normalized health record helpers and validation checks.
+- [ ] Add a manual CSV/JSON import MVP for sleep and activity.
+- [ ] Add Personal Stats charts for imported sleep and activity.
+- [ ] Design Google Health API OAuth and server-side token storage.
+- [ ] Add share-safe family health summaries after personal import is stable.

@@ -12,6 +12,7 @@ My Care follows a ten-day release cadence. Each milestone should produce one usa
 
 ## Next: External Health Data
 
-- Evaluate Apple Health, Health Connect, wearable APIs, and manual import.
-- Start with a small sleep and activity import workflow.
+- Use `WEARABLE_HEALTH.md` as the source plan before implementation.
+- Start with normalized health records and manual import.
+- Add Google Health API sync only after the data model and privacy boundary are stable.
 - Generate clear, non-diagnostic personal reports.

@@ -15,6 +15,7 @@ assert(family.normalizeUrgency("panic") === "normal", "unknown urgency should fa
 assert(!family.minimalInvitationSelect.includes("updated_at"), "legacy invitation select should not require updated_at");
 assert(typeof family.listReceivedInvitations === "function", "received invitation inbox should be exported");
 assert(typeof family.acceptInvitationById === "function", "accept by invitation id should be exported");
+assert(typeof family.removeFamilyMember === "function", "owner remove-member helper should be exported");
 
 const receivedInvitation = family.mapFamilyInvitation({
   id: "invite-1",

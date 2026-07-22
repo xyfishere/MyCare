@@ -2045,6 +2045,51 @@ body[data-language="zh"] .low-energy-hero h2 {
   color: rgba(56, 82, 68, 0.66);
 }
 
+.family-member-meta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.family-member-remove {
+  min-height: 28px;
+  border: 1px solid rgba(145, 91, 82, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.48);
+  color: rgba(121, 78, 70, 0.64);
+  padding: 0 10px;
+  font: 760 0.68rem/1 var(--font-ui);
+  transition:
+    transform 150ms ease,
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.family-member-remove:hover,
+.family-member-remove:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(145, 91, 82, 0.28);
+  background: rgba(255, 248, 245, 0.76);
+  color: #87574f;
+  box-shadow: 0 8px 18px rgba(121, 78, 70, 0.06);
+}
+
+.family-member-remove:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+.family-member-remove.is-confirming {
+  border-color: rgba(145, 91, 82, 0.36);
+  background: rgba(134, 79, 70, 0.88);
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 10px 22px rgba(121, 78, 70, 0.12);
+}
+
 .family-invite-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -2145,47 +2190,196 @@ body[data-language="zh"] .low-energy-hero h2 {
 
 .family-deadline-field {
   position: relative;
+  z-index: 9;
 }
 
-.family-deadline-field input[type="date"] {
+.family-goal-form.calendar-open {
+  margin-bottom: 0;
   position: relative;
-  z-index: 2;
-  color: transparent;
-  cursor: pointer;
-  caret-color: transparent;
+  z-index: 12;
 }
 
-.family-deadline-field input[type="date"]::-webkit-datetime-edit,
-.family-deadline-field input[type="date"]::-webkit-datetime-edit-fields-wrapper,
-.family-deadline-field input[type="date"]::-webkit-datetime-edit-text,
-.family-deadline-field input[type="date"]::-webkit-datetime-edit-month-field,
-.family-deadline-field input[type="date"]::-webkit-datetime-edit-day-field,
-.family-deadline-field input[type="date"]::-webkit-datetime-edit-year-field {
-  color: transparent;
-}
-
-.family-deadline-field input[type="date"]::-webkit-calendar-picker-indicator {
-  opacity: 0.82;
-  cursor: pointer;
-  filter: sepia(18%) saturate(480%) hue-rotate(86deg) brightness(76%);
-}
-
-.family-date-display {
-  position: absolute;
-  left: 14px;
-  right: 42px;
-  bottom: 0;
-  z-index: 3;
+.work-date-trigger.family-date-trigger {
   min-height: 46px;
-  display: flex;
-  align-items: center;
-  color: rgba(40, 69, 54, 0.78);
-  font: 700 0.95rem/1 var(--font-ui);
+  border-color: rgba(73, 111, 82, 0.16);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(242, 249, 239, 0.64)),
+    rgba(255, 255, 255, 0.74);
+  color: rgba(58, 82, 69, 0.58);
+  font-family: var(--font-ui);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    0 10px 24px rgba(45, 82, 58, 0.04);
+}
+
+.work-date-trigger.family-date-trigger:hover,
+.work-date-trigger.family-date-trigger:focus-visible,
+.work-date-trigger.family-date-trigger[aria-expanded="true"] {
+  border-color: rgba(73, 111, 82, 0.34);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(238, 248, 233, 0.78)),
+    rgba(255, 255, 255, 0.9);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.84),
+    0 0 0 4px rgba(127, 179, 140, 0.12),
+    0 14px 30px rgba(45, 82, 58, 0.08);
+}
+
+.work-date-trigger.family-date-trigger.has-date {
+  color: #183228;
+}
+
+.work-calendar.family-calendar {
+  right: 0;
+  width: min(334px, calc(100vw - 56px));
+  padding: 17px;
+  overflow: hidden;
+  border-color: rgba(255, 255, 255, 0.86);
+  background:
+    radial-gradient(circle at 12% 0%, rgba(190, 219, 187, 0.26), transparent 34%),
+    radial-gradient(circle at 92% 14%, rgba(227, 238, 211, 0.34), transparent 30%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(238, 248, 235, 0.9)),
+    rgba(248, 252, 245, 0.92);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    0 24px 52px rgba(27, 56, 42, 0.18);
+}
+
+.work-calendar.family-calendar::before,
+.work-calendar.family-calendar::after {
+  content: "";
+  position: absolute;
   pointer-events: none;
 }
 
-.family-deadline-field:not(.has-date) .family-date-display {
-  color: rgba(58, 82, 69, 0.48);
+.work-calendar.family-calendar::before {
+  right: 17px;
+  top: 17px;
+  width: 44px;
+  height: 44px;
+  border-top: 1px solid rgba(73, 111, 82, 0.14);
+  border-right: 1px solid rgba(73, 111, 82, 0.11);
+  border-radius: 50%;
+  transform: rotate(-18deg);
+}
+
+.work-calendar.family-calendar::after {
+  left: 18px;
+  bottom: 16px;
+  width: 54px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(73, 111, 82, 0.24), rgba(73, 111, 82, 0));
+}
+
+.work-calendar.family-calendar .work-calendar-head {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 14px;
+}
+
+.work-calendar.family-calendar .work-calendar-head strong {
+  color: #244f3a;
+  font-family: var(--font-display);
+  font-size: 1.04rem;
+  font-weight: 780;
+}
+
+.work-calendar.family-calendar .work-calendar-head button {
+  border-radius: 8px;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.76), rgba(240, 248, 235, 0.58)),
+    rgba(255, 255, 255, 0.56);
+  color: rgba(54, 91, 66, 0.82);
+  font-family: var(--font-ui);
+  font-size: 1.22rem;
+  font-weight: 800;
+  transition:
+    transform 140ms ease,
+    border-color 160ms ease,
+    background 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.work-calendar.family-calendar .work-calendar-head button:hover,
+.work-calendar.family-calendar .work-calendar-head button:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(73, 111, 82, 0.28);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 8px 18px rgba(45, 82, 58, 0.08);
+}
+
+.work-calendar.family-calendar .work-calendar-weekdays {
+  color: rgba(54, 91, 66, 0.54);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+}
+
+.work-calendar.family-calendar .work-calendar-days button {
+  color: #274d3c;
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  transition:
+    transform 120ms ease,
+    border-color 150ms ease,
+    background 150ms ease,
+    color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.work-calendar.family-calendar .work-calendar-days button:hover,
+.work-calendar.family-calendar .work-calendar-days button:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(73, 111, 82, 0.22);
+  background: rgba(202, 228, 194, 0.26);
+  box-shadow: 0 7px 14px rgba(45, 82, 58, 0.06);
+}
+
+.work-calendar.family-calendar .work-calendar-days button.is-muted {
+  color: rgba(73, 111, 82, 0.32);
+}
+
+.work-calendar.family-calendar .work-calendar-days button.is-today {
+  border-color: rgba(127, 158, 112, 0.56);
+  background: rgba(246, 250, 238, 0.72);
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.64);
+}
+
+.work-calendar.family-calendar .work-calendar-days button.is-selected {
+  border-color: rgba(67, 110, 73, 0.86);
+  background:
+    linear-gradient(145deg, #6d9a71, #3f714e),
+    #527d5e;
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    0 9px 18px rgba(45, 82, 58, 0.2);
+}
+
+.work-calendar.family-calendar .work-calendar-foot {
+  position: relative;
+  z-index: 1;
+  border-top-color: rgba(73, 111, 82, 0.1);
+}
+
+.work-calendar.family-calendar .work-calendar-foot button {
+  min-height: 34px;
+  border: 1px solid rgba(73, 111, 82, 0.13);
+  background: rgba(255, 255, 255, 0.58);
+  color: rgba(42, 78, 56, 0.82);
+  font-family: var(--font-ui);
+  transition:
+    transform 140ms ease,
+    background 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.work-calendar.family-calendar .work-calendar-foot button:hover,
+.work-calendar.family-calendar .work-calendar-foot button:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(73, 111, 82, 0.28);
+  background: rgba(239, 248, 234, 0.82);
+  box-shadow: 0 8px 18px rgba(45, 82, 58, 0.07);
 }
 
 .family-secret-form {
@@ -2622,6 +2816,11 @@ body[data-language="zh"] .low-energy-hero h2 {
 .family-goal-submit {
   grid-column: 1 / -1;
   min-height: 46px;
+  transition: margin-top 180ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.family-goal-form.calendar-open .family-goal-submit {
+  margin-top: 430px;
 }
 
 .family-goal-form.is-disabled {
@@ -2669,7 +2868,59 @@ body[data-language="zh"] .low-energy-hero h2 {
   background: rgba(255, 255, 255, 0.38);
 }
 
+@media (max-width: 1160px) {
+  .habit-garden {
+    grid-template-columns: 1fr;
+  }
+
+  .habit-custom-start {
+    grid-template-columns: 1fr;
+  }
+
+  .block-panels {
+    grid-template-columns: 1fr;
+  }
+
+  .block-shell,
+  .block-head,
+  .block-panels,
+  .block-panel,
+  #blockReadPanel,
+  .note-composer {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .block-head {
+    gap: 16px;
+  }
+
+  .block-theme-switch {
+    justify-content: flex-start;
+  }
+}
+
 @media (max-width: 860px) {
+  .work-head {
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 24px;
+  }
+
+  #view-work .section-head h2 {
+    max-width: 12ch;
+    font-size: clamp(2.35rem, 12vw, 3.45rem);
+  }
+
+  #view-work .section-head .muted {
+    max-width: 30ch;
+    margin-top: 16px;
+  }
+
+  #view-work .section-head .muted::before {
+    margin-bottom: 14px;
+  }
+
   .goal-scope-switch,
   .stats-scope-switch {
     width: 100%;
@@ -2684,10 +2935,30 @@ body[data-language="zh"] .low-energy-hero h2 {
     width: 100%;
   }
 
+  .stats-head {
+    gap: 22px;
+  }
+
+  .stats-head-actions {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+
   .family-room-grid,
   .family-invite-row,
   .family-goal-form {
     grid-template-columns: 1fr;
+  }
+
+  .work-calendar.family-calendar {
+    left: 0;
+    right: auto;
+    width: min(334px, calc(100vw - 72px));
+  }
+
+  .family-goal-form.calendar-open .family-goal-submit {
+    margin-top: 430px;
   }
 
   .family-room-head,
@@ -3383,6 +3654,21 @@ body[data-language="zh"] .low-energy-hero h2 {
   transform: translateY(1px);
 }
 
+.work-delete-button.is-confirming {
+  border-color: rgba(145, 91, 82, 0.36);
+  background: rgba(134, 79, 70, 0.88);
+  color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 10px 22px rgba(121, 78, 70, 0.12);
+}
+
+.work-delete-button.is-confirming:hover,
+.work-delete-button.is-confirming:focus-visible {
+  background: #744841;
+  color: #fff;
+}
+
 .work-completed {
   color: rgba(73, 111, 82, 0.74);
   font-family: var(--font-ui);
@@ -3626,6 +3912,62 @@ body[data-language="zh"] .low-energy-hero h2 {
   .work-form.calendar-open .work-form-row {
     margin-bottom: 350px;
   }
+
+  .work-calendar.family-calendar {
+    width: min(318px, calc(100vw - 46px));
+  }
+
+  .family-goal-form.calendar-open .family-goal-submit {
+    margin-top: 410px;
+  }
+}
+
+@media (min-width: 861px) and (max-width: 1160px) {
+  #view-work {
+    padding-top: clamp(34px, 5vh, 58px);
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .work-head {
+    grid-template-columns: minmax(320px, 0.9fr) minmax(300px, 0.72fr);
+    gap: clamp(28px, 4vw, 48px);
+    width: 100%;
+    max-width: 100%;
+  }
+
+  #view-work .section-head h2 {
+    max-width: 10.5ch;
+    font-size: clamp(3rem, 5.8vw, 4.35rem);
+  }
+
+  .goal-scope-switch {
+    justify-self: end;
+    min-width: min(330px, 100%);
+    transform: translateY(8px);
+  }
+
+  .goal-subtoolbar {
+    margin-top: -2px;
+  }
+
+  .goal-scope {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .global-settings-toggle,
+  .family-settings-toggle {
+    right: 17px;
+  }
+
+  .global-settings-toggle {
+    top: 118px;
+  }
+
+  .family-settings-toggle {
+    top: 158px;
+  }
 }
 
 .today-panel,
@@ -3739,6 +4081,7 @@ body[data-language="zh"] .low-energy-hero h2 {
 }
 
 .main {
+  min-width: 0;
   padding: 34px;
   display: grid;
   gap: 22px;
@@ -4405,6 +4748,8 @@ body[data-language="zh"] .low-energy-hero h2 {
 
 .view {
   display: none;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .view.active {
@@ -10457,34 +10802,58 @@ body.block-mode[data-block-theme="iceland"] .today-panel {
 
   .sidebar {
     position: static;
-    padding: 18px;
+    gap: 12px;
+    padding: 14px 18px 12px;
+    border-right: 0;
+    border-bottom: 1px solid rgba(24, 50, 40, 0.08);
+    background:
+      linear-gradient(180deg, rgba(247, 251, 245, 0.74), rgba(239, 248, 236, 0.56)),
+      rgba(247, 251, 245, 0.64);
+  }
+
+  .brand {
+    min-height: 42px;
+  }
+
+  .brand-logo {
+    width: 176px;
   }
 
   .nav-tabs {
-    grid-template-columns: repeat(auto-fit, minmax(54px, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 6px;
+    padding: 2px;
   }
 
   .nav-tab {
     justify-content: center;
-    padding: 0 8px;
-    min-height: 44px;
+    padding: 0 6px;
+    min-height: 40px;
   }
 
-  .nav-tab strong {
-    display: none;
+  .nav-tab strong,
+  .nav-group-toggle strong {
+    display: inline;
+    font-size: 0.78rem;
+    line-height: 1.1;
   }
 
   .nav-dropdown {
-    grid-column: 1 / -1;
+    grid-column: auto;
   }
 
   .nav-group-toggle {
     justify-content: center;
+    min-height: 40px;
+    padding: 0 6px;
   }
 
   .nav-group-toggle strong {
     flex: 0 1 auto;
+  }
+
+  .nav-group-toggle i {
+    display: none;
   }
 
   .nav-submenu {
@@ -10502,6 +10871,46 @@ body.block-mode[data-block-theme="iceland"] .today-panel {
 
   .account-entry {
     margin-top: 0;
+  }
+
+  .paper-entry,
+  .habit-entry {
+    min-height: 38px;
+    padding: 8px 12px;
+  }
+
+  .paper-entry span,
+  .habit-entry span {
+    display: none;
+  }
+
+  .paper-entry strong,
+  .habit-entry strong {
+    font-size: 0.78rem;
+  }
+
+  .today-panel,
+  .site-footer {
+    display: none;
+  }
+
+  .account-entry {
+    order: 8;
+    min-height: 42px;
+    padding: 7px 10px;
+  }
+
+  .account-entry-copy small {
+    display: none;
+  }
+
+  .account-entry-copy strong {
+    font-size: 0.78rem;
+  }
+
+  .main {
+    min-width: 0;
+    padding-top: clamp(20px, 4vw, 34px);
   }
 
   .ritual-layout,
@@ -10563,6 +10972,32 @@ body.block-mode[data-block-theme="iceland"] .today-panel {
     grid-template-columns: 1fr;
   }
 
+  .block-shell {
+    width: 100%;
+    max-width: 100%;
+    padding: clamp(24px, 5vw, 40px);
+    overflow: hidden;
+  }
+
+  .block-head {
+    gap: 16px;
+  }
+
+  .block-theme-switch {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .block-panels {
+    min-width: 0;
+  }
+
+  .block-panel,
+  #blockReadPanel,
+  .note-composer {
+    min-width: 0;
+  }
+
   .work-head {
     gap: 16px;
   }
@@ -10580,6 +11015,21 @@ body.block-mode[data-block-theme="iceland"] .today-panel {
   .habit-start-card .panel-title,
   .habit-seeds-card .panel-title {
     grid-template-columns: auto 1fr;
+  }
+
+  .habit-garden {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .habit-start-card,
+  .habit-energy-card,
+  .habit-seeds-card {
+    min-width: 0;
+  }
+
+  .habit-custom-start {
+    grid-template-columns: 1fr;
   }
 
   .habit-start-card .panel-title span {
@@ -10689,7 +11139,117 @@ body.block-mode[data-block-theme="iceland"] .today-panel {
   }
 }
 
+@media (min-width: 861px) and (max-width: 1160px) {
+  #view-work {
+    width: 100%;
+    max-width: 100%;
+    padding-top: clamp(34px, 5vh, 58px);
+  }
+
+  .work-head {
+    grid-template-columns: minmax(300px, 0.9fr) minmax(280px, 0.72fr);
+    width: 100%;
+    max-width: 100%;
+    gap: clamp(24px, 4vw, 42px);
+  }
+
+  #view-work .section-head h2 {
+    max-width: 10.5ch;
+    font-size: clamp(3rem, 5.8vw, 4.35rem);
+  }
+
+  .goal-scope-switch {
+    justify-self: end;
+    min-width: min(310px, 100%);
+    max-width: 100%;
+    transform: none;
+  }
+
+  .goal-scope {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+@media (min-width: 981px) and (max-width: 1160px) {
+  #view-work {
+    inline-size: min(100%, calc(100vw - 304px));
+    justify-self: stretch;
+  }
+
+  .work-head,
+  .goal-scope,
+  .family-room-panel {
+    inline-size: calc(100vw - 304px);
+    max-inline-size: calc(100vw - 304px);
+    justify-self: start;
+  }
+
+  .family-room-head,
+  .family-room-message,
+  .family-room-grid,
+  .family-active-card {
+    max-inline-size: 100%;
+  }
+}
+
 @media (max-width: 620px) {
+  .sidebar {
+    gap: 10px;
+    padding: 12px 14px 10px;
+  }
+
+  .brand {
+    min-height: 36px;
+  }
+
+  .brand-logo {
+    width: 150px;
+  }
+
+  .nav-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .nav-tab,
+  .nav-group-toggle {
+    min-height: 38px;
+  }
+
+  .nav-tab > span,
+  .nav-group-toggle > span {
+    width: 18px;
+    height: 18px;
+  }
+
+  .nav-submenu {
+    gap: 6px;
+  }
+
+  .nav-dropdown.open .nav-submenu {
+    max-height: 92px;
+  }
+
+  .paper-entry,
+  .habit-entry,
+  .account-entry {
+    min-height: 38px;
+  }
+
+  .global-language-toggle {
+    top: 14px;
+    right: 14px;
+  }
+
+  .global-settings-toggle {
+    top: 58px;
+    right: 18px;
+  }
+
+  .family-settings-toggle {
+    top: 96px;
+  }
+
   .main {
     padding: 20px 14px;
   }
@@ -10766,6 +11326,41 @@ body.block-mode[data-block-theme="iceland"] .today-panel {
 
   .habit-seed {
     border-right: 0;
+  }
+
+  .block-shell {
+    padding: 22px 14px;
+  }
+
+  .block-head h2 {
+    font-size: clamp(1.9rem, 11vw, 2.8rem);
+  }
+
+  .block-theme-switch,
+  .block-tabs,
+  .recipient-switch,
+  .note-filter-row {
+    gap: 6px;
+  }
+
+  .block-theme-option,
+  .block-tab,
+  .recipient-option,
+  .note-chip,
+  .note-filter {
+    min-height: 34px;
+    padding-inline: 10px;
+    font-size: 0.86rem;
+  }
+
+  .board-head,
+  .composer-top {
+    display: grid;
+  }
+
+  .note-date-search,
+  .note-date-trigger {
+    width: 100%;
   }
 
   .low-energy-shell {
@@ -11030,5 +11625,97 @@ body.block-mode[data-block-theme="iceland"] .today-panel {
 @media (max-width: 420px) {
   .focus-duration {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 981px) and (max-width: 1160px) {
+  #view-block,
+  #view-habits {
+    overflow: hidden;
+  }
+
+  .block-shell,
+  .block-head,
+  .block-panels,
+  .block-panel,
+  #blockReadPanel,
+  .note-composer,
+  .notes-toolbar,
+  .notes-board,
+  .habit-garden,
+  .habit-garden .panel {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .block-head,
+  .block-panels,
+  .habit-garden,
+  .habit-custom-start {
+    grid-template-columns: 1fr;
+  }
+
+  .block-shell {
+    width: 100%;
+    padding: clamp(26px, 4vw, 42px);
+  }
+
+  .block-head {
+    gap: 16px;
+  }
+
+  .block-theme-switch {
+    justify-content: flex-start;
+  }
+
+  .block-panels {
+    margin-top: clamp(28px, 4vh, 44px);
+  }
+
+  #blockReadPanel,
+  .note-composer {
+    min-height: 560px;
+  }
+
+  .habit-garden {
+    width: 100%;
+  }
+
+  .habit-custom-start .primary {
+    width: 100%;
+  }
+
+  .habit-start-card > p {
+    margin-left: 0;
+  }
+
+  #view-work {
+    width: min(100%, calc(100vw - 304px));
+    max-width: calc(100vw - 304px);
+    overflow: hidden;
+  }
+
+  #view-work .work-head,
+  #view-work .goal-scope,
+  #view-work .family-room-panel {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  #view-work .family-room-panel {
+    overflow: hidden;
+  }
+
+  #view-work .family-room-head,
+  #view-work .family-room-message,
+  #view-work .family-room-grid,
+  #view-work .family-active-card,
+  #view-work .family-active-head,
+  #view-work .family-invite-row,
+  #view-work .family-goals-panel,
+  #view-work .family-goal-form {
+    max-width: 100%;
+    min-width: 0;
   }
 }

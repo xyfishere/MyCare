@@ -487,6 +487,18 @@
     return true;
   }
 
+  async function removeFamilyMember(client, familyId, memberUserId) {
+    requireClient(client);
+    const targetUserId = String(memberUserId || "").trim();
+    if (!targetUserId) throw new Error("Member id is required");
+    throwIfError(await client
+      .from("family_members")
+      .delete()
+      .eq("family_id", ensureFamilyId(familyId))
+      .eq("user_id", targetUserId));
+    return true;
+  }
+
   async function listFamilyGoalCategories(client, familyId) {
     requireClient(client);
     const data = await selectFamilyCategory((columns) => client
@@ -741,6 +753,7 @@
     minimalInvitationSelect,
     normalizeEmail,
     normalizeUrgency,
+    removeFamilyMember,
     reopenFamilyGoal,
     toFamilyGoalCompletionPatch,
     toFamilySecretNoteInsert,
