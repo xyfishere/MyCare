@@ -6,7 +6,7 @@
     <meta property="og:image" content="assets/images/my-care-logo.png?v=20260609-2" />
     <title>My Care</title>
     <link rel="icon" type="image/png" href="assets/images/my-care-logo.png?v=20260609-2" />
-    <link rel="stylesheet" href="styles.css?v=20260720-family-date-1" />
+    <link rel="stylesheet" href="styles.css?v=20260722-health-extremes-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -894,6 +894,20 @@
                   </div>
                   <div class="skin-timeline" id="skinTimeline"></div>
                 </article>
+                <article class="stats-chart-card health-import-card">
+                  <div class="stats-chart-title">
+                    <span class="mini-seed-icon" aria-hidden="true"></span>
+                    <div><h4 id="healthImportTitle">Imported health data</h4><p id="healthImportMeta">CSV, JSON, or XML preview</p></div>
+                  </div>
+                  <div class="health-import-actions">
+                    <label class="health-import-button" for="healthImport" id="healthImportButton">Import CSV / JSON / XML</label>
+                    <input id="healthImport" type="file" accept=".csv,.json,.xml,application/json,text/csv,text/xml,application/xml" />
+                    <button class="health-import-clear" id="clearHealthImport" type="button">Clear imported data</button>
+                    <p class="import-result" id="importResult" aria-live="polite"></p>
+                  </div>
+                  <div class="health-import-flow" id="healthImportFlow"></div>
+                  <div class="health-import-summary" id="healthImportSummary"></div>
+                </article>
               </div>
             </section>
 
@@ -1247,6 +1261,8 @@
     <script src="src/modules/goals.js?v=20260701-1"></script>
     <script src="src/modules/family.js?v=20260706-accept-invite-rpc-1"></script>
     <script src="src/modules/sharing.js?v=20260702-sharing-1"></script>
-    <script src="app.js?v=20260720-family-date-1"></script>
+    <script src="src/modules/health-import.js?v=20260722-health-import-2"></script>
+    <script src="src/modules/health-report.js?v=20260722-health-report-2"></script>
+    <script src="app.js?v=20260722-health-extremes-1"></script>
   </body>
 </html>

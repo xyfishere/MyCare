@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<HealthData locale="en_CA">
+  <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Apple Watch" startDate="2026-07-07 23:05:00 -0600" endDate="2026-07-08 05:05:00 -0600" value="HKCategoryValueSleepAnalysisAsleepCore"/>
+  <Record type="HKQuantityTypeIdentifierStepCount" sourceName="Apple Watch" unit="count" startDate="2026-07-08 00:00:00 -0600" endDate="2026-07-08 23:59:59 -0600" value="4300"/>
+  <Record type="HKQuantityTypeIdentifierAppleExerciseTime" sourceName="Apple Watch" unit="min" startDate="2026-07-08 18:20:00 -0600" endDate="2026-07-08 18:30:00 -0600" value="10"/>
+  <Record type="HKQuantityTypeIdentifierHeartRate" sourceName="Apple Watch" unit="count/min" startDate="2026-07-08 12:00:00 -0600" endDate="2026-07-08 12:05:00 -0600" value="82"/>
+  <Record type="HKQuantityTypeIdentifierActiveEnergyBurned" sourceName="Apple Watch" unit="kcal" startDate="2026-07-08 00:00:00 -0600" endDate="2026-07-08 23:59:59 -0600" value="210"/>
+  <Record type="HKQuantityTypeIdentifierRestingHeartRate" sourceName="Apple Watch" unit="count/min" startDate="2026-07-08 08:00:00 -0600" endDate="2026-07-08 08:00:00 -0600" value="72"/>
+  <Record type="HKQuantityTypeIdentifierHeartRateVariabilitySDNN" sourceName="Apple Watch" unit="ms" startDate="2026-07-08 08:00:00 -0600" endDate="2026-07-08 08:00:00 -0600" value="24"/>
+
+  <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Apple Watch" startDate="2026-07-08 23:25:00 -0600" endDate="2026-07-09 06:35:00 -0600" value="HKCategoryValueSleepAnalysisAsleepCore"/>
+  <Record type="HKQuantityTypeIdentifierStepCount" sourceName="Apple Watch" unit="count" startDate="2026-07-09 00:00:00 -0600" endDate="2026-07-09 23:59:59 -0600" value="9200"/>
+  <Record type="HKQuantityTypeIdentifierAppleExerciseTime" sourceName="Apple Watch" unit="min" startDate="2026-07-09 17:45:00 -0600" endDate="2026-07-09 18:26:00 -0600" value="41"/>
+  <Record type="HKQuantityTypeIdentifierHeartRate" sourceName="Apple Watch" unit="count/min" startDate="2026-07-09 12:00:00 -0600" endDate="2026-07-09 12:05:00 -0600" value="73"/>
+  <Record type="HKQuantityTypeIdentifierActiveEnergyBurned" sourceName="Apple Watch" unit="kcal" startDate="2026-07-09 00:00:00 -0600" endDate="2026-07-09 23:59:59 -0600" value="480"/>
+  <Record type="HKQuantityTypeIdentifierRestingHeartRate" sourceName="Apple Watch" unit="count/min" startDate="2026-07-09 08:00:00 -0600" endDate="2026-07-09 08:00:00 -0600" value="65"/>
+  <Record type="HKQuantityTypeIdentifierHeartRateVariabilitySDNN" sourceName="Apple Watch" unit="ms" startDate="2026-07-09 08:00:00 -0600" endDate="2026-07-09 08:00:00 -0600" value="42"/>
+
+  <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Apple Watch" startDate="2026-07-09 23:10:00 -0600" endDate="2026-07-10 06:55:00 -0600" value="HKCategoryValueSleepAnalysisAsleepCore"/>
+  <Record type="HKQuantityTypeIdentifierStepCount" sourceName="Apple Watch" unit="count" startDate="2026-07-10 00:00:00 -0600" endDate="2026-07-10 23:59:59 -0600" value="11200"/>
+  <Record type="HKQuantityTypeIdentifierAppleExerciseTime" sourceName="Apple Watch" unit="min" startDate="2026-07-10 18:05:00 -0600" endDate="2026-07-10 18:59:00 -0600" value="54"/>
+  <Record type="HKQuantityTypeIdentifierHeartRate" sourceName="Apple Watch" unit="count/min" startDate="2026-07-10 12:00:00 -0600" endDate="2026-07-10 12:05:00 -0600" value="71"/>
+  <Record type="HKQuantityTypeIdentifierActiveEnergyBurned" sourceName="Apple Watch" unit="kcal" startDate="2026-07-10 00:00:00 -0600" endDate="2026-07-10 23:59:59 -0600" value="590"/>
+  <Record type="HKQuantityTypeIdentifierRestingHeartRate" sourceName="Apple Watch" unit="count/min" startDate="2026-07-10 08:00:00 -0600" endDate="2026-07-10 08:00:00 -0600" value="62"/>
+  <Record type="HKQuantityTypeIdentifierHeartRateVariabilitySDNN" sourceName="Apple Watch" unit="ms" startDate="2026-07-10 08:00:00 -0600" endDate="2026-07-10 08:00:00 -0600" value="48"/>
+
+  <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Apple Watch" startDate="2026-07-10 23:38:00 -0600" endDate="2026-07-11 08:13:00 -0600" value="HKCategoryValueSleepAnalysisAsleepCore"/>
+  <Record type="HKQuantityTypeIdentifierStepCount" sourceName="Apple Watch" unit="count" startDate="2026-07-11 00:00:00 -0600" endDate="2026-07-11 23:59:59 -0600" value="13400"/>
+  <Record type="HKQuantityTypeIdentifierAppleExerciseTime" sourceName="Apple Watch" unit="min" startDate="2026-07-11 15:05:00 -0600" endDate="2026-07-11 16:15:00 -0600" value="70"/>
+  <Record type="HKQuantityTypeIdentifierHeartRate" sourceName="Apple Watch" unit="count/min" startDate="2026-07-11 12:00:00 -0600" endDate="2026-07-11 12:05:00 -0600" value="69"/>
+  <Record type="HKQuantityTypeIdentifierActiveEnergyBurned" sourceName="Apple Watch" unit="kcal" startDate="2026-07-11 00:00:00 -0600" endDate="2026-07-11 23:59:59 -0600" value="760"/>
+  <Record type="HKQuantityTypeIdentifierRestingHeartRate" sourceName="Apple Watch" unit="count/min" startDate="2026-07-11 08:00:00 -0600" endDate="2026-07-11 08:00:00 -0600" value="60"/>
+  <Record type="HKQuantityTypeIdentifierHeartRateVariabilitySDNN" sourceName="Apple Watch" unit="ms" startDate="2026-07-11 08:00:00 -0600" endDate="2026-07-11 08:00:00 -0600" value="55"/>
+
+  <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Apple Watch" startDate="2026-07-11 23:50:00 -0600" endDate="2026-07-12 07:10:00 -0600" value="HKCategoryValueSleepAnalysisAsleepCore"/>
+  <Record type="HKQuantityTypeIdentifierStepCount" sourceName="Apple Watch" unit="count" startDate="2026-07-12 00:00:00 -0600" endDate="2026-07-12 23:59:59 -0600" value="8000"/>
+  <Record type="HKQuantityTypeIdentifierAppleExerciseTime" sourceName="Apple Watch" unit="min" startDate="2026-07-12 19:10:00 -0600" endDate="2026-07-12 19:42:00 -0600" value="32"/>
+  <Record type="HKQuantityTypeIdentifierHeartRate" sourceName="Apple Watch" unit="count/min" startDate="2026-07-12 12:00:00 -0600" endDate="2026-07-12 12:05:00 -0600" value="72"/>
+  <Record type="HKQuantityTypeIdentifierActiveEnergyBurned" sourceName="Apple Watch" unit="kcal" startDate="2026-07-12 00:00:00 -0600" endDate="2026-07-12 23:59:59 -0600" value="410"/>
+  <Record type="HKQuantityTypeIdentifierRestingHeartRate" sourceName="Apple Watch" unit="count/min" startDate="2026-07-12 08:00:00 -0600" endDate="2026-07-12 08:00:00 -0600" value="64"/>
+  <Record type="HKQuantityTypeIdentifierHeartRateVariabilitySDNN" sourceName="Apple Watch" unit="ms" startDate="2026-07-12 08:00:00 -0600" endDate="2026-07-12 08:00:00 -0600" value="40"/>
+
+  <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Apple Watch" startDate="2026-07-12 23:30:00 -0600" endDate="2026-07-13 06:05:00 -0600" value="HKCategoryValueSleepAnalysisAsleepCore"/>
+  <Record type="HKQuantityTypeIdentifierStepCount" sourceName="Apple Watch" unit="count" startDate="2026-07-13 00:00:00 -0600" endDate="2026-07-13 23:59:59 -0600" value="5900"/>
+  <Record type="HKQuantityTypeIdentifierAppleExerciseTime" sourceName="Apple Watch" unit="min" startDate="2026-07-13 18:40:00 -0600" endDate="2026-07-13 18:58:00 -0600" value="18"/>
+  <Record type="HKQuantityTypeIdentifierHeartRate" sourceName="Apple Watch" unit="count/min" startDate="2026-07-13 12:00:00 -0600" endDate="2026-07-13 12:05:00 -0600" value="79"/>
+  <Record type="HKQuantityTypeIdentifierActiveEnergyBurned" sourceName="Apple Watch" unit="kcal" startDate="2026-07-13 00:00:00 -0600" endDate="2026-07-13 23:59:59 -0600" value="260"/>
+  <Record type="HKQuantityTypeIdentifierRestingHeartRate" sourceName="Apple Watch" unit="count/min" startDate="2026-07-13 08:00:00 -0600" endDate="2026-07-13 08:00:00 -0600" value="70"/>
+  <Record type="HKQuantityTypeIdentifierHeartRateVariabilitySDNN" sourceName="Apple Watch" unit="ms" startDate="2026-07-13 08:00:00 -0600" endDate="2026-07-13 08:00:00 -0600" value="30"/>
+
+  <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Apple Watch" startDate="2026-07-13 23:20:00 -0600" endDate="2026-07-14 07:00:00 -0600" value="HKCategoryValueSleepAnalysisAsleepCore"/>
+  <Record type="HKQuantityTypeIdentifierStepCount" sourceName="Apple Watch" unit="count" startDate="2026-07-14 00:00:00 -0600" endDate="2026-07-14 23:59:59 -0600" value="9700"/>
+  <Record type="HKQuantityTypeIdentifierAppleExerciseTime" sourceName="Apple Watch" unit="min" startDate="2026-07-14 17:55:00 -0600" endDate="2026-07-14 18:39:00 -0600" value="44"/>
+  <Record type="HKQuantityTypeIdentifierHeartRate" sourceName="Apple Watch" unit="count/min" startDate="2026-07-14 12:00:00 -0600" endDate="2026-07-14 12:05:00 -0600" value="71"/>
+  <Record type="HKQuantityTypeIdentifierActiveEnergyBurned" sourceName="Apple Watch" unit="kcal" startDate="2026-07-14 00:00:00 -0600" endDate="2026-07-14 23:59:59 -0600" value="530"/>
+  <Record type="HKQuantityTypeIdentifierRestingHeartRate" sourceName="Apple Watch" unit="count/min" startDate="2026-07-14 08:00:00 -0600" endDate="2026-07-14 08:00:00 -0600" value="63"/>
+  <Record type="HKQuantityTypeIdentifierHeartRateVariabilitySDNN" sourceName="Apple Watch" unit="ms" startDate="2026-07-14 08:00:00 -0600" endDate="2026-07-14 08:00:00 -0600" value="46"/>
+</HealthData>

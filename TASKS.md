@@ -43,9 +43,14 @@
 
 - [x] Compare official wearable data paths and choose a first integration direction.
 - [x] Write a maintainable wearable health integration plan.
-- [ ] Decide whether first imported health records are local-only or Supabase-backed.
-- [ ] Define normalized health record helpers and validation checks.
-- [ ] Add a manual CSV/JSON import MVP for sleep and activity.
-- [ ] Add Personal Stats charts for imported sleep and activity.
-- [ ] Design Google Health API OAuth and server-side token storage.
-- [ ] Add share-safe family health summaries after personal import is stable.
+- [x] Decide whether first imported health records are local-only or Supabase-backed.
+- [x] Define normalized health record helpers and validation checks.
+- [x] Add a manual CSV/JSON import MVP for sleep and activity.
+- [x] Add direct Apple Health `export.xml` parsing for Apple Watch-derived records.
+- [x] Add a clear in-app Apple Watch import flow for zip export, `export.xml`, and local-only storage.
+- [x] Add Personal Stats charts for imported sleep and activity.
+- [x] Add a local clear/delete control for imported health data.
+- [x] Design Google Health API OAuth and server-side token storage.
+- [x] Add share-safe family health summaries after personal import is stable.
+- [x] Add non-diagnostic personal health trend reports for imported wearable data.
+- [x] Add heart rate and active energy import/report support.

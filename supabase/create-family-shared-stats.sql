@@ -51,7 +51,7 @@ begin
     drop constraint if exists family_shared_stats_summary_type_check;
   alter table public.family_shared_stats
     add constraint family_shared_stats_summary_type_check
-    check (summary_type in ('skin', 'sleep', 'focus', 'goals'));
+    check (summary_type in ('skin', 'sleep', 'focus', 'goals', 'health'));
 
   alter table public.family_shared_stats
     drop constraint if exists family_shared_stats_period_check;

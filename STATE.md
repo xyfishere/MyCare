@@ -1,6 +1,6 @@
 # Current State
 
-Last updated: 2026-07-20
+Last updated: 2026-07-22
 
 ## Product
 
@@ -43,14 +43,26 @@ Last updated: 2026-07-20
 - Personal Stats sharing can use its own range: today, this week, or this month, separate from the main Stats chart range.
 - Family Stats now includes low-pressure family garden cards based only on opt-in shared summaries.
 - Family Stats shared personal summaries now use visual cards for skin distribution, wake-time trend, focus minutes, and goal progress instead of text-only rows.
+- Imported wearable health summaries can now be shared with family as opt-in, summary-only snapshots for sleep, steps, active minutes, active energy, heart rate, and recovery indicators.
 - Two-account family synchronization was manually tested for the current Family Sharing flow.
+- Wearable health import is starting local-first with normalized record helpers before any provider API or Supabase raw-health table.
+- Personal Stats now has a local-first CSV/JSON/XML health import card with sleep, steps, and active-minute preview charts.
+- Apple Health `export.xml` can be imported directly for selected Apple Watch metrics: sleep, steps, exercise minutes, active energy, heart rate, resting heart rate, and HRV.
+- The Stats page explains the Apple Watch import flow: export from iPhone Health, unzip, upload `export.xml`, then review local-only trends.
+- Health import now detects file content as well as extension, and gives a clear unzip/export.xml message if an Apple Health zip is uploaded.
+- Imported health data now generates a non-diagnostic personal trend report for sleep, activity, active time, and recovery signals.
+- Imported health records can be cleared from Personal Stats without affecting morning, focus, goals, or family data.
+- Google Health API sync is still design-only; future OAuth token exchange and refresh must happen server-side.
 - GitHub `main` deploys through Cloudflare Pages.
 
 ## Current Limitations
 
 - Family statistics are scaffolded separately from personal statistics and can show family goals plus opt-in shared summaries.
 - Shared personal stats currently expose lightweight summaries only; richer member-level sharing rules are still future work.
-- External health and wearable data cannot yet be imported.
+- Family health sharing does not expose raw imported health rows, detailed metadata, routes, private notes, or diagnostic language.
+- External health data can be imported manually through CSV/JSON or a direct Apple Health `export.xml`; direct wearable API sync is not connected yet.
+- Apple Health zip auto-extraction is not implemented yet, so the user should upload the `export.xml` inside the Apple Health export.
+- Imported health data is local-only for now, so it does not sync across devices yet.
 
 ## Repository
 
@@ -61,7 +73,9 @@ Last updated: 2026-07-20
 - `src/modules/goals.js` owns reusable goal sorting, deadline, and stats calculations.
 - `src/modules/family.js` owns Supabase family operations, family goals/categories, and family secret note row mapping.
 - `src/modules/sharing.js` owns summary-only personal stats snapshots for future Family Stats sharing.
-- The roadmap is closing Version 2 family sharing, with final responsive UI QA remaining before external health data.
+- `src/modules/health-import.js` owns normalized health records, CSV/JSON/Apple Health XML parsing helpers, cloud row mapping, and non-diagnostic summary helpers.
+- `src/modules/health-report.js` owns non-diagnostic report text and signal generation for imported wearable summaries.
+- The roadmap is now moving into local-first wearable health import before direct API sync.
 - `assets/images/my-care-linkedin-thumbnail.png` remains an unrelated untracked file.
 
 ## Latest Validation
@@ -78,5 +92,7 @@ Last updated: 2026-07-20
 - `node scripts/check-family-service.js` passes for family row mapping, shared goal stats, and secret note mapping.
 - `node scripts/check-family-service.js` also checks that the family remove-member helper is exported.
 - `node scripts/check-sharing-module.js` passes for privacy-safe personal stats snapshot generation.
+- `node scripts/check-health-import.js` passes for normalized health records, CSV/JSON/Apple Health XML parsing, local import summaries, and summary privacy checks.
+- `node scripts/check-health-report.js` passes for bilingual, non-diagnostic imported-health report generation.
 - `node scripts/check-goals-stats-structure.js` passes and checks that Personal/Family Goals and Stats stay separated.
 - `node --check app.js` passes after the shared-summary control update.

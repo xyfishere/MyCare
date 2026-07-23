@@ -21,16 +21,26 @@ const state = {
     { id: "goal-1", title: "Private title", status: "done", completedAt: "2026-07-02T10:00:00.000Z" },
     { id: "goal-2", title: "Private open title", status: "open", completedAt: "" },
   ],
+  healthRecords: [
+    { date: "2026-07-01", metric: "sleep_minutes", value: 420, metadata: { raw: "private sleep stage rows" } },
+    { date: "2026-07-02", metric: "sleep_minutes", value: 450, metadata: { raw: "private sleep stage rows" } },
+    { date: "2026-07-02", metric: "steps", value: 9100, metadata: { route: "private route" } },
+    { date: "2026-07-03", metric: "active_minutes", value: 35 },
+    { date: "2026-07-03", metric: "active_energy", value: 390 },
+    { date: "2026-07-03", metric: "heart_rate", value: 78 },
+    { date: "2026-07-03", metric: "resting_heart_rate", value: 62 },
+    { date: "2026-07-03", metric: "heart_rate_variability", value: 45 },
+  ],
 };
 
 const snapshots = sharing.buildPersonalStatsSnapshots(state, {
   familyId: "family-1",
   periodStart: "2026-07-01",
   periodEnd: "2026-07-07",
-  summaryTypes: ["skin", "sleep", "focus", "goals"],
+  summaryTypes: ["skin", "sleep", "focus", "goals", "health"],
 });
 
-assert(snapshots.length === 4, "expected one snapshot per requested type");
+assert(snapshots.length === 5, "expected one snapshot per requested type");
 
 const skin = snapshots.find((item) => item.summaryType === "skin");
 assert(skin.payload.totalDays === 3, "skin summary should count days");
@@ -52,6 +62,28 @@ const goals = snapshots.find((item) => item.summaryType === "goals");
 assert(goals.payload.completed === 1, "goal summary should count completed goals");
 assert(goals.payload.open === 1, "goal summary should count open goals");
 assert(!JSON.stringify(goals.payload).includes("Private title"), "goal summary must not include private goal titles");
+
+const health = snapshots.find((item) => item.summaryType === "health");
+assert(health.payload.recordCount === 8, "health summary should count imported records");
+assert(health.payload.sleepRecords === 2, "health summary should count imported sleep records");
+assert(health.payload.averageSleepMinutes === 435, "health summary should average sleep");
+assert(health.payload.stepsTotal === 9100, "health summary should total steps");
+assert(health.payload.activeMinutesTotal === 35, "health summary should total active minutes");
+assert(health.payload.activeEnergyTotal === 390, "health summary should total active energy");
+assert(health.payload.heartRateAverage === 78, "health summary should average heart rate");
+assert(health.payload.restingHeartRateAverage === 62, "health summary should average resting heart rate");
+assert(health.payload.heartRateVariabilityAverage === 45, "health summary should average HRV");
+assert(!JSON.stringify(health.payload).includes("private"), "health summary must not include raw private metadata");
+assert(sharing.hasSummaryData(health), "health summary with records should be shareable");
+
+const emptyHealth = sharing.buildPersonalStatsSnapshots(state, {
+  familyId: "family-1",
+  periodStart: "2026-07-16",
+  periodEnd: "2026-07-22",
+  summaryTypes: ["health"],
+})[0];
+assert(emptyHealth.payload.recordCount === 0, "empty health summary should count zero records");
+assert(!sharing.hasSummaryData(emptyHealth), "empty health summary should not be shareable");
 
 const row = sharing.toSharedStatUpsert(skin, { id: "user-1" });
 assert(row.family_id === "family-1", "family id should map to snake case");

@@ -1,6 +1,6 @@
 (function initSharingModule(global) {
   const namespace = global.MyCare || {};
-  const SUMMARY_TYPES = ["skin", "sleep", "focus", "goals"];
+  const SUMMARY_TYPES = ["skin", "sleep", "focus", "goals", "health"];
 
   function requireClient(client) {
     if (!client?.from) throw new Error("Supabase client is required");
@@ -146,12 +146,75 @@
     };
   }
 
+  function average(values = []) {
+    const nums = values.filter(Number.isFinite);
+    return nums.length ? nums.reduce((sum, value) => sum + value, 0) / nums.length : null;
+  }
+
+  function healthMetricFromRecord(record = {}) {
+    const metric = String(record.metric || record.type || record.name || "").trim().toLowerCase();
+    const aliases = {
+      active: "active_minutes",
+      active_calories: "active_energy",
+      active_energy: "active_energy",
+      active_minutes: "active_minutes",
+      calories: "active_energy",
+      energy_burned: "active_energy",
+      exercise_minutes: "active_minutes",
+      heart_rate: "heart_rate",
+      hr: "heart_rate",
+      heart_rate_variability: "heart_rate_variability",
+      hrv: "heart_rate_variability",
+      resting_heart_rate: "resting_heart_rate",
+      resting_hr: "resting_heart_rate",
+      rhr: "resting_heart_rate",
+      sleep: "sleep_minutes",
+      sleep_duration: "sleep_minutes",
+      sleep_minutes: "sleep_minutes",
+      step_count: "steps",
+      steps: "steps",
+    };
+    return aliases[metric] || "";
+  }
+
+  function valuesForHealthMetric(records = [], metric) {
+    return records
+      .filter((record) => healthMetricFromRecord(record) === metric)
+      .map((record) => Number(record.value))
+      .filter(Number.isFinite);
+  }
+
+  function buildImportedHealthSummary(state = {}, periodStart, periodEnd) {
+    const records = (state.healthRecords || [])
+      .filter((record) => dateInRange(record.date, periodStart, periodEnd));
+    const sleepValues = valuesForHealthMetric(records, "sleep_minutes");
+    const stepValues = valuesForHealthMetric(records, "steps");
+    const activeValues = valuesForHealthMetric(records, "active_minutes");
+    const activeEnergyValues = valuesForHealthMetric(records, "active_energy");
+    const heartRateValues = valuesForHealthMetric(records, "heart_rate");
+    const restingHeartRateValues = valuesForHealthMetric(records, "resting_heart_rate");
+    const hrvValues = valuesForHealthMetric(records, "heart_rate_variability");
+    return {
+      recordCount: records.length,
+      sleepRecords: sleepValues.length,
+      averageSleepMinutes: average(sleepValues),
+      stepsTotal: stepValues.reduce((sum, value) => sum + value, 0),
+      activeMinutesTotal: activeValues.reduce((sum, value) => sum + value, 0),
+      activeEnergyTotal: activeEnergyValues.reduce((sum, value) => sum + value, 0),
+      recoveryRecords: heartRateValues.length + restingHeartRateValues.length + hrvValues.length,
+      heartRateAverage: average(heartRateValues),
+      restingHeartRateAverage: average(restingHeartRateValues),
+      heartRateVariabilityAverage: average(hrvValues),
+    };
+  }
+
   function buildSummaryPayload(type, state, periodStart, periodEnd) {
     const summaryType = normalizeSummaryType(type);
     if (summaryType === "skin") return buildSkinSummary(state, periodStart, periodEnd);
     if (summaryType === "sleep") return buildSleepSummary(state, periodStart, periodEnd);
     if (summaryType === "focus") return buildFocusSummary(state, periodStart, periodEnd);
     if (summaryType === "goals") return buildGoalSummary(state, periodStart, periodEnd);
+    if (summaryType === "health") return buildImportedHealthSummary(state, periodStart, periodEnd);
     return {};
   }
 
@@ -170,6 +233,17 @@
       payload: buildSummaryPayload(summaryType, state, periodStart, periodEnd),
       visible: options.visible !== false,
     }));
+  }
+
+  function hasSummaryData(snapshot = {}) {
+    const summaryType = normalizeSummaryType(snapshot.summaryType || snapshot.summary_type);
+    const payload = snapshot.payload && typeof snapshot.payload === "object" ? snapshot.payload : {};
+    if (summaryType === "skin") return Number(payload.totalDays || 0) > 0;
+    if (summaryType === "sleep") return Number(payload.recordCount || 0) > 0;
+    if (summaryType === "focus") return Number(payload.minutes || 0) > 0 || Number(payload.sessions || 0) > 0;
+    if (summaryType === "goals") return Number(payload.completed || 0) > 0 || Number(payload.open || 0) > 0;
+    if (summaryType === "health") return Number(payload.recordCount || 0) > 0;
+    return false;
   }
 
   function toSharedStatUpsert(input = {}, user) {
@@ -206,7 +280,9 @@
   async function saveSharedStats(client, user, snapshots = []) {
     requireClient(client);
     const list = Array.isArray(snapshots) ? snapshots : [snapshots];
-    const rows = list.map((snapshot) => toSharedStatUpsert(snapshot, user));
+    const rows = list
+      .filter(hasSummaryData)
+      .map((snapshot) => toSharedStatUpsert(snapshot, user));
     if (!rows.length) return [];
     const data = throwIfError(await client
       .from("family_shared_stats")
@@ -240,11 +316,13 @@
     SUMMARY_TYPES,
     buildFocusSummary,
     buildGoalSummary,
+    buildImportedHealthSummary,
     buildPersonalStatsSnapshots,
     buildSkinSummary,
     buildSleepSummary,
     buildSummaryPayload,
     deleteSharedStat,
+    hasSummaryData,
     listSharedStats,
     mapSharedStat,
     normalizeSummaryType,

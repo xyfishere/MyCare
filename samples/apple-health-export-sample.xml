@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<HealthData>
+  <Record type="HKQuantityTypeIdentifierStepCount" sourceName="Apple Watch" unit="count" startDate="2026-07-03 08:00:00 -0600" endDate="2026-07-03 09:00:00 -0600" value="1200"/>
+  <Record type="HKQuantityTypeIdentifierAppleExerciseTime" sourceName="Apple Watch" unit="min" startDate="2026-07-03 18:30:00 -0600" endDate="2026-07-03 19:00:00 -0600" value="30"/>
+  <Record type="HKQuantityTypeIdentifierRestingHeartRate" sourceName="Apple Watch" unit="count/min" startDate="2026-07-03 08:00:00 -0600" endDate="2026-07-03 08:00:00 -0600" value="61"/>
+  <Record type="HKQuantityTypeIdentifierHeartRateVariabilitySDNN" sourceName="Apple Watch" unit="ms" startDate="2026-07-03 08:00:00 -0600" endDate="2026-07-03 08:00:00 -0600" value="42"/>
+  <Record type="HKCategoryTypeIdentifierSleepAnalysis" sourceName="Apple Watch" startDate="2026-07-03 23:30:00 -0600" endDate="2026-07-04 06:30:00 -0600" value="HKCategoryValueSleepAnalysisAsleepCore"/>
+</HealthData>

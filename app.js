@@ -56,7 +56,8 @@ const defaultHabitSeeds = [
   { id: "soft-skills", labelZh: "Soft Skills", labelEn: "Soft Skills", color: "#ad9fbe", active: true, builtIn: true },
 ];
 
-const shareableStatsTypes = ["skin", "sleep", "focus", "goals"];
+const defaultSharedStatsTypes = ["skin", "sleep", "focus", "goals"];
+const shareableStatsTypes = [...defaultSharedStatsTypes, "health"];
 const shareableStatsRanges = ["day", "week", "month"];
 
 const personalizationColorPalette = [
@@ -83,7 +84,7 @@ const defaults = {
     language: "zh",
     focusCategories: defaultFocusCategories,
     habitSeedTypes: defaultHabitSeeds,
-    sharedStatsTypes: shareableStatsTypes,
+    sharedStatsTypes: [...defaultSharedStatsTypes],
     sharedStatsRange: "week",
     selfCareQuotes: [],
     recordDataResetVersion: RECORD_DATA_RESET_VERSION,
@@ -1320,7 +1321,7 @@ function normalizePersonalizationSettings(settings) {
 }
 
 function normalizeSharedStatsTypes(saved) {
-  if (!Array.isArray(saved)) return [...shareableStatsTypes];
+  if (!Array.isArray(saved)) return [...defaultSharedStatsTypes];
   const selected = saved.filter((type) => shareableStatsTypes.includes(type));
   return [...new Set(selected)];
 }
@@ -2927,6 +2928,8 @@ function renderStatsLanguage() {
     hungerStatsMeta: zh ? "晨间记录 · 0–10" : "Morning check-in · 0–10",
     skinStatsTitle: zh ? "皮肤状态" : "Skin status",
     skinStatsMeta: zh ? "按日期查看变化" : "Changes over time",
+    healthImportTitle: zh ? "导入的健康数据" : "Imported health data",
+    healthImportMeta: zh ? "本地 CSV / JSON / XML 预览" : "Local CSV / JSON / XML preview",
     focusStatsTitle: zh ? "专注投入" : "Focus",
     focusStatsSubtitle: zh ? "查看时间投入，而不是追逐完美表现。" : "See where time went without chasing perfection.",
     focusMinutesStatsTitle: zh ? "每日专注分钟" : "Daily focus minutes",
@@ -2973,10 +2976,14 @@ function renderStatsLanguage() {
   });
   $("#previewSharedStats").textContent = zh ? "\u9884\u89c8" : "Preview";
   $("#saveSharedStats").textContent = zh ? "\u5206\u4eab\u7ed9\u5bb6\u5ead" : "Share with family";
+  $("#healthImportButton").textContent = zh ? "导入 CSV / JSON / XML" : "Import CSV / JSON / XML";
+  $("#clearHealthImport").textContent = zh ? "清空导入数据" : "Clear imported data";
+  renderHealthImportFlow();
   $$(".stats-range").forEach((button) => {
     const range = button.dataset.statsRange;
     button.textContent = range === "all" ? (zh ? "全部" : "All") : `${range} ${zh ? "天" : "days"}`;
   });
+  setStatsRange(selectedStatsRange);
   renderStatsScope();
   if ($("#view-stats").classList.contains("active")) drawCharts();
 }
@@ -5436,6 +5443,7 @@ function escapeHtml(value) {
 
 function bindStats() {
   $("#healthImport")?.addEventListener("change", handleImport);
+  $("#clearHealthImport")?.addEventListener("click", clearImportedHealthData);
   $("#exportData").addEventListener("click", exportData);
   $("#previewSharedStats")?.addEventListener("click", () => {
     sharedStatsError = false;
@@ -5456,47 +5464,59 @@ function bindStats() {
   });
   $$(".stats-range").forEach((button) => {
     button.addEventListener("click", () => {
-      selectedStatsRange = button.dataset.statsRange || "7";
-      $$(".stats-range").forEach((item) => item.classList.toggle("active", item === button));
+      setStatsRange(button.dataset.statsRange || "7");
       drawCharts();
     });
   });
 }
 
-function handleImport(event) {
-  const file = event.target.files[0];
+async function handleImport(event) {
+  const file = event.target.files?.[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    const text = String(reader.result);
-    const records = file.name.endsWith(".xml") ? parseHealthXml(text) : parseCsvOrJson(text, file.name);
-    state.healthRecords.push(...records);
+  const target = $("#importResult");
+  const zh = getLanguage() === "zh";
+  try {
+    target.classList.remove("is-error");
+    target.textContent = zh ? "正在读取健康数据..." : "Reading health data...";
+    const text = await file.text();
+    const records = window.MyCare.healthImport.parseHealthFileText(text, file.name);
+    const before = new Set((state.healthRecords || []).map((record) => record.id));
+    const merged = new Map((state.healthRecords || []).map((record) => [record.id, record]));
+    records.forEach((record) => merged.set(record.id, record));
+    state.healthRecords = Array.from(merged.values()).sort((a, b) => `${a.date}${a.recordedAt}`.localeCompare(`${b.date}${b.recordedAt}`));
+    setStatsRange("all");
     saveState();
-    $("#importResult").textContent = `已导入 ${records.length} 条健康记录`;
-  };
-  reader.readAsText(file);
-}
-
-function parseHealthXml(text) {
-  const doc = new DOMParser().parseFromString(text, "text/xml");
-  const records = Array.from(doc.querySelectorAll("Record")).slice(0, 6000);
-  return records.map((record) => ({
-    date: (record.getAttribute("startDate") || "").slice(0, 10),
-    type: record.getAttribute("type") || "unknown",
-    value: Number(record.getAttribute("value")) || 0,
-    unit: record.getAttribute("unit") || "",
-  })).filter((item) => item.date);
-}
-
-function parseCsvOrJson(text, name) {
-  if (name.endsWith(".json")) {
-    const parsed = JSON.parse(text);
-    return Array.isArray(parsed) ? parsed : [];
+    const added = records.filter((record) => !before.has(record.id)).length;
+    const skipped = records.length - added;
+    target.textContent = zh
+      ? `已导入 ${added} 条健康记录${skipped ? `，跳过 ${skipped} 条重复记录` : ""}。`
+      : `Imported ${added} health records${skipped ? ` and skipped ${skipped} duplicates` : ""}.`;
+    drawCharts();
+  } catch (error) {
+    console.error("Health import failed", error);
+    target.classList.add("is-error");
+    target.textContent = `${zh ? "暂时无法导入：" : "Could not import: "}${error?.message || ""}`;
+  } finally {
+    event.target.value = "";
   }
-  return text.split(/\r?\n/).slice(1).map((line) => {
-    const [date, type, value, unit = ""] = line.split(",");
-    return { date, type, value: Number(value), unit };
-  }).filter((item) => item.date && item.type);
+}
+
+function clearImportedHealthData() {
+  const count = (state.healthRecords || []).length;
+  if (!count) return;
+  const zh = getLanguage() === "zh";
+  const confirmed = window.confirm(zh
+    ? "确定要清空所有导入的健康数据吗？这不会影响晨间记录、专注记录或家庭数据。"
+    : "Clear all imported health data? This will not affect morning records, focus records, or family data.");
+  if (!confirmed) return;
+  state.healthRecords = [];
+  saveState();
+  const target = $("#importResult");
+  if (target) {
+    target.classList.remove("is-error");
+    target.textContent = zh ? "已清空导入的健康数据。" : "Imported health data cleared.";
+  }
+  drawCharts();
 }
 
 function startAudio(kind) {
@@ -5579,11 +5599,19 @@ function lastSevenDays() {
   return recentDays(7);
 }
 
+function setStatsRange(range = "7") {
+  selectedStatsRange = ["7", "30", "all"].includes(String(range)) ? String(range) : "7";
+  $$(".stats-range").forEach((item) => {
+    item.classList.toggle("active", item.dataset.statsRange === selectedStatsRange);
+  });
+}
+
 function getStatsDays() {
   if (selectedStatsRange !== "all") return recentDays(Number(selectedStatsRange) || 7);
   const dates = [
     ...state.morningEntries.map((item) => item.date),
     ...state.focusSessions.map((item) => item.date),
+    ...(state.healthRecords || []).map((item) => item.date),
     ...(state.workGoals || []).flatMap((item) => [item.createdAt?.slice(0, 10), item.completedAt?.slice(0, 10)]),
     ...(familyState.goals || []).flatMap((item) => [item.createdAt?.slice(0, 10), item.completedAt?.slice(0, 10)]),
   ].filter(Boolean).sort();
@@ -5601,6 +5629,7 @@ function drawCharts() {
   drawFocusBarChart($("#focusChart"), days, days.map((day) => focusSessions.filter((item) => item.date === day).reduce((sum, item) => sum + item.minutes, 0)));
   drawCategoryChart($("#categoryChart"), days);
   renderSkinTimeline(days);
+  renderImportedHealthStats(days);
   renderStatsSummaries(days, focusSessions);
   renderPersonalSharedStats();
   renderGoalStats(days);
@@ -5770,6 +5799,205 @@ function renderSkinTimeline(days) {
       <strong>${escapeHtml(formatSkinStateLabel(item.skinState))}</strong>
     </div>
   `).join("");
+}
+
+function renderHealthImportFlow() {
+  const target = $("#healthImportFlow");
+  if (!target) return;
+  const zh = getLanguage() === "zh";
+  const steps = zh
+    ? [
+      ["01", "在 iPhone 健康 App 导出", "头像 > 导出所有健康数据，会得到一个 zip 文件。"],
+      ["02", "先解压，再上传 export.xml", "请打开 zip 里的 apple_health_export/export.xml，不要直接上传 zip。"],
+      ["03", "上传后查看轻量趋势", "数据只保存在本地，可以随时清空。"],
+    ]
+    : [
+      ["01", "Export from iPhone Health", "Profile > Export All Health Data gives you a zip file."],
+      ["02", "Unzip, then upload export.xml", "Use apple_health_export/export.xml inside the zip, not the zip itself."],
+      ["03", "Review gentle trends", "Records stay local and can be cleared anytime."],
+    ];
+  target.innerHTML = `
+    <div class="health-import-flow-head">
+      <span>${escapeHtml(zh ? "Apple Watch 导入流程" : "Apple Watch import flow")}</span>
+      <small>${escapeHtml(zh ? "CSV / JSON 也可以直接上传" : "CSV / JSON can be uploaded directly")}</small>
+    </div>
+    <div class="health-import-flow-steps">
+      ${steps.map(([number, title, detail]) => `
+        <article>
+          <em>${escapeHtml(number)}</em>
+          <strong>${escapeHtml(title)}</strong>
+          <p>${escapeHtml(detail)}</p>
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
+
+function getImportedHealthRecords(days = getStatsDays()) {
+  if (!window.MyCare?.healthImport) return [];
+  return window.MyCare.healthImport.filterRecords(state.healthRecords || [], {
+    periodStart: days[0],
+    periodEnd: days[days.length - 1],
+  });
+}
+
+function formatHealthDuration(minutes) {
+  if (!Number.isFinite(minutes)) return "—";
+  const total = Math.max(0, Math.round(minutes));
+  const hours = Math.floor(total / 60);
+  const mins = total % 60;
+  if (!hours) return `${mins}m`;
+  return mins ? `${hours}h ${mins}m` : `${hours}h`;
+}
+
+const AVERAGE_DAILY_HEALTH_METRICS = new Set(["heart_rate", "resting_heart_rate", "heart_rate_variability"]);
+
+function getDailyHealthMetric(records, metric) {
+  const grouped = records
+    .filter((record) => record.metric === metric)
+    .reduce((acc, record) => {
+      if (!acc[record.date]) acc[record.date] = [];
+      acc[record.date].push(Number(record.value));
+      return acc;
+    }, {});
+  return Object.entries(grouped)
+    .map(([date, values]) => ({
+      date,
+      value: AVERAGE_DAILY_HEALTH_METRICS.has(metric)
+        ? values.reduce((sum, value) => sum + value, 0) / values.length
+        : values.reduce((sum, value) => sum + value, 0),
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function renderHealthMetricLine(records, metric, label, formatter = (value) => Math.round(value).toLocaleString(), tone = "sleep") {
+  const points = getDailyHealthMetric(records, metric).slice(-7);
+  const zh = getLanguage() === "zh";
+  if (!points.length) return "";
+  const values = points.map((point) => Number(point.value)).filter(Number.isFinite);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = Math.max(max - min, 1);
+  const padded = points.length === 1 ? [points[0], points[0]] : points;
+  const pointPositions = padded.map((point, index) => {
+    const x = padded.length === 1 ? 50 : 6 + (index / (padded.length - 1)) * 88;
+    const normalized = (Number(point.value) - min) / range;
+    const y = 42 - normalized * 30;
+    const kind = Number(point.value) === max ? "high" : Number(point.value) === min ? "low" : "normal";
+    return { ...point, x, y, kind };
+  });
+  const linePoints = pointPositions.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
+  const areaPoints = `6,45 ${linePoints} 94,45`;
+  const latest = points.at(-1);
+  const first = points[0];
+  const highPoint = pointPositions.find((point) => Number(point.value) === max);
+  const lowPoint = pointPositions.find((point) => Number(point.value) === min && point.date !== highPoint?.date);
+  const extremeTags = [
+    highPoint ? { ...highPoint, label: zh ? "最高" : "High", kind: "high" } : null,
+    lowPoint ? { ...lowPoint, label: zh ? "最低" : "Low", kind: "low" } : null,
+  ].filter(Boolean);
+  return `
+    <div class="health-import-series health-import-line-card" data-health-metric="${escapeHtml(tone)}">
+      <div class="health-import-series-top">
+        <div>
+          <span>${escapeHtml(label)}</span>
+          <small>${escapeHtml(zh ? "最近趋势" : "Recent trend")}</small>
+        </div>
+        <strong>${escapeHtml(formatter(latest.value))}</strong>
+      </div>
+      <div class="health-import-line-wrap">
+        <svg class="health-import-line" viewBox="0 0 100 52" aria-hidden="true" focusable="false">
+          <path class="health-import-line-grid" d="M6 12 H94 M6 27 H94 M6 42 H94" />
+          <polygon points="${areaPoints}" />
+          <polyline points="${linePoints}" />
+          ${pointPositions.map((point) => `
+            <circle class="health-line-point is-${point.kind}" cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="${point.kind === "normal" ? "2.4" : "3.4"}">
+              <title>${escapeHtml(formatChartDate(point.date))}: ${escapeHtml(formatter(point.value))}</title>
+            </circle>
+          `).join("")}
+        </svg>
+        ${extremeTags.map((point) => `
+          <span class="health-extreme-tag is-${point.kind}" style="--tag-left: ${Math.max(20, Math.min(80, point.x)).toFixed(1)}%; --tag-top: ${Math.max(12, Math.min(82, (point.y / 52) * 100)).toFixed(1)}%;">
+            <b>${escapeHtml(point.label)}</b>
+            <em>${escapeHtml(formatChartDate(point.date))}</em>
+            <strong>${escapeHtml(formatter(point.value))}</strong>
+          </span>
+        `).join("")}
+      </div>
+      <div class="health-import-line-labels">
+        <span>${escapeHtml(formatChartDate(first.date))}</span>
+        <strong>${escapeHtml(zh ? "最高 / 最低" : "High / low")}</strong>
+        <span>${escapeHtml(formatChartDate(latest.date))}</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderHealthReport(summary, records) {
+  if (!window.MyCare?.healthReport) return "";
+  const zh = getLanguage() === "zh";
+  const report = window.MyCare.healthReport.buildHealthReport(records, summary, {
+    language: zh ? "zh" : "en",
+  });
+  return `
+    <section class="health-report-card" aria-label="${escapeHtml(zh ? "身体趋势小结" : "Body trend note")}">
+      <div class="health-report-head">
+        <div>
+          <span>${escapeHtml(zh ? "身体小结" : "Body note")}</span>
+          <strong>${escapeHtml(report.headline)}</strong>
+        </div>
+        <em>${escapeHtml(report.coverage)}</em>
+      </div>
+      ${report.signals.length ? `
+        <div class="health-report-signals">
+          ${report.signals.map((signal) => `
+            <article data-health-signal="${escapeHtml(signal.tone)}">
+              <span>${escapeHtml(signal.label)}</span>
+              <strong>${escapeHtml(signal.value)}</strong>
+              <p>${escapeHtml(signal.detail)}</p>
+            </article>
+          `).join("")}
+        </div>
+      ` : ""}
+      <p class="health-report-note">${escapeHtml(report.note)}</p>
+    </section>
+  `;
+}
+
+function renderImportedHealthStats(days = getStatsDays()) {
+  const target = $("#healthImportSummary");
+  if (!target || !window.MyCare?.healthImport) return;
+  const zh = getLanguage() === "zh";
+  const records = getImportedHealthRecords(days);
+  const clearButton = $("#clearHealthImport");
+  if (clearButton) clearButton.hidden = !(state.healthRecords || []).length;
+  if (!records.length) {
+    target.innerHTML = `
+      <div class="health-import-empty">
+        <strong>${escapeHtml(zh ? "还没有导入健康数据" : "No imported health data yet")}</strong>
+        <span>${escapeHtml(zh ? "支持 date, metric, value, unit 格式的 CSV / JSON。" : "Use CSV / JSON with date, metric, value, and unit fields.")}</span>
+      </div>
+    `;
+    return;
+  }
+  const summary = window.MyCare.healthImport.buildHealthSummary(records, {
+    periodStart: days[0],
+    periodEnd: days[days.length - 1],
+  });
+  target.innerHTML = `
+    <div class="health-import-count">
+      <strong>${escapeHtml(summary.recordCount)}</strong>
+      <span>${escapeHtml(zh ? "条导入记录" : "imported records")}</span>
+    </div>
+    ${renderHealthReport(summary, records)}
+    <div class="health-import-trend-grid">
+      ${renderHealthMetricLine(records, "sleep_minutes", zh ? "睡眠" : "Sleep", formatHealthDuration, "sleep")}
+      ${renderHealthMetricLine(records, "steps", zh ? "步数" : "Steps", (value) => Math.round(value).toLocaleString(), "steps")}
+      ${renderHealthMetricLine(records, "active_minutes", zh ? "活动分钟" : "Active minutes", formatHealthDuration, "active")}
+      ${renderHealthMetricLine(records, "heart_rate", zh ? "心率" : "Heart rate", (value) => `${Math.round(value)} bpm`, "heart")}
+      ${renderHealthMetricLine(records, "active_energy", zh ? "活动能量" : "Active energy", (value) => `${Math.round(value).toLocaleString()} kcal`, "energy")}
+    </div>
+  `;
 }
 
 function toFamilyCategoryDefinition(category) {
@@ -5957,10 +6185,12 @@ function getSharingText() {
     previewSignedOut: zh ? "\u8fd9\u662f\u672c\u5730\u9884\u89c8\u3002\u767b\u5f55\u540e\u624d\u80fd\u5206\u4eab\u7ed9\u5bb6\u5ead\u3002" : "This is a local preview. Sign in to share it with family.",
     previewNoFamily: zh ? "\u8fd9\u662f\u672c\u5730\u9884\u89c8\u3002\u52a0\u5165\u5bb6\u5ead\u540e\u624d\u80fd\u4fdd\u5b58\u5206\u4eab\u3002" : "This is a local preview. Join a family to save it as shared.",
     saved: zh ? "\u5df2\u5206\u4eab\u7ed9\u5bb6\u5ead\u3002" : "Shared with family.",
+    savedAvailable: zh ? "\u5df2\u5206\u4eab\u6709\u6570\u636e\u7684\u6458\u8981\uff0c\u7a7a\u7684\u65f6\u95f4\u6bb5\u5df2\u81ea\u52a8\u8df3\u8fc7\u3002" : "Shared the summaries with data. Empty periods were skipped.",
     stopped: zh ? "\u5df2\u505c\u6b62\u5206\u4eab\u8fd9\u4efd\u6458\u8981\u3002" : "Stopped sharing this summary.",
     failed: zh ? "\u6682\u65f6\u65e0\u6cd5\u5206\u4eab\u3002" : "Could not share right now.",
     stopFailed: zh ? "\u6682\u65f6\u65e0\u6cd5\u505c\u6b62\u5206\u4eab\u3002" : "Could not stop sharing right now.",
     selectOne: zh ? "\u8bf7\u81f3\u5c11\u9009\u62e9\u4e00\u4e2a\u60f3\u5206\u4eab\u7684\u6458\u8981\u3002" : "Choose at least one summary to share.",
+    noShareableData: zh ? "\u8fd9\u4e2a\u65f6\u95f4\u6bb5\u8fd8\u6ca1\u6709\u53ef\u5206\u4eab\u7684\u6570\u636e\u3002\u6362\u4e00\u4e2a\u65f6\u95f4\u8303\u56f4\u8bd5\u8bd5\u3002" : "There is no shareable data in this range. Try another time range.",
     missingTable: zh
       ? "\u8fd8\u6ca1\u6709\u521b\u5efa family_shared_stats \u8868\u3002\u8bf7\u5148\u5728 Supabase SQL Editor \u8fd0\u884c supabase/create-family-shared-stats.sql\u3002"
       : "The family_shared_stats table is missing. Run supabase/create-family-shared-stats.sql in Supabase SQL Editor first.",
@@ -5969,6 +6199,7 @@ function getSharingText() {
     sleep: zh ? "\u8d77\u5e8a" : "Wake",
     focus: zh ? "\u4e13\u6ce8" : "Focus",
     goals: zh ? "\u76ee\u6807" : "Goals",
+    health: zh ? "\u5065\u5eb7\u6570\u636e" : "Health data",
     records: zh ? "\u6761\u8bb0\u5f55" : "records",
     days: zh ? "\u5929" : "days",
     minutes: zh ? "\u5206\u949f" : "min",
@@ -5996,6 +6227,7 @@ function getSharingText() {
     wakeSignal: zh ? "\u5e73\u5747\u8d77\u5e8a" : "Avg wake",
     focusSignal: zh ? "\u4e13\u6ce8\u53d8\u5316" : "Focus change",
     goalsSignal: zh ? "\u76ee\u6807\u72b6\u6001" : "Goal state",
+    healthSignal: zh ? "\u5065\u5eb7\u8d8b\u52bf" : "Health trend",
     noSignal: zh ? "\u8fd8\u6ca1\u6709\u53ef\u5224\u65ad\u7684\u72b6\u6001\u53d8\u5316" : "No clear state change yet",
     laterThanBefore: zh ? "\u6bd4\u4e0a\u6b21\u665a" : "later than last share",
     earlierThanBefore: zh ? "\u6bd4\u4e0a\u6b21\u65e9" : "earlier than last share",
@@ -6005,6 +6237,7 @@ function getSharingText() {
     latest: zh ? "\u6700\u65b0" : "Latest",
     top: zh ? "\u4e3b\u8981" : "Top",
     noData: zh ? "\u6682\u65e0\u6570\u636e" : "No data",
+    noDataInRange: zh ? "\u8fd9\u4e2a\u65f6\u95f4\u6bb5\u6ca1\u6709\u6570\u636e" : "No data in this range",
   };
 }
 
@@ -6029,6 +6262,7 @@ function getSharedStatsTypeOptions() {
     { key: "sleep", label: text.sleep },
     { key: "focus", label: text.focus },
     { key: "goals", label: text.goals },
+    { key: "health", label: text.health },
   ];
 }
 
@@ -6139,6 +6373,10 @@ function getSharedStatsSnapshots(days = getStatsDays(), summaryTypes = getSelect
   });
 }
 
+function hasSharedStatsData(snapshot) {
+  return window.MyCare.sharing.hasSummaryData(snapshot);
+}
+
 function formatSharedStatsValue(snapshot) {
   const text = getSharingText();
   const payload = snapshot.payload || {};
@@ -6158,6 +6396,11 @@ function formatSharedStatsValue(snapshot) {
   if (snapshot.summaryType === "goals") {
     return `${payload.completed || 0} ${text.completed} · ${payload.open || 0} ${text.open}`;
   }
+  if (snapshot.summaryType === "health") {
+    const sleep = Number.isFinite(payload.averageSleepMinutes) ? formatHealthDuration(payload.averageSleepMinutes) : "-";
+    const steps = Number(payload.stepsTotal || 0).toLocaleString();
+    return `${sleep} · ${steps} ${getLanguage() === "zh" ? "步" : "steps"}`;
+  }
   return "-";
 }
 
@@ -6168,6 +6411,7 @@ function getSharedStatsTitle(type) {
     sleep: text.sleep,
     focus: text.focus,
     goals: text.goals,
+    health: text.health,
   }[type] || type;
 }
 
@@ -6217,13 +6461,14 @@ function renderPersonalSharedStats(days = getSharedStatsDaysForRange()) {
 function renderSharedStatsPreviewCard(snapshot, period) {
   const text = getSharingText();
   const shared = findSharedStatForSnapshot(snapshot);
+  const hasData = hasSharedStatsData(snapshot);
   return `
-    <article class="shared-stat-preview-card${shared ? " is-shared" : ""}" data-shared-type="${escapeHtml(snapshot.summaryType)}">
+    <article class="shared-stat-preview-card${shared ? " is-shared" : ""}${hasData ? "" : " is-empty"}" data-shared-type="${escapeHtml(snapshot.summaryType)}">
       <div class="shared-stat-preview-top">
         <span>${escapeHtml(getSharedStatsTitle(snapshot.summaryType))}</span>
-        <em>${escapeHtml(shared ? text.shared : text.notShared)}</em>
+        <em>${escapeHtml(shared ? text.shared : hasData ? text.notShared : text.noDataInRange)}</em>
       </div>
-      <strong>${escapeHtml(formatSharedStatsValue(snapshot))}</strong>
+      <strong>${escapeHtml(hasData ? formatSharedStatsValue(snapshot) : text.noDataInRange)}</strong>
       <small>${escapeHtml(period.periodStart)} - ${escapeHtml(period.periodEnd)}</small>
       ${shared ? `<button class="shared-stat-stop" type="button" data-shared-stat-action="stop" data-shared-stat-id="${escapeHtml(shared.id)}">${escapeHtml(text.stopSharing)}</button>` : ""}
     </article>
@@ -6279,10 +6524,17 @@ async function sharePersonalStatsWithFamily() {
     sharedStatsMessage = text.loading;
     renderPersonalSharedStats();
     const snapshots = getSharedStatsSnapshots(getSharedStatsDaysForRange(), selectedTypes);
-    const saved = await window.MyCare.sharing.saveSharedStats(supabaseClient, currentUser, snapshots);
+    const shareableSnapshots = snapshots.filter(hasSharedStatsData);
+    if (!shareableSnapshots.length) {
+      sharedStatsError = true;
+      sharedStatsMessage = text.noShareableData;
+      renderPersonalSharedStats();
+      return;
+    }
+    const saved = await window.MyCare.sharing.saveSharedStats(supabaseClient, currentUser, shareableSnapshots);
     familyState.sharedStats = mergeSharedStats(familyState.sharedStats, saved);
     sharedStatsError = false;
-    sharedStatsMessage = text.saved;
+    sharedStatsMessage = shareableSnapshots.length < snapshots.length ? text.savedAvailable : text.saved;
     renderPersonalSharedStats();
     renderFamilyStats(getStatsDays());
   } catch (error) {
@@ -6443,6 +6695,36 @@ function renderGoalsSharedChart(item) {
   `;
 }
 
+function renderImportedHealthSharedChart(model) {
+  const text = getSharingText();
+  const payload = model.latest.payload || {};
+  const zh = getLanguage() === "zh";
+  const sleepValues = model.series
+    .map((item) => Number(item.payload?.averageSleepMinutes))
+    .filter(Number.isFinite);
+  const stepsValues = model.series
+    .map((item) => Number(item.payload?.stepsTotal || 0))
+    .filter(Number.isFinite);
+  const sleep = Number.isFinite(payload.averageSleepMinutes) ? formatHealthDuration(payload.averageSleepMinutes) : "-";
+  const steps = Number(payload.stepsTotal || 0).toLocaleString();
+  const active = formatHealthDuration(Number(payload.activeMinutesTotal || 0));
+  const energy = Number(payload.activeEnergyTotal || 0) ? `${Math.round(Number(payload.activeEnergyTotal || 0)).toLocaleString()} kcal` : "-";
+  const heart = Number(payload.heartRateAverage || 0) ? `${Math.round(Number(payload.heartRateAverage || 0))} bpm` : "-";
+  const recovery = Number(payload.recoveryRecords || 0);
+  return `
+    ${sleepValues.length ? renderMiniSparkline(sleepValues, { invert: false }) : renderMiniSparkline(stepsValues, { invert: false })}
+    <div class="family-shared-health-grid">
+      <span><b>${escapeHtml(sleep)}</b><small>${escapeHtml(zh ? "平均睡眠" : "Avg sleep")}</small></span>
+      <span><b>${escapeHtml(steps)}</b><small>${escapeHtml(zh ? "步数" : "Steps")}</small></span>
+      <span><b>${escapeHtml(active)}</b><small>${escapeHtml(zh ? "活动" : "Active")}</small></span>
+      <span><b>${escapeHtml(energy)}</b><small>${escapeHtml(zh ? "活动能量" : "Energy")}</small></span>
+      <span><b>${escapeHtml(heart)}</b><small>${escapeHtml(zh ? "心率" : "Heart rate")}</small></span>
+      <span><b>${escapeHtml(recovery)}</b><small>${escapeHtml(zh ? "恢复指标" : "Recovery")}</small></span>
+    </div>
+    <p>${Number(payload.recordCount || 0)} ${escapeHtml(text.records)} · ${escapeHtml(text.hidden)}</p>
+  `;
+}
+
 function renderFamilySharedVisualCard(model) {
   const text = getSharingText();
   const item = model.latest;
@@ -6451,6 +6733,7 @@ function renderFamilySharedVisualCard(model) {
   if (model.type === "sleep") chart = renderWakeSharedChart(model);
   if (model.type === "focus") chart = renderFocusSharedChart(model);
   if (model.type === "goals") chart = renderGoalsSharedChart(item);
+  if (model.type === "health") chart = renderImportedHealthSharedChart(model);
   return `
     <article class="family-shared-visual-card" data-shared-type="${escapeHtml(model.type)}">
       <div class="family-shared-visual-top">
@@ -6471,6 +6754,7 @@ function renderFamilySharedStats(days = getStatsDays()) {
   const { periodStart, periodEnd } = getSharedStatsPeriod(days);
   const stats = (familyState.sharedStats || [])
     .filter((item) => item.visible !== false)
+    .filter(hasSharedStatsData)
     .filter((item) => !(item.periodEnd < periodStart || item.periodStart > periodEnd));
   if (!stats.length) {
     target.innerHTML = `<div class="stats-empty">${escapeHtml(text.noShared)}</div>`;
@@ -6499,6 +6783,7 @@ function getFamilySharedStatsInRange(days = getStatsDays()) {
   const { periodStart, periodEnd } = getSharedStatsPeriod(days);
   return (familyState.sharedStats || [])
     .filter((item) => item.visible !== false)
+    .filter(hasSharedStatsData)
     .filter((item) => !(item.periodEnd < periodStart || item.periodStart > periodEnd));
 }
 
@@ -6512,6 +6797,7 @@ function createFamilyMemberOverviewRow(ownerId) {
     goalCompleted: 0,
     skinDays: 0,
     wakeRecords: 0,
+    healthRecords: 0,
     types: new Set(),
     byType: {},
   };
@@ -6552,6 +6838,9 @@ function getFamilyMemberOverviewRows(days = getStatsDays()) {
     if (item.summaryType === "sleep") {
       row.wakeRecords += Number(payload.recordCount || 0);
     }
+    if (item.summaryType === "health") {
+      row.healthRecords += Number(payload.recordCount || 0);
+    }
   });
   return [...rows.values()];
 }
@@ -6584,6 +6873,7 @@ function getMemberCareSignals(row) {
   let concernScore = 0;
   const skin = row.byType.skin;
   const sleep = row.byType.sleep;
+  const health = row.byType.health;
   const focus = row.byType.focus;
   const goals = row.byType.goals;
 
@@ -6622,6 +6912,26 @@ function getMemberCareSignals(row) {
       detail: hasDelta && Math.abs(delta) >= 15
         ? `${formatMinuteDelta(delta)} ${delta > 0 ? text.laterThanBefore : text.earlierThanBefore}`
         : `${sleep.latest.payload.recordCount || 0} ${text.records}`,
+    });
+  }
+
+  if (health?.latest) {
+    const payload = health.latest.payload || {};
+    const previous = health.previous?.payload || null;
+    const currentSleep = Number(payload.averageSleepMinutes);
+    const previousSleep = Number(previous?.averageSleepMinutes);
+    const hasSleepDelta = Number.isFinite(currentSleep) && Number.isFinite(previousSleep);
+    const sleepDelta = hasSleepDelta ? currentSleep - previousSleep : 0;
+    const concern = (Number.isFinite(currentSleep) && currentSleep > 0 && currentSleep < 360) || (hasSleepDelta && sleepDelta < -60);
+    if (concern) concernScore += 1;
+    signals.push({
+      type: "health",
+      concern,
+      label: text.healthSignal,
+      value: Number.isFinite(currentSleep) ? formatHealthDuration(currentSleep) : `${Number(payload.stepsTotal || 0).toLocaleString()} ${getLanguage() === "zh" ? "步" : "steps"}`,
+      detail: hasSleepDelta && Math.abs(sleepDelta) >= 30
+        ? `${formatMinuteDelta(sleepDelta)} ${sleepDelta < 0 ? text.lessThanBefore : text.moreThanBefore}`
+        : `${payload.recordCount || 0} ${text.records}`,
     });
   }
 
@@ -6717,6 +7027,7 @@ function renderFamilyMemberOverview(days = getStatsDays()) {
           <span><b>${escapeHtml(text.goals)}</b>${row.goalCompleted} ${escapeHtml(text.completed)}</span>
           <span><b>${escapeHtml(text.skin)}</b>${row.skinDays} ${escapeHtml(text.days)}</span>
           <span><b>${escapeHtml(text.sleep)}</b>${row.wakeRecords} ${escapeHtml(text.records)}</span>
+          <span><b>${escapeHtml(text.health)}</b>${row.healthRecords} ${escapeHtml(text.records)}</span>
         </div>
       </article>
     `;

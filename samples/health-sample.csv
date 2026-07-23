@@ -1,0 +1,9 @@
+date,metric,value,unit
+2026-07-01,sleep_minutes,420,minutes
+2026-07-01,steps,8300,count
+2026-07-01,active_minutes,35,minutes
+2026-07-02,sleep_minutes,450,minutes
+2026-07-02,steps,9200,count
+2026-07-02,active_minutes,42,minutes
+2026-07-03,resting_heart_rate,62,bpm
+2026-07-03,heart_rate_variability,45,ms
