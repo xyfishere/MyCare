@@ -6374,7 +6374,17 @@ function getSharedStatsSnapshots(days = getStatsDays(), summaryTypes = getSelect
 }
 
 function hasSharedStatsData(snapshot) {
-  return window.MyCare.sharing.hasSummaryData(snapshot);
+  if (typeof window.MyCare.sharing.hasSummaryData === "function") {
+    return window.MyCare.sharing.hasSummaryData(snapshot);
+  }
+  const payload = snapshot?.payload && typeof snapshot.payload === "object" ? snapshot.payload : {};
+  const summaryType = snapshot?.summaryType || snapshot?.summary_type;
+  if (summaryType === "skin") return Number(payload.totalDays || 0) > 0;
+  if (summaryType === "sleep") return Number(payload.recordCount || 0) > 0;
+  if (summaryType === "focus") return Number(payload.minutes || 0) > 0 || Number(payload.sessions || 0) > 0;
+  if (summaryType === "goals") return Number(payload.completed || 0) > 0 || Number(payload.open || 0) > 0;
+  if (summaryType === "health") return Number(payload.recordCount || 0) > 0;
+  return false;
 }
 
 function formatSharedStatsValue(snapshot) {
